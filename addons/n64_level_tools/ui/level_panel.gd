@@ -161,6 +161,7 @@ func _init() -> void:
 		[_editor_icon(&"ToolMove"), "Move by exact X / Y / Z…\n(or arrow keys / PgUp / PgDn, Shift x10)", &"move_dialog", "M"],
 		[_svg("grid_resize"), "Grid resize… (cells keep their size, walls move with the border)\nor Alt+drag a resize square", &"grid_resize", "G"],
 		[_svg("retopo"), "Retopo: rebuild the selected brushes as clean grids sized to the snap\n(cells fit the geometry, not world snap; heights resampled)", &"retopo", "R"],
+		[_svg("cleanup"), "Clean up: merge matching flat faces (removes strips left by cuts), then\ncut them back into a grid on world lines one snap apart, for vertex lighting.\nPaint is kept; bake lighting / AO again afterwards", &"cleanup", "C"],
 		[_editor_icon(&"ExternalLink"), "Edit in Blender: a set piece's .blend opens in Blender;\nother brushes move into a new one (a set piece: shaped in Blender,\nplaced and painted here). Saving in Blender updates it here.", &"blender", "Bl"],
 		[_editor_icon(&"Unlinked"), "Unlink from Blender: the selected set piece brushes go back\nto the brush tools (the .blend stays)", &"blender_unlink", "U"],
 		[_svg("fence"), "Fence: drops a fence on the ground where the view looks and selects it:\ndrag its points (snapped, on the ground), click a section's + to split it,\nShift+click the ground to extend, Alt+click a point / section to remove / open it.\nVertex mode with a line of vertices selected: follows them instead.", &"fence", "▥"],
@@ -173,6 +174,7 @@ func _init() -> void:
 		[_editor_icon(&"Remove"), "Delete faces (Delete)", &"delete_faces", "X"],
 		[_svg("subdivide"), "Subdivide selected faces (Face mode)\ninto quads; press again for finer", &"subdivide", "S"],
 		[_svg("retopo"), "Retopo selected faces: a clean grid sized to the snap\n(cells fit the selection, not world snap; heights resampled,\nneighbours stitched)", &"retopo", "R"],
+		[_svg("cleanup"), "Clean up selected faces: merge matching flat faces, then a grid\non world lines one snap apart (paint kept; bake lighting / AO again)", &"cleanup", "C"],
 		[_svg("fence"), "Fence: drops a fence on the ground where the view looks and selects it:\ndrag its points (snapped, on the ground), click a section's + to split it,\nShift+click the ground to extend, Alt+click a point / section to remove / open it.\nVertex mode with a line of vertices selected: follows them instead.", &"fence", "▥"],
 		[_svg("ramp"), "Ramp (R): even slope between two rows. Raise the top row to its\nheight, then select the top, the foot row and everything between (vertices\nor faces): the top stays, the low row farthest from it stays, the rest slope evenly", &"ramp", "/"],
 		[_editor_icon(&"ToolMove"), "Move by exact X / Y / Z…\n(or arrow keys / PgUp / PgDn, Shift x10)", &"move_dialog", "M"],
@@ -218,9 +220,12 @@ func _init() -> void:
 	_preview_button = _button(_editor_icon(&"GuiVisibilityVisible"), "Preview baked result", true, "P")
 	_preview_button.toggled.connect(func(on): preview_baked_toggled.emit(on))
 	bake_grid.add_child(_preview_button)
-	var play := _button(_editor_icon(&"PlayScene"), "Play here: bake, save and run this zone\nstarting on the reference character, or where the view is centred", false, "▶")
+	var play := _button(_editor_icon(&"PlayScene"), "Quick Play: bake, save and run this zone as you see it\nstarting on the reference character, or where the view is centred", false, "▶")
 	play.pressed.connect(func(): action_requested.emit(&"play_here"))
 	bake_grid.add_child(play)
+	var build_play := _button(_editor_icon(&"PlayStart"), "Build & Play: bake as the export does (faces keep only the vertices their\nshape and lighting need, inside each chunk), save and run from the same spot.\nSlower; your brushes aren't changed (the next Bake replaces the build's bake)", false, "▶▶")
+	build_play.pressed.connect(func(): action_requested.emit(&"build_play"))
+	bake_grid.add_child(build_play)
 	var ao_bake := _button(_editor_icon(&"VoxelGI"), "Bake AO only: darkens corners and creases into the vertex AO channel.\nKeeps real-time lighting (Dynamic). Settings: Paint panel > Vertex colour.", false, "AO")
 	ao_bake.pressed.connect(func(): action_requested.emit(&"bake_vertex_ao"))
 	bake_grid.add_child(ao_bake)

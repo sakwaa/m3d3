@@ -424,10 +424,13 @@ func _is_character_scene(root: Node) -> bool:
 	return script != null and script.get_global_name() == &"ActorModel"
 
 
-## Bakes every level in the open zone, saves it, and runs it with the player on the
-## reference character (if shown), else on the surface at the centre of the 3D view
-## (facing the way the camera looks), else at the zone's default spawn.
-func _play_here() -> void:
+## Quick Play: bakes every level in the open zone, saves it, and runs it with the player on
+## the reference character (if shown), else on the surface at the centre of the 3D view
+## (facing the way the camera looks), else at the zone's default spawn. `build` (Build &
+## Play): the bake is then redone as the export does it (BuildSimplify: only the vertices
+## shape and vertex data need), so the run shows the shipped geometry; the brushes stay as
+## they are, only the stored bake is the build's (the next Bake replaces it).
+func _play_here(build := false) -> void:
 	var scene := EditorInterface.get_edited_scene_root()
 	if scene == null or not scene is Zone:
 		push_warning("N64 Level Tools: Play here needs an open zone scene (root with zone.gd).")
@@ -436,6 +439,8 @@ func _play_here() -> void:
 		push_warning("N64 Level Tools: save the zone scene once before using Play here.")
 		return
 	_bake_all()
+	if build:
+		_build_bake()
 	for root in _scene_level_roots():
 		if root.data and _is_external(root.data):
 			ResourceSaver.save(root.data)
@@ -470,6 +475,27 @@ func _play_here() -> void:
 		var hour := float(EditorInterface.get_editor_settings().get_project_metadata(SETTINGS_SECTION, "preview_hour", 12.0))
 		PlayHere.write(scene.scene_file_path, scene.global_transform.affine_inverse() * pos, yaw, room_path, hour)
 	EditorInterface.play_current_scene()
+
+
+## Re-bakes every level of the open scene with the build's simplification (after _bake_all,
+## so lighting is current). Not undoable: the bake is derived data, and Bake redoes it.
+func _build_bake() -> void:
+	for root in _scene_level_roots():
+		if root.data == null or root.data.brushes.is_empty() or not LevelBaker.not_ready_reason(root.data).is_empty():
+			continue
+		var t := Time.get_ticks_msec()
+		var result := LevelBaker.bake(root.data, root.merge_coplanar, true)
+		var s: Dictionary = result.stats
+		var data := root.data
+		data.baked_mesh = result.mesh
+		data.baked_chunks = result.chunks
+		data.set_baked_collision(result)
+		data.bake_hash = root.compute_hash()
+		data.bake_summary = "build: %d tris, %d surfaces in %d chunks (from %d tris; faces %d -> %d)" % [s.baked_tris,
+			s.surfaces, s.chunks, s.source_tris, s.simplified_from, s.simplified_to]
+		root._apply_bake()
+		print("[N64 Level Tools] Build bake %s: faces %d -> %d, %d tris, %d chunks, %d collision tris (%d ms)" % [root.name,
+			s.simplified_from, s.simplified_to, s.baked_tris, s.chunks, s.collision_tris, Time.get_ticks_msec() - t])
 
 
 ## Bakes ambient occlusion into the vertex AO channel of the active level (replacing the
@@ -663,12 +689,14 @@ func _on_action(action: StringName) -> void:
 		&"flip": _flip_faces()
 		&"subdivide": _subdivide_faces()
 		&"retopo": _retopo()
+		&"cleanup": _cleanup()
 		&"fence": _fence_from_selection()
 		&"rope": _start_rope()
 		&"ramp": _ramp()
 		&"move_dialog": _open_move_dialog()
 		&"grid_resize": _open_grid_resize_dialog()
 		&"play_here": _play_here()
+		&"build_play": _play_here(true)
 		&"bake_vertex_ao":
 			_bake_vertex_ao(panel.paint_panel.ao_add.button_pressed)
 		&"delete_faces": _delete_faces()
@@ -2091,6 +2119,47 @@ func _subdivide_faces() -> void:
 	if mode == Mode.FACE:
 		sel_faces = result.selected
 		_sync_verts_from_faces()
+
+
+## "Clean up" (BrushCleanup): whole brushes in Object mode, the selected faces (or faces
+## touching the selected vertices / edges) otherwise; the grid is one snap step.
+func _cleanup() -> void:
+	var jobs := []
+	if mode == Mode.OBJECT:
+		for b in sel_brushes:
+			var all: Array[int] = []
+			for f in b.get_face_count():
+				all.append(f)
+			jobs.append([b, all])
+	elif _active():
+		jobs.append([_active(), _faces_from_selection(_active())])
+	jobs = jobs.filter(func(j): return not j[1].is_empty())
+	if jobs.is_empty():
+		push_warning("N64 Level Tools: select brushes (Object mode) or faces / vertices to clean up.")
+		return
+	var before_faces := 0
+	var after_faces := 0
+	for job in jobs:
+		var b: LevelBrush = job[0]
+		if b.blend_file != "":
+			push_warning("N64 Level Tools: clean up: set pieces are shaped in Blender.")
+			continue
+		var targets: Array[int] = []
+		targets.assign(job[1])
+		var before := b.snapshot()
+		var result := BrushCleanup.clean_up(b, targets, snap, level.data.mask_density)
+		if result.has("error"):
+			push_warning("N64 Level Tools: clean up: %s." % result.error)
+			continue
+		before_faces += result.before
+		after_faces += result.after
+		_commit_geometry(b, before, "Clean Up")
+		if mode == Mode.FACE and b == _active():
+			sel_faces.clear()
+	_refresh_status()
+	update_overlays()
+	if before_faces > 0:
+		print("[N64 Level Tools] Clean up: %d faces -> %d. Bake lighting / AO again." % [before_faces, after_faces])
 
 
 ## Rebuilds the selection as grids sized to the snap (BrushOps.retopo): whole brushes in

@@ -5,6 +5,8 @@ extends RefCounted
 ##   - culls interior faces (coincident, opposite-facing polygons between touching brushes)
 ##   - merges adjacent coplanar faces within each brush (optional; never faces with painted
 ##     masks or vertex colours, since merging drops their interior vertices)
+##   - `optimize` (the build: Build & Play, export): first a copy of the level whose faces
+##     keep only the vertices their shape or vertex data needs (BuildSimplify)
 ##   - drops degenerate triangles left behind by collapsed vertices
 ##   - one indexed surface per base texture (paint shader + baked mask atlases) or per
 ##     legacy brush material, with welded vertices
@@ -37,7 +39,11 @@ static func not_ready_reason(data: LevelData) -> String:
 	return ""
 
 
-static func bake(data: LevelData, merge_coplanar: bool) -> Dictionary:
+static func bake(data: LevelData, merge_coplanar: bool, optimize := false) -> Dictionary:
+	var simplified := {}
+	if optimize:
+		simplified = BuildSimplify.optimized_copy(data)
+		data = simplified.data
 	var timed := LevelData.mode_is_timed(data.lighting_mode)
 	# Stored corner lighting only counts in Baked Vertex mode (Dynamic = real-time lights).
 	var baked_light := data.lighting_mode == LevelData.LightingMode.BAKED_VERTEX
@@ -48,6 +54,7 @@ static func bake(data: LevelData, merge_coplanar: bool) -> Dictionary:
 	var stats := {
 		brushes = 0, source_tris = 0, culled_faces = 0, merged_faces = 0, degenerate_tris = 0,
 		baked_tris = 0, baked_verts = 0, surfaces = 0, collision_tris = 0, chunks = 0,
+		simplified_from = simplified.get("before", 0), simplified_to = simplified.get("after", 0),
 	}
 	# Only faces with paint get a mask chart (erased masks stay stored, all zero).
 	var atlas := PaintAtlas.layout(data.brushes, true)

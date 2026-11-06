@@ -80,8 +80,9 @@ static func _bake_level(root: LevelRoot, occluders: Array, lights: Array) -> voi
 	for brush in data.brushes:
 		if brush:
 			brush.set_block_signals(false)
-	# Geometry + materials (bake strength, contrast etc. go into the materials here).
-	var result := LevelBaker.bake(data, root.merge_coplanar)
+	# Geometry + materials (bake strength, contrast etc. go into the materials here), with
+	# the build's simplification (BuildSimplify).
+	var result := LevelBaker.bake(data, root.merge_coplanar, true)
 	data.set_block_signals(true)
 	data.baked_mesh = result.mesh
 	data.baked_chunks = result.chunks
