@@ -1,0 +1,37 @@
+Thank you for downloading and using this collection of textures!
+
+Q: WHAT IS THE PURPOSE OF THESE STAIR TEXTURE TEMPLATES?
+A: They're intended for use in videogames with a low fidelity aesthetic. Many Nintendo 64 games, and even games from 32-bit consoles like the original PlayStation and Sega Saturn, would use textures with stairs painted onto them for better performance.
+
+Games like The Legend of Zelda: Ocarina of Time, the sequel Majora's Mask, Turok: Dinosaur Hunter, etc, used this method. Large open levels would use stair textures, as the number of triangles had to be used wisely.
+
+Q: WHAT ARE THE SCREENSHOTS ABOUT?
+A: In order:
+	- Screenshot 0: Four thumbnails of example scenes containing flat planes with a stair texture on each corresponding to what the theme of the floor texture is.	
+
+	- Screenshot 1: All the 64-by-64 pixel stair textures. Type 1 on the top row, type 2 on the middle row, and type 3 on the bottom row. There's some textures with a 2:1 aspect ratio or wider, so though they're a part of this texture pack, they aren't shown in the photo.
+
+	- Screenshot 2: Four examples of combining the various stair textures with existing floor textures. A red carpet combination on the first, a stone floor combination on the second row, another more optimized stone floor combination on the third row, and a brick floor combination on the fourth row.
+
+	- Screenshots 3-6: Screenshot 0 but separated into individual image files.
+
+Q: WHY ARE THERE DUPLICATE STAIR TEXTURES AT DIFFERENT RESOLUTIONS?
+A: At first, I planned to keep the stairs to 32-by-32 pixels and 64-by-64 pixels, but I thought It'd be worth offering more resolutions as artists might prefer smaller textures, or they might work with high resolution textures and shrink them down. 
+
+Q: HOW DO I USE THESE TEXTURES?
+A: It'd be weird to use blank grey stairs in your projects, they'd look out of place in a forest or a castle level, for example.
+
+They're to be mixed with other textures you own, like stones, bricks, carpet, tiles, etc. Blend them together in your art software or photo editing software of choice (GIMP, Krita, Paint.NET, etc), with layer blending modes such as Overlay, Linear Light, Multiply, etc. Anything that looks good to you.
+
+Q: WHAT ARE THE EXAMPLE TEXTURES FOR?
+A: They're to demonstrate the uses of the blank stair textures with other non-stair textures.
+
+Q: WHAT IS THAT GREY GRID TEXTURE BEHIND THE STAIRS IN THE SCREENSHOTS?
+A: That's a 32-by-32 pixel prototyping texture, part of a much larger free texture pack. For prototyping levels in games with a low fidelity aesthetic. Download that texture pack from here: https://opengameart.org/content/prototype-textures-32x32px
+
+All textures were made by Emerald Eel. Licenced under CC0 / Public Domain. This includes the example textures. Credit is not necessary, but appreciated.
+
+That means:
+- Use them in any way you like!
+- No credit needed!
+- no payment needed!

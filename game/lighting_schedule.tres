@@ -1,0 +1,42 @@
+[gd_resource type="Resource" script_class="LightingSchedule" format=3 uid="uid://biiuoc0dvpud4"]
+
+[ext_resource type="Script" uid="uid://cy381oac8nk62" path="res://addons/n64_runtime/lighting/lighting_key.gd" id="1_j62n8"]
+[ext_resource type="Script" uid="uid://du1ouvjvdvwlw" path="res://addons/n64_runtime/lighting/lighting_schedule.gd" id="2_yydri"]
+
+[sub_resource type="Resource" id="Resource_l6fpb"]
+script = ExtResource("1_j62n8")
+name = "Night"
+hour = 0.0
+sun_color = Color(0.55, 0.65, 1, 1)
+sun_energy = 0.35
+sky = Color(0.14, 0.17, 0.3, 1)
+ground = Color(0.07, 0.07, 0.1, 1)
+
+[sub_resource type="Resource" id="Resource_ymb4e"]
+script = ExtResource("1_j62n8")
+name = "Dawn"
+hour = 6.5
+sun_color = Color(1, 0.68, 0.45, 1)
+sun_energy = 0.8
+sky = Color(0.42, 0.42, 0.55, 1)
+ground = Color(0.26, 0.22, 0.2, 1)
+local_lights = 0.5
+
+[sub_resource type="Resource" id="Resource_dwdbm"]
+script = ExtResource("1_j62n8")
+sun_color = Color(1, 0.97, 0.9, 1)
+local_lights = 0.0
+
+[sub_resource type="Resource" id="Resource_ifidw"]
+script = ExtResource("1_j62n8")
+name = "Dusk"
+hour = 18.0
+sun_color = Color(1, 0.55, 0.3, 1)
+sun_energy = 0.9
+sky = Color(0.45, 0.35, 0.45, 1)
+ground = Color(0.25, 0.18, 0.15, 1)
+local_lights = 0.6
+
+[resource]
+script = ExtResource("2_yydri")
+keys = Array[ExtResource("1_j62n8")]([SubResource("Resource_l6fpb"), SubResource("Resource_ymb4e"), SubResource("Resource_dwdbm"), SubResource("Resource_ifidw")])

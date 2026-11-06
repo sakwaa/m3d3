@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="N64Effect" format=3]
+
+[ext_resource type="Script" path="res://addons/n64_runtime/effects/n64_effect.gd" id="1_kmye5"]
+[ext_resource type="Texture2D" path="res://game/effects/sprites/puff.png" id="2_02h8l"]
+
+[sub_resource type="Gradient" id="Gradient_6vgvd"]
+offsets = PackedFloat32Array(0, 0.15, 1)
+colors = PackedColorArray(0.45, 0.43, 0.42, 0, 0.45, 0.43, 0.42, 0.45, 0.6, 0.6, 0.6, 0)
+
+[resource]
+resource_name = "smoke"
+script = ExtResource("1_kmye5")
+texture = ExtResource("2_02h8l")
+burst = 0
+rate = 2.5
+max_sprites = 10
+radius = 0.1
+lifetime = Vector2(2.2, 3)
+speed = Vector2(0.35, 0.6)
+spread = 18.0
+gravity = -0.15
+drag = 0.4
+spin = Vector2(0.03, 0.1)
+size = Vector2(0.35, 0.45)
+size_end = 3.0
+color = SubResource("Gradient_6vgvd")

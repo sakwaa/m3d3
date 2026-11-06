@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="RopeStyle" format=3]
+
+[ext_resource type="Script" path="res://addons/n64_level_tools/rope_style.gd" id="1_txhv6"]
+[ext_resource type="Texture2D" path="res://textures/rope/shimenawa.res" id="2_6x52y"]
+
+[resource]
+script = ExtResource("1_txhv6")
+texture = ExtResource("2_6x52y")
+width = 0.16
+segment_length = 0.35

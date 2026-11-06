@@ -1,0 +1,5 @@
+# Project word list for the in-game script (tooling only, never shipped).
+# One word per line: the word, then its sounds in ARPAbet (as in cmudict.dict), e.g.
+#   kakariko  K AA K AA R IY K OW
+# Words here win over CMUdict (their sounds are used, and among words that sound the same
+# they get the first spelling marks). Add names, invented words and any fixes here.

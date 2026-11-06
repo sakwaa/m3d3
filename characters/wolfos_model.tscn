@@ -1,0 +1,915 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://addons/n64_actor_tools/actor_model.gd" id="1_ew5an"]
+[ext_resource type="Script" path="res://addons/n64_actor_tools/actor_animation.gd" id="2_c1f0f"]
+[ext_resource type="Script" path="res://addons/n64_actor_tools/actor_piece.gd" id="3_ss4ui"]
+[ext_resource type="Script" path="res://addons/n64_actor_tools/actor_model_data.gd" id="4_ovqmj"]
+
+[sub_resource type="Resource" id="Resource_md1fp"]
+script = ExtResource("2_c1f0f")
+name = "Idle"
+length = 40
+loop = true
+keys = [{
+&"ease": 0,
+&"frame": 0,
+&"pose": {
+&"chest": Quaternion(0, 0, 0, 1),
+&"lower_front_L": Quaternion(-1.4901161e-08, 0, 0, 1),
+&"lower_front_R": Quaternion(-1.4901161e-08, 0, 0, 1),
+&"paw_back_L": Quaternion(5.9604645e-08, 0, 0, 1),
+&"paw_back_R": Quaternion(5.9604645e-08, 0, 0, 1),
+&"paw_front_L": Quaternion(0, 0, 0, 1),
+&"paw_front_R": Quaternion(0, 0, 0, 1),
+&"shin_L": Quaternion(-5.9604645e-08, 0, 0, 1),
+&"shin_R": Quaternion(-5.9604645e-08, 0, 0, 1),
+&"thigh_L": Quaternion(0, 0, 0, 1),
+&"thigh_R": Quaternion(0, 0, 0, 1),
+&"upper_front_L": Quaternion(0, 0, 0, 1),
+&"upper_front_R": Quaternion(0, 0, 0, 1)
+},
+&"root": Vector3(0, 0, 0)
+}, {
+&"ease": 0,
+&"frame": 20,
+&"pose": {
+&"chest": Quaternion(-0.026176952, 0, 0, 0.99965733),
+&"lower_front_L": Quaternion(0.21341445, 0, 0, 0.97696173),
+&"lower_front_R": Quaternion(0.21341445, 0, 0, 0.97696173),
+&"paw_back_L": Quaternion(0.021847786, 0, 0, 0.9997614),
+&"paw_back_R": Quaternion(0.021847786, 0, 0, 0.9997614),
+&"paw_front_L": Quaternion(-0.13799009, 0, 0, 0.99043363),
+&"paw_front_R": Quaternion(-0.13799009, 0, 0, 0.99043363),
+&"shin_L": Quaternion(-0.04291442, 0, 0, 0.99907875),
+&"shin_R": Quaternion(-0.04291442, 0, 0, 0.99907875),
+&"thigh_L": Quaternion(0.02107653, 0, 0, 0.9997779),
+&"thigh_R": Quaternion(0.02107653, 0, 0, 0.9997779),
+&"upper_front_L": Quaternion(-0.07656187, 0, 0, 0.9970648),
+&"upper_front_R": Quaternion(-0.07656187, 0, 0, 0.9970648)
+},
+&"root": Vector3(0, -0.01, 0)
+}]
+
+[sub_resource type="Resource" id="Resource_cavh0"]
+script = ExtResource("2_c1f0f")
+name = "Walk"
+length = 24
+loop = true
+keys = [{
+&"ease": 0,
+&"frame": 0,
+&"pose": {
+&"lower_front_L": Quaternion(0.09442027, 0, 0, 0.99553245),
+&"lower_front_R": Quaternion(-0.11007939, 0, 0, 0.9939229),
+&"paw_back_L": Quaternion(-0.4748777, 0, 0, 0.88005185),
+&"paw_back_R": Quaternion(0.072319485, 0, 0, 0.99738157),
+&"paw_front_L": Quaternion(-0.094420284, 0, 0, 0.99553245),
+&"paw_front_R": Quaternion(0.19131953, 0, 0, 0.98152786),
+&"shin_L": Quaternion(0.63633883, 0, 0, 0.7714097),
+&"shin_R": Quaternion(-0.043050855, 0, 0, 0.9990729),
+&"thigh_L": Quaternion(-0.19368601, 0, 0, 0.9810636),
+&"thigh_R": Quaternion(-0.029314369, 0, 0, 0.99957025),
+&"upper_front_L": Quaternion(0, 0, 0, 1),
+&"upper_front_R": Quaternion(-0.08211079, 0, 0, 0.9966232)
+},
+&"root": Vector3(0, -0.015, 0)
+}, {
+&"ease": 0,
+&"frame": 3,
+&"pose": {
+&"lower_front_L": Quaternion(0.062493593, 0, 0, 0.9980454),
+&"lower_front_R": Quaternion(0.35594875, 0, 0, 0.9345055),
+&"paw_back_L": Quaternion(-0.44155627, 0, 0, 0.8972336),
+&"paw_back_R": Quaternion(0.0790216, 0, 0, 0.9968729),
+&"paw_front_L": Quaternion(-0.031755954, 0, 0, 0.9994957),
+&"paw_front_R": Quaternion(-0.18407297, 0, 0, 0.9829126),
+&"shin_L": Quaternion(0.6544918, 0, 0, 0.7560691),
+&"shin_R": Quaternion(0.038187478, 0, 0, 0.9992707),
+&"thigh_L": Quaternion(-0.25338507, 0, 0, 0.9673655),
+&"thigh_R": Quaternion(-0.117032036, 0, 0, 0.99312824),
+&"upper_front_L": Quaternion(-0.030768335, 0, 0, 0.9995266),
+&"upper_front_R": Quaternion(-0.17784923, 0, 0, 0.9840578)
+},
+&"root": Vector3(0, -0.0075, 0)
+}, {
+&"ease": 0,
+&"frame": 6,
+&"pose": {
+&"lower_front_L": Quaternion(-0.029269982, 0, 0, 0.9995716),
+&"lower_front_R": Quaternion(-0.19843754, 0, 0, 0.9801136),
+&"paw_back_L": Quaternion(-0.051435657, 0, 0, 0.9986764),
+&"paw_back_R": Quaternion(0.046848297, 0, 0, 0.9989021),
+&"paw_front_L": Quaternion(0.060275555, 0, 0, 0.9981818),
+&"paw_front_R": Quaternion(-0.032036096, 0, 0, 0.99948674),
+&"shin_L": Quaternion(0.0041326587, 0, 0, 0.99999154),
+&"shin_R": Quaternion(0.18965812, 0, 0, 0.98185027),
+&"thigh_L": Quaternion(0.047308028, 0, 0, 0.9988804),
+&"thigh_R": Quaternion(-0.23544785, 0, 0, 0.971887),
+&"upper_front_L": Quaternion(-0.031033006, 0, 0, 0.99951833),
+&"upper_front_R": Quaternion(0.22973472, 0, 0, 0.9732533)
+},
+&"root": Vector3(0, 0, 0)
+}, {
+&"ease": 0,
+&"frame": 9,
+&"pose": {
+&"lower_front_L": Quaternion(-0.035798706, 0, 0, 0.999359),
+&"lower_front_R": Quaternion(-0.27083454, 0, 0, 0.962626),
+&"paw_back_L": Quaternion(0.016597034, 0, 0, 0.9998623),
+&"paw_back_R": Quaternion(0.13415974, 0, 0, 0.99095976),
+&"paw_front_L": Quaternion(0.10916498, 0, 0, 0.9940237),
+&"paw_front_R": Quaternion(0.048015416, 0, 0, 0.99884665),
+&"shin_L": Quaternion(-0.032612205, 0, 0, 0.9994681),
+&"shin_R": Quaternion(-0.2597134, 0, 0, 0.9656857),
+&"thigh_L": Quaternion(0.016019374, 0, 0, 0.99987173),
+&"thigh_R": Quaternion(0.1278093, 0, 0, 0.9917989),
+&"upper_front_L": Quaternion(-0.07351025, 0, 0, 0.9972944),
+&"upper_front_R": Quaternion(0.22430134, 0, 0, 0.97451985)
+},
+&"root": Vector3(0, -0.0075, 0)
+}, {
+&"ease": 0,
+&"frame": 12,
+&"pose": {
+&"lower_front_L": Quaternion(-0.11007939, 0, 0, 0.9939229),
+&"lower_front_R": Quaternion(0.09442027, 0, 0, 0.99553245),
+&"paw_back_L": Quaternion(0.072319485, 0, 0, 0.99738157),
+&"paw_back_R": Quaternion(-0.4748777, 0, 0, 0.88005185),
+&"paw_front_L": Quaternion(0.19131953, 0, 0, 0.98152786),
+&"paw_front_R": Quaternion(-0.094420284, 0, 0, 0.99553245),
+&"shin_L": Quaternion(-0.043050855, 0, 0, 0.9990729),
+&"shin_R": Quaternion(0.63633883, 0, 0, 0.7714097),
+&"thigh_L": Quaternion(-0.029314369, 0, 0, 0.99957025),
+&"thigh_R": Quaternion(-0.19368601, 0, 0, 0.9810636),
+&"upper_front_L": Quaternion(-0.08211079, 0, 0, 0.9966232),
+&"upper_front_R": Quaternion(0, 0, 0, 1)
+},
+&"root": Vector3(0, -0.015, 0)
+}, {
+&"ease": 0,
+&"frame": 15,
+&"pose": {
+&"lower_front_L": Quaternion(0.35594875, 0, 0, 0.9345055),
+&"lower_front_R": Quaternion(0.062493593, 0, 0, 0.9980454),
+&"paw_back_L": Quaternion(0.0790216, 0, 0, 0.9968729),
+&"paw_back_R": Quaternion(-0.44155627, 0, 0, 0.8972336),
+&"paw_front_L": Quaternion(-0.18407297, 0, 0, 0.9829126),
+&"paw_front_R": Quaternion(-0.031755954, 0, 0, 0.9994957),
+&"shin_L": Quaternion(0.038187478, 0, 0, 0.9992707),
+&"shin_R": Quaternion(0.6544918, 0, 0, 0.7560691),
+&"thigh_L": Quaternion(-0.117032036, 0, 0, 0.99312824),
+&"thigh_R": Quaternion(-0.25338507, 0, 0, 0.9673655),
+&"upper_front_L": Quaternion(-0.17784923, 0, 0, 0.9840578),
+&"upper_front_R": Quaternion(-0.030768335, 0, 0, 0.9995266)
+},
+&"root": Vector3(0, -0.0075, 0)
+}, {
+&"ease": 0,
+&"frame": 18,
+&"pose": {
+&"lower_front_L": Quaternion(-0.19843754, 0, 0, 0.9801136),
+&"lower_front_R": Quaternion(-0.029269982, 0, 0, 0.9995716),
+&"paw_back_L": Quaternion(0.046848297, 0, 0, 0.9989021),
+&"paw_back_R": Quaternion(-0.051435657, 0, 0, 0.9986764),
+&"paw_front_L": Quaternion(-0.032036096, 0, 0, 0.99948674),
+&"paw_front_R": Quaternion(0.060275555, 0, 0, 0.9981818),
+&"shin_L": Quaternion(0.18965812, 0, 0, 0.98185027),
+&"shin_R": Quaternion(0.0041326587, 0, 0, 0.99999154),
+&"thigh_L": Quaternion(-0.23544785, 0, 0, 0.971887),
+&"thigh_R": Quaternion(0.047308028, 0, 0, 0.9988804),
+&"upper_front_L": Quaternion(0.22973472, 0, 0, 0.9732533),
+&"upper_front_R": Quaternion(-0.031033006, 0, 0, 0.99951833)
+},
+&"root": Vector3(0, 0, 0)
+}, {
+&"ease": 0,
+&"frame": 21,
+&"pose": {
+&"lower_front_L": Quaternion(-0.27083454, 0, 0, 0.962626),
+&"lower_front_R": Quaternion(-0.035798706, 0, 0, 0.999359),
+&"paw_back_L": Quaternion(0.13415974, 0, 0, 0.99095976),
+&"paw_back_R": Quaternion(0.016597034, 0, 0, 0.9998623),
+&"paw_front_L": Quaternion(0.048015416, 0, 0, 0.99884665),
+&"paw_front_R": Quaternion(0.10916498, 0, 0, 0.9940237),
+&"shin_L": Quaternion(-0.2597134, 0, 0, 0.9656857),
+&"shin_R": Quaternion(-0.032612205, 0, 0, 0.9994681),
+&"thigh_L": Quaternion(0.1278093, 0, 0, 0.9917989),
+&"thigh_R": Quaternion(0.016019374, 0, 0, 0.99987173),
+&"upper_front_L": Quaternion(0.22430134, 0, 0, 0.97451985),
+&"upper_front_R": Quaternion(-0.07351025, 0, 0, 0.9972944)
+},
+&"root": Vector3(0, -0.0075, 0)
+}]
+
+[sub_resource type="Resource" id="Resource_06ufs"]
+script = ExtResource("2_c1f0f")
+name = "Run"
+length = 12
+loop = true
+keys = [{
+&"ease": 0,
+&"frame": 0,
+&"pose": {
+&"lower_front_L": Quaternion(0.059260733, 0, 0, 0.9982426),
+&"lower_front_R": Quaternion(-0.110079415, 0, 0, 0.99392277),
+&"paw_back_L": Quaternion(-0.43063548, 0, 0, 0.902526),
+&"paw_back_R": Quaternion(-0.47448343, 0, 0, 0.88026446),
+&"paw_front_L": Quaternion(0.049191855, 0, 0, 0.9987893),
+&"paw_front_R": Quaternion(0.1949513, 0, 0, 0.980813),
+&"shin_L": Quaternion(0.39104876, 0, 0, 0.92037),
+&"shin_R": Quaternion(0.57917356, 0, 0, 0.8152044),
+&"thigh_L": Quaternion(0.043412298, 0, 0, 0.99905723),
+&"thigh_R": Quaternion(-0.12302488, 0, 0, 0.9924036),
+&"upper_front_L": Quaternion(-0.10829437, 0, 0, 0.9941189),
+&"upper_front_R": Quaternion(-0.08579916, 0, 0, 0.9963125)
+},
+&"root": Vector3(0, -0.015, 0)
+}, {
+&"ease": 0,
+&"frame": 2,
+&"pose": {
+&"lower_front_L": Quaternion(-0.11007917, 0, 0, 0.9939228),
+&"lower_front_R": Quaternion(-0.110079244, 0, 0, 0.9939228),
+&"paw_back_L": Quaternion(-0.4464198, 0, 0, 0.89482373),
+&"paw_back_R": Quaternion(-0.41934162, 0, 0, 0.90782857),
+&"paw_front_L": Quaternion(0.22968408, 0, 0, 0.9732653),
+&"paw_front_R": Quaternion(0.25425175, 0, 0, 0.9671381),
+&"shin_L": Quaternion(0.60037076, 0, 0, 0.79972184),
+&"shin_R": Quaternion(0.65599364, 0, 0, 0.7547664),
+&"thigh_L": Quaternion(-0.18021442, 0, 0, 0.98362744),
+&"thigh_R": Quaternion(-0.27902487, 0, 0, 0.9602839),
+&"upper_front_L": Quaternion(-0.12115206, 0, 0, 0.99263406),
+&"upper_front_R": Quaternion(-0.1462447, 0, 0, 0.98924845)
+},
+&"root": Vector3(0, -0.00375, 0)
+}, {
+&"ease": 0,
+&"frame": 4,
+&"pose": {
+&"lower_front_L": Quaternion(0.41286004, 0, 0, 0.9107945),
+&"lower_front_R": Quaternion(-0.6187084, 0, 0, 0.78562075),
+&"paw_back_L": Quaternion(-0.019537779, 0, 0, 0.9998092),
+&"paw_back_R": Quaternion(0.040368263, 0, 0, 0.99918497),
+&"paw_front_L": Quaternion(-0.123446375, 0, 0, 0.9923513),
+&"paw_front_R": Quaternion(0.21213737, 0, 0, 0.97723985),
+&"shin_L": Quaternion(-0.017470658, 0, 0, 0.9998474),
+&"shin_R": Quaternion(-0.0014073552, 0, 0, 0.9999991),
+&"thigh_L": Quaternion(0.03700203, 0, 0, 0.99931526),
+&"thigh_R": Quaternion(-0.03896207, 0, 0, 0.99924076),
+&"upper_front_L": Quaternion(0.29726785, 0, 0, -0.95479417),
+&"upper_front_R": Quaternion(0.43796694, 0, 0, 0.8989911)
+},
+&"root": Vector3(0, -0.00375, 0)
+}, {
+&"ease": 0,
+&"frame": 6,
+&"pose": {
+&"lower_front_L": Quaternion(-0.19843753, 0, 0, 0.9801136),
+&"lower_front_R": Quaternion(-0.19843736, 0, 0, 0.98011357),
+&"paw_back_L": Quaternion(0.09240836, 0, 0, 0.9957212),
+&"paw_back_R": Quaternion(0.10185972, 0, 0, 0.99479884),
+&"paw_front_L": Quaternion(-0.12204018, 0, 0, 0.99252516),
+&"paw_front_R": Quaternion(-0.067760885, 0, 0, 0.99770164),
+&"shin_L": Quaternion(-0.013166398, 0, 0, 0.99991333),
+&"shin_R": Quaternion(0.09622711, 0, 0, 0.9953595),
+&"thigh_L": Quaternion(-0.07929028, 0, 0, 0.9968517),
+&"thigh_R": Quaternion(-0.19711363, 0, 0, 0.98038065),
+&"upper_front_L": Quaternion(0.3165674, 0, 0, 0.94857013),
+&"upper_front_R": Quaternion(0.26439473, 0, 0, 0.9644146)
+},
+&"root": Vector3(0, -0.015, 0)
+}, {
+&"ease": 0,
+&"frame": 8,
+&"pose": {
+&"lower_front_L": Quaternion(-0.19843754, 0, 0, 0.9801136),
+&"lower_front_R": Quaternion(-0.28319693, 0, 0, 0.9590618),
+&"paw_back_L": Quaternion(0.030217499, 0, 0, 0.99954337),
+&"paw_back_R": Quaternion(0.08253464, 0, 0, 0.9965883),
+&"paw_front_L": Quaternion(-0.026679456, 0, 0, 0.9996441),
+&"paw_front_R": Quaternion(0.07799795, 0, 0, 0.99695355),
+&"shin_L": Quaternion(0.30726722, 0, 0, 0.95162326),
+&"shin_R": Quaternion(0.2595213, 0, 0, 0.9657374),
+&"thigh_L": Quaternion(-0.33588263, 0, 0, 0.9419038),
+&"thigh_R": Quaternion(-0.33834264, 0, 0, 0.941023),
+&"upper_front_L": Quaternion(0.2245158, 0, 0, 0.9744705),
+&"upper_front_R": Quaternion(0.20752934, 0, 0, 0.97822887)
+},
+&"root": Vector3(0, -0.00375, 0)
+}, {
+&"ease": 0,
+&"frame": 10,
+&"pose": {
+&"lower_front_L": Quaternion(0.0265235, 0, 0, 0.9996482),
+&"lower_front_R": Quaternion(0.01922679, 0, 0, 0.99981517),
+&"paw_back_L": Quaternion(0.25530362, 0, 0, 0.966861),
+&"paw_back_R": Quaternion(-0.587488, 0, 0, 0.8092329),
+&"paw_front_L": Quaternion(-0.03963238, 0, 0, 0.99921435),
+&"paw_front_R": Quaternion(0.026839703, 0, 0, 0.99963975),
+&"shin_L": Quaternion(-0.30013236, 0, 0, 0.9538976),
+&"shin_R": Quaternion(0.8310574, 0, 0, 0.5561868),
+&"thigh_L": Quaternion(0.046652734, 0, 0, 0.9989112),
+&"thigh_R": Quaternion(-0.345766, 0, 0, 0.9383209),
+&"upper_front_L": Quaternion(0.013115734, 0, 0, 0.99991405),
+&"upper_front_R": Quaternion(-0.0460546, 0, 0, 0.998939)
+},
+&"root": Vector3(0, -0.00375, 0)
+}]
+
+[sub_resource type="Resource" id="Resource_n5eao"]
+script = ExtResource("2_c1f0f")
+name = "Claw"
+length = 18
+keys = [{
+&"ease": 2,
+&"frame": 0,
+&"pose": {
+&"lower_front_L": Quaternion(-1.4901161e-08, 0, 0, 1),
+&"lower_front_R": Quaternion(-1.4901161e-08, 0, 0, 1),
+&"paw_back_L": Quaternion(5.9604645e-08, 0, 0, 1),
+&"paw_back_R": Quaternion(5.9604645e-08, 0, 0, 1),
+&"paw_front_L": Quaternion(0, 0, 0, 1),
+&"paw_front_R": Quaternion(0, 0, 0, 1),
+&"shin_L": Quaternion(-5.9604645e-08, 0, 0, 1),
+&"shin_R": Quaternion(-5.9604645e-08, 0, 0, 1),
+&"thigh_L": Quaternion(0, 0, 0, 1),
+&"thigh_R": Quaternion(0, 0, 0, 1),
+&"upper_front_L": Quaternion(0, 0, 0, 1),
+&"upper_front_R": Quaternion(0, 0, 0, 1)
+},
+&"root": Vector3(0, 0, 0)
+}, {
+&"ease": 4,
+&"frame": 6,
+&"pose": {
+&"jaw": Quaternion(-0.25881907, 0, 0, 0.9659258),
+&"lower_front_L": Quaternion(-0.6082404, 0, 0, 0.7937529),
+&"lower_front_R": Quaternion(-0.6082404, 0, 0, 0.7937529),
+&"neck": Quaternion(0.19080901, 0, 0, 0.9816272),
+&"paw_back_L": Quaternion(-0.54850364, 0, 0, 0.83614826),
+&"paw_back_R": Quaternion(-0.54850364, 0, 0, 0.83614826),
+&"paw_front_L": Quaternion(0.24150133, 0, 0, 0.9704006),
+&"paw_front_R": Quaternion(0.24150133, 0, 0, 0.9704006),
+&"shin_L": Quaternion(0.823534, 0, 0, 0.5672669),
+&"shin_R": Quaternion(0.823534, 0, 0, 0.5672669),
+&"tail_1": Quaternion(0.21643966, 0, 0, 0.97629607),
+&"thigh_L": Quaternion(0.37744868, 0, 0, -0.9260305),
+&"thigh_R": Quaternion(0.37744868, 0, 0, -0.9260305),
+&"upper_front_L": Quaternion(0.39854443, 0, 0, 0.91714907),
+&"upper_front_R": Quaternion(0.39854443, 0, 0, 0.91714907)
+},
+&"root": Vector3(0, -0.08, 0.1)
+}, {
+&"ease": 3,
+&"frame": 8,
+&"pose": {
+&"jaw": Quaternion(-0.30070585, 0, 0, 0.953717),
+&"lower_front_L": Quaternion(0.41113472, 0, 0, 0.9115746),
+&"lower_front_R": Quaternion(0.41113472, 0, 0, 0.9115746),
+&"neck": Quaternion(-0.2164396, 0, 0, 0.976296),
+&"paw_front_L": Quaternion(-0.16866502, 0, 0, 0.9856735),
+&"paw_front_R": Quaternion(-0.16866502, 0, 0, 0.9856735),
+&"upper_front_L": Quaternion(0.2514938, 0, 0, -0.96785897),
+&"upper_front_R": Quaternion(0.2514938, 0, 0, -0.96785897)
+},
+&"root": Vector3(0, 0.02, -0.25)
+}, {
+&"ease": 0,
+&"frame": 10,
+&"pose": {
+&"lower_front_L": Quaternion(-0.1100793, 0, 0, 0.9939229),
+&"lower_front_R": Quaternion(-0.1100793, 0, 0, 0.9939229),
+&"neck": Quaternion(-0.17364813, 0, 0, 0.9848078),
+&"paw_back_L": Quaternion(0.110203385, 0, 0, 0.9939091),
+&"paw_back_R": Quaternion(0.110203385, 0, 0, 0.9939091),
+&"paw_front_L": Quaternion(0.2478694, 0, 0, 0.9687935),
+&"paw_front_R": Quaternion(0.2478694, 0, 0, 0.9687935),
+&"shin_L": Quaternion(0.1925229, 0, 0, 0.9812925),
+&"shin_R": Quaternion(0.1925229, 0, 0, 0.9812925),
+&"thigh_L": Quaternion(-0.29949197, 0, 0, 0.9540988),
+&"thigh_R": Quaternion(-0.29949197, 0, 0, 0.9540988),
+&"upper_front_L": Quaternion(-0.13971886, 0, 0, 0.9901912),
+&"upper_front_R": Quaternion(-0.13971886, 0, 0, 0.9901912)
+},
+&"root": Vector3(0, -0.03, -0.25)
+}, {
+&"ease": 0,
+&"frame": 17,
+&"pose": {
+&"lower_front_L": Quaternion(-1.4901161e-08, 0, 0, 1),
+&"lower_front_R": Quaternion(-1.4901161e-08, 0, 0, 1),
+&"paw_back_L": Quaternion(5.9604645e-08, 0, 0, 1),
+&"paw_back_R": Quaternion(5.9604645e-08, 0, 0, 1),
+&"paw_front_L": Quaternion(0, 0, 0, 1),
+&"paw_front_R": Quaternion(0, 0, 0, 1),
+&"shin_L": Quaternion(-5.9604645e-08, 0, 0, 1),
+&"shin_R": Quaternion(-5.9604645e-08, 0, 0, 1),
+&"thigh_L": Quaternion(0, 0, 0, 1),
+&"thigh_R": Quaternion(0, 0, 0, 1),
+&"upper_front_L": Quaternion(0, 0, 0, 1),
+&"upper_front_R": Quaternion(0, 0, 0, 1)
+},
+&"root": Vector3(0, 0, 0)
+}]
+windows = {
+"active": Vector2i(8, 9),
+"opening": Vector2i(11, 17),
+"windup": Vector2i(0, 7)
+}
+
+[sub_resource type="Resource" id="Resource_afhmo"]
+script = ExtResource("2_c1f0f")
+name = "Guard"
+length = 6
+keys = [{
+&"ease": 3,
+&"frame": 0,
+&"pose": {
+&"lower_front_L": Quaternion(-1.4901161e-08, 0, 0, 1),
+&"lower_front_R": Quaternion(-1.4901161e-08, 0, 0, 1),
+&"paw_back_L": Quaternion(5.9604645e-08, 0, 0, 1),
+&"paw_back_R": Quaternion(5.9604645e-08, 0, 0, 1),
+&"paw_front_L": Quaternion(0, 0, 0, 1),
+&"paw_front_R": Quaternion(0, 0, 0, 1),
+&"shin_L": Quaternion(-5.9604645e-08, 0, 0, 1),
+&"shin_R": Quaternion(-5.9604645e-08, 0, 0, 1),
+&"thigh_L": Quaternion(0, 0, 0, 1),
+&"thigh_R": Quaternion(0, 0, 0, 1),
+&"upper_front_L": Quaternion(0, 0, 0, 1),
+&"upper_front_R": Quaternion(0, 0, 0, 1)
+},
+&"root": Vector3(0, 0, 0)
+}, {
+&"ease": 0,
+&"frame": 3,
+&"pose": {
+&"lower_front_L": Quaternion(0.4111321, 0, 0, 0.91157585),
+&"lower_front_R": Quaternion(0.4111321, 0, 0, 0.91157585),
+&"neck": Quaternion(-0.2164396, 0, 0, 0.976296),
+&"paw_back_L": Quaternion(0.113285154, 0, 0, 0.9935625),
+&"paw_back_R": Quaternion(0.113285154, 0, 0, 0.9935625),
+&"paw_front_L": Quaternion(-0.25882334, 0, 0, 0.9659247),
+&"paw_front_R": Quaternion(-0.25882334, 0, 0, 0.9659247),
+&"shin_L": Quaternion(-0.31500414, 0, 0, 0.9490903),
+&"shin_R": Quaternion(-0.31500414, 0, 0, 0.9490903),
+&"tail_1": Quaternion(-0.17364821, 0, 0, 0.9848078),
+&"thigh_L": Quaternion(0.2054584, 0, 0, 0.97866595),
+&"thigh_R": Quaternion(0.2054584, 0, 0, 0.97866595),
+&"upper_front_L": Quaternion(-0.16118553, 0, 0, 0.9869242),
+&"upper_front_R": Quaternion(-0.16118553, 0, 0, 0.9869242)
+},
+&"root": Vector3(0, -0.1, 0.05)
+}]
+
+[sub_resource type="Resource" id="Resource_hyx12"]
+script = ExtResource("2_c1f0f")
+name = "Hurt"
+length = 8
+keys = [{
+&"ease": 4,
+&"frame": 0,
+&"pose": {
+&"lower_front_L": Quaternion(-1.4901161e-08, 0, 0, 1),
+&"lower_front_R": Quaternion(-1.4901161e-08, 0, 0, 1),
+&"paw_back_L": Quaternion(5.9604645e-08, 0, 0, 1),
+&"paw_back_R": Quaternion(5.9604645e-08, 0, 0, 1),
+&"paw_front_L": Quaternion(0, 0, 0, 1),
+&"paw_front_R": Quaternion(0, 0, 0, 1),
+&"shin_L": Quaternion(-5.9604645e-08, 0, 0, 1),
+&"shin_R": Quaternion(-5.9604645e-08, 0, 0, 1),
+&"thigh_L": Quaternion(0, 0, 0, 1),
+&"thigh_R": Quaternion(0, 0, 0, 1),
+&"upper_front_L": Quaternion(0, 0, 0, 1),
+&"upper_front_R": Quaternion(0, 0, 0, 1)
+},
+&"root": Vector3(0, 0, 0)
+}, {
+&"ease": 0,
+&"frame": 2,
+&"pose": {
+&"jaw": Quaternion(-0.17364822, 0, 0, 0.98480785),
+&"lower_front_L": Quaternion(-0.19843745, 0, 0, 0.98011357),
+&"lower_front_R": Quaternion(-0.19843745, 0, 0, 0.98011357),
+&"neck": Quaternion(0.25881907, 0, 0, 0.96592593),
+&"paw_back_L": Quaternion(-0.36214212, 0, 0, 0.9321229),
+&"paw_back_R": Quaternion(-0.36214212, 0, 0, 0.9321229),
+&"paw_front_L": Quaternion(0.026226163, 0, 0, 0.9996561),
+&"paw_front_R": Quaternion(0.026226163, 0, 0, 0.9996561),
+&"shin_L": Quaternion(0.54349583, 0, 0, 0.83941185),
+&"shin_R": Quaternion(0.54349583, 0, 0, 0.83941185),
+&"thigh_L": Quaternion(-0.20261869, 0, 0, 0.9792578),
+&"thigh_R": Quaternion(-0.20261869, 0, 0, 0.9792578),
+&"upper_front_L": Quaternion(0.17266461, 0, 0, 0.9849807),
+&"upper_front_R": Quaternion(0.17266461, 0, 0, 0.9849807)
+},
+&"root": Vector3(0, 0.02, 0.1)
+}, {
+&"ease": 0,
+&"frame": 7,
+&"pose": {
+&"lower_front_L": Quaternion(-1.4901161e-08, 0, 0, 1),
+&"lower_front_R": Quaternion(-1.4901161e-08, 0, 0, 1),
+&"paw_back_L": Quaternion(5.9604645e-08, 0, 0, 1),
+&"paw_back_R": Quaternion(5.9604645e-08, 0, 0, 1),
+&"paw_front_L": Quaternion(0, 0, 0, 1),
+&"paw_front_R": Quaternion(0, 0, 0, 1),
+&"shin_L": Quaternion(-5.9604645e-08, 0, 0, 1),
+&"shin_R": Quaternion(-5.9604645e-08, 0, 0, 1),
+&"thigh_L": Quaternion(0, 0, 0, 1),
+&"thigh_R": Quaternion(0, 0, 0, 1),
+&"upper_front_L": Quaternion(0, 0, 0, 1),
+&"upper_front_R": Quaternion(0, 0, 0, 1)
+},
+&"root": Vector3(0, 0, 0)
+}]
+
+[sub_resource type="Resource" id="Resource_hf1an"]
+script = ExtResource("2_c1f0f")
+name = "Stagger"
+length = 16
+keys = [{
+&"ease": 5,
+&"frame": 0,
+&"pose": {
+&"lower_front_L": Quaternion(-1.4901161e-08, 0, 0, 1),
+&"lower_front_R": Quaternion(-1.4901161e-08, 0, 0, 1),
+&"paw_back_L": Quaternion(5.9604645e-08, 0, 0, 1),
+&"paw_back_R": Quaternion(5.9604645e-08, 0, 0, 1),
+&"paw_front_L": Quaternion(0, 0, 0, 1),
+&"paw_front_R": Quaternion(0, 0, 0, 1),
+&"shin_L": Quaternion(-5.9604645e-08, 0, 0, 1),
+&"shin_R": Quaternion(-5.9604645e-08, 0, 0, 1),
+&"thigh_L": Quaternion(0, 0, 0, 1),
+&"thigh_R": Quaternion(0, 0, 0, 1),
+&"upper_front_L": Quaternion(0, 0, 0, 1),
+&"upper_front_R": Quaternion(0, 0, 0, 1)
+},
+&"root": Vector3(0, 0, 0)
+}, {
+&"ease": 0,
+&"frame": 3,
+&"pose": {
+&"lower_front_L": Quaternion(-0.19203463, -2.3283064e-10, -0.02346528, 0.98110765),
+&"lower_front_R": Quaternion(-0.19203463, 2.0954758e-09, -0.023465306, 0.98110765),
+&"neck": Quaternion(0.30070582, 0, 0, 0.95371693),
+&"paw_back_L": Quaternion(-0.39393878, -0.14382969, 0.04205297, 0.90683895),
+&"paw_back_R": Quaternion(-0.39393878, -0.14382969, 0.04205297, 0.90683895),
+&"paw_front_L": Quaternion(-0.01640907, -0.028592773, -0.0035999808, 0.99944997),
+&"paw_front_R": Quaternion(-0.01640907, -0.02859277, -0.003599965, 0.99944997),
+&"pelvis": Quaternion(-2.9802322e-08, 0.069410294, -0.0069410205, 0.9975641),
+&"shin_L": Quaternion(0.5321571, 3.7252907e-09, 0.18561217, 0.8260491),
+&"shin_R": Quaternion(0.5321571, 3.7252907e-09, 0.18561217, 0.8260491),
+&"thigh_L": Quaternion(-0.16380347, -1.8626449e-09, -0.038489223, 0.98574185),
+&"thigh_R": Quaternion(-0.16380347, -1.8626449e-09, -0.038489223, 0.98574185),
+&"upper_front_L": Quaternion(0.20827961, -1.8626451e-09, 0.050027695, 0.9767891),
+&"upper_front_R": Quaternion(0.20827961, 0, 0.050027706, 0.9767891)
+},
+&"root": Vector3(0.05, 0, 0.15)
+}, {
+&"ease": 0,
+&"frame": 9,
+&"pose": {
+&"lower_front_L": Quaternion(-0.4267937, -7.4505815e-09, 0.2515741, 0.8686529),
+&"lower_front_R": Quaternion(-0.4267937, -7.4505815e-09, 0.2515741, 0.8686529),
+&"neck": Quaternion(0, 0.15304592, 0.15304594, 0.976296),
+&"paw_back_L": Quaternion(-0.36443612, 0.29178578, -0.14350155, 0.87261367),
+&"paw_back_R": Quaternion(-0.36443606, 0.29178584, -0.14350165, 0.87261367),
+&"paw_front_L": Quaternion(0.14762902, -0.060800772, -0.09855544, 0.9822402),
+&"paw_front_R": Quaternion(0.14762902, -0.060800772, -0.09855544, 0.9822402),
+&"pelvis": Quaternion(-1.1920929e-07, -0.052076228, 0.005207617, 0.99862957),
+&"shin_L": Quaternion(0.5137832, 0, -0.47003832, 0.7176983),
+&"shin_R": Quaternion(0.51378316, -1.4901161e-08, -0.47003832, 0.71769834),
+&"thigh_L": Quaternion(-0.2481927, 7.450581e-09, 0.17114377, 0.95347273),
+&"thigh_R": Quaternion(-0.2481927, 0, 0.17114379, 0.95347273),
+&"upper_front_L": Quaternion(0.30524406, 7.450581e-09, -0.14196992, 0.9416319),
+&"upper_front_R": Quaternion(0.30524406, 7.450581e-09, -0.14196992, 0.9416319)
+},
+&"root": Vector3(-0.03, -0.05, 0.1)
+}, {
+&"ease": 0,
+&"frame": 15,
+&"pose": {
+&"lower_front_L": Quaternion(-1.4901161e-08, 0, 0, 1),
+&"lower_front_R": Quaternion(-1.4901161e-08, 0, 0, 1),
+&"paw_back_L": Quaternion(5.9604645e-08, 0, 0, 1),
+&"paw_back_R": Quaternion(5.9604645e-08, 0, 0, 1),
+&"paw_front_L": Quaternion(0, 0, 0, 1),
+&"paw_front_R": Quaternion(0, 0, 0, 1),
+&"shin_L": Quaternion(-5.9604645e-08, 0, 0, 1),
+&"shin_R": Quaternion(-5.9604645e-08, 0, 0, 1),
+&"thigh_L": Quaternion(0, 0, 0, 1),
+&"thigh_R": Quaternion(0, 0, 0, 1),
+&"upper_front_L": Quaternion(0, 0, 0, 1),
+&"upper_front_R": Quaternion(0, 0, 0, 1)
+},
+&"root": Vector3(0, 0, 0)
+}]
+
+[sub_resource type="Resource" id="Resource_hufuh"]
+script = ExtResource("2_c1f0f")
+name = "Recoil"
+length = 10
+keys = [{
+&"ease": 4,
+&"frame": 0,
+&"pose": {
+&"lower_front_L": Quaternion(-1.4901161e-08, 0, 0, 1),
+&"lower_front_R": Quaternion(-1.4901161e-08, 0, 0, 1),
+&"paw_back_L": Quaternion(5.9604645e-08, 0, 0, 1),
+&"paw_back_R": Quaternion(5.9604645e-08, 0, 0, 1),
+&"paw_front_L": Quaternion(0, 0, 0, 1),
+&"paw_front_R": Quaternion(0, 0, 0, 1),
+&"shin_L": Quaternion(-5.9604645e-08, 0, 0, 1),
+&"shin_R": Quaternion(-5.9604645e-08, 0, 0, 1),
+&"thigh_L": Quaternion(0, 0, 0, 1),
+&"thigh_R": Quaternion(0, 0, 0, 1),
+&"upper_front_L": Quaternion(0, 0, 0, 1),
+&"upper_front_R": Quaternion(0, 0, 0, 1)
+},
+&"root": Vector3(0, 0, 0)
+}, {
+&"ease": 0,
+&"frame": 2,
+&"pose": {
+&"head": Quaternion(-2.9802322e-08, 0.04922937, 0.16652375, 0.9848078),
+&"lower_front_L": Quaternion(-0.24530482, 0, 0, 0.969446),
+&"lower_front_R": Quaternion(-0.24530482, 0, 0, 0.969446),
+&"neck": Quaternion(0.21643972, 0, 0, 0.976296),
+&"paw_back_L": Quaternion(-0.40757647, 0, 0, 0.9131711),
+&"paw_back_R": Quaternion(-0.40757647, 0, 0, 0.9131711),
+&"paw_front_L": Quaternion(0.063598275, 0, 0, 0.9979756),
+&"paw_front_R": Quaternion(0.063598275, 0, 0, 0.9979756),
+&"shin_L": Quaternion(0.64544004, 0, 0, 0.76381105),
+&"shin_R": Quaternion(0.64544004, 0, 0, 0.76381105),
+&"thigh_L": Quaternion(-0.2780858, 0, 0, 0.96055627),
+&"thigh_R": Quaternion(-0.2780858, 0, 0, 0.96055627),
+&"upper_front_L": Quaternion(0.18315318, 0, 0, 0.9830844),
+&"upper_front_R": Quaternion(0.18315318, 0, 0, 0.9830844)
+},
+&"root": Vector3(0, 0, 0.08)
+}, {
+&"ease": 0,
+&"frame": 9,
+&"pose": {
+&"lower_front_L": Quaternion(-1.4901161e-08, 0, 0, 1),
+&"lower_front_R": Quaternion(-1.4901161e-08, 0, 0, 1),
+&"paw_back_L": Quaternion(5.9604645e-08, 0, 0, 1),
+&"paw_back_R": Quaternion(5.9604645e-08, 0, 0, 1),
+&"paw_front_L": Quaternion(0, 0, 0, 1),
+&"paw_front_R": Quaternion(0, 0, 0, 1),
+&"shin_L": Quaternion(-5.9604645e-08, 0, 0, 1),
+&"shin_R": Quaternion(-5.9604645e-08, 0, 0, 1),
+&"thigh_L": Quaternion(0, 0, 0, 1),
+&"thigh_R": Quaternion(0, 0, 0, 1),
+&"upper_front_L": Quaternion(0, 0, 0, 1),
+&"upper_front_R": Quaternion(0, 0, 0, 1)
+},
+&"root": Vector3(0, 0, 0)
+}]
+
+[sub_resource type="Resource" id="Resource_pkb8s"]
+script = ExtResource("2_c1f0f")
+name = "Death"
+length = 16
+keys = [{
+&"ease": 2,
+&"frame": 0,
+&"pose": {
+&"lower_front_L": Quaternion(-1.4901161e-08, 0, 0, 1),
+&"lower_front_R": Quaternion(-1.4901161e-08, 0, 0, 1),
+&"paw_back_L": Quaternion(5.9604645e-08, 0, 0, 1),
+&"paw_back_R": Quaternion(5.9604645e-08, 0, 0, 1),
+&"paw_front_L": Quaternion(0, 0, 0, 1),
+&"paw_front_R": Quaternion(0, 0, 0, 1),
+&"shin_L": Quaternion(-5.9604645e-08, 0, 0, 1),
+&"shin_R": Quaternion(-5.9604645e-08, 0, 0, 1),
+&"thigh_L": Quaternion(0, 0, 0, 1),
+&"thigh_R": Quaternion(0, 0, 0, 1),
+&"upper_front_L": Quaternion(0, 0, 0, 1),
+&"upper_front_R": Quaternion(0, 0, 0, 1)
+},
+&"root": Vector3(0, 0, 0)
+}, {
+&"ease": 2,
+&"frame": 7,
+&"pose": {
+&"lower_front_L": Quaternion(0.7600423, 0, 0, 0.64987355),
+&"lower_front_R": Quaternion(0.7600423, 0, 0, 0.64987355),
+&"neck": Quaternion(-0.25881907, 0, 0, 0.96592593),
+&"paw_back_L": Quaternion(0.37790716, 0, 0, 0.92584354),
+&"paw_back_R": Quaternion(0.37790716, 0, 0, 0.92584354),
+&"paw_front_L": Quaternion(-0.42853191, 0, 0, 0.90352666),
+&"paw_front_R": Quaternion(-0.42853191, 0, 0, 0.90352666),
+&"shin_L": Quaternion(0.6700244, 0, 0, -0.7423391),
+&"shin_R": Quaternion(0.6700244, 0, 0, -0.7423391),
+&"thigh_L": Quaternion(0.3398025, 0, 0, 0.9404969),
+&"thigh_R": Quaternion(0.3398025, 0, 0, 0.9404969),
+&"upper_front_L": Quaternion(0.40822697, 0, 0, -0.9128805),
+&"upper_front_R": Quaternion(0.40822697, 0, 0, -0.9128805)
+},
+&"root": Vector3(0, -0.3, 0)
+}, {
+&"ease": 5,
+&"frame": 14,
+&"pose": {
+&"neck": Quaternion(-0.044943456, -0.11860393, -0.118603945, 0.98480785),
+&"pelvis": Quaternion(2.9802322e-08, 0.6057403, -0.060573936, 0.7933533)
+},
+&"root": Vector3(0.1, -0.42, 0)
+}, {
+&"ease": 0,
+&"frame": 15,
+&"pose": {
+&"neck": Quaternion(-0.03967139, -0.13197392, -0.13197398, 0.9816272),
+&"pelvis": Quaternion(-2.9802322e-08, 0.6261972, -0.0626196, 0.777146)
+},
+&"root": Vector3(0.1, -0.43, 0)
+}]
+
+[sub_resource type="Resource" id="Resource_473j8"]
+script = ExtResource("3_ss4ui")
+bone = &"pelvis"
+vertices = PackedVector3Array(-0.126, 0, -0.144, 0.126, 0, -0.144, 0.126, 0, 0.144, -0.126, 0, 0.144, -0.126, 0.27637157, -0.144, 0.126, 0.27637157, -0.144, 0.126, 0.27637157, 0.144, -0.126, 0.27637157, 0.144)
+face_indices = PackedInt32Array(0, 1, 2, 3, 4, 7, 6, 5, 0, 4, 5, 1, 1, 5, 6, 2, 2, 6, 7, 3, 3, 7, 4, 0)
+face_counts = PackedInt32Array(4, 4, 4, 4, 4, 4)
+bone_length = 0.27637157
+face_textures = PackedInt32Array(-1, -1, -1, -1, -1, -1)
+face_overlays = PackedInt32Array(-1, -1, -1, -1, -1, -1)
+colors = PackedColorArray(0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0)
+
+[sub_resource type="Resource" id="Resource_qq8qr"]
+script = ExtResource("3_ss4ui")
+bone = &"spine"
+vertices = PackedVector3Array(0.13509996, 0, 0.078, 9.552245e-18, 0, 0.156, -0.13509996, 0, 0.078, -0.13509996, 0, -0.078, -2.8656736e-17, 0, -0.156, 0.13509996, 0, -0.078, 0.14549227, 0.27637157, 0.084, 1.0287033e-17, 0.27637157, 0.168, -0.14549227, 0.27637157, 0.084, -0.14549227, 0.27637157, -0.084, -3.08611e-17, 0.27637157, -0.168, 0.14549227, 0.27637157, -0.084, 0, 0.27637157, 1.2417635e-09)
+face_indices = PackedInt32Array(0, 6, 7, 1, 1, 7, 8, 2, 2, 8, 9, 3, 3, 9, 10, 4, 4, 10, 11, 5, 5, 11, 6, 0, 12, 7, 6, 12, 8, 7, 12, 9, 8, 12, 10, 9, 12, 11, 10, 12, 6, 11)
+face_counts = PackedInt32Array(4, 4, 4, 4, 4, 4, 3, 3, 3, 3, 3, 3)
+rings = Array[PackedInt32Array]([PackedInt32Array(0, 1, 2, 3, 4, 5), PackedInt32Array(6, 7, 8, 9, 10, 11)])
+cap_start = false
+bone_length = 0.27637157
+face_textures = PackedInt32Array(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1)
+face_overlays = PackedInt32Array(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1)
+colors = PackedColorArray(0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0)
+
+[sub_resource type="Resource" id="Resource_di1yd"]
+script = ExtResource("3_ss4ui")
+bone = &"chest"
+vertices = PackedVector3Array(-0.14, 0, -0.18, 0.14, 0, -0.18, 0.14, 0, 0.18, -0.14, 0, 0.18, -0.14, 0.5500227, -0.18, 0.14, 0.5500227, -0.18, 0.14, 0.5500227, 0.18, -0.14, 0.5500227, 0.18)
+face_indices = PackedInt32Array(0, 1, 2, 3, 4, 7, 6, 5, 0, 4, 5, 1, 1, 5, 6, 2, 2, 6, 7, 3, 3, 7, 4, 0)
+face_counts = PackedInt32Array(4, 4, 4, 4, 4, 4)
+bone_length = 0.5500227
+face_textures = PackedInt32Array(-1, -1, -1, -1, -1, -1)
+face_overlays = PackedInt32Array(-1, -1, -1, -1, -1, -1)
+colors = PackedColorArray(0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0)
+
+[sub_resource type="Resource" id="Resource_jpwdn"]
+script = ExtResource("3_ss4ui")
+bone = &"neck"
+vertices = PackedVector3Array(0.083138436, 0, 0.048, 5.878305e-18, 0, 0.096, -0.083138436, 0, 0.048, -0.083138436, 0, -0.048, -1.7634913e-17, 0, -0.096, 0.083138436, 0, -0.048, 0.072746135, 0.32, 0.042, 5.1435166e-18, 0.32, 0.084, -0.072746135, 0.32, 0.042, -0.072746135, 0.32, -0.042, -1.543055e-17, 0.32, -0.084, 0.072746135, 0.32, -0.042, 0, 0.31999996, 6.2088173e-10)
+face_indices = PackedInt32Array(0, 6, 7, 1, 1, 7, 8, 2, 2, 8, 9, 3, 3, 9, 10, 4, 4, 10, 11, 5, 5, 11, 6, 0, 12, 7, 6, 12, 8, 7, 12, 9, 8, 12, 10, 9, 12, 11, 10, 12, 6, 11)
+face_counts = PackedInt32Array(4, 4, 4, 4, 4, 4, 3, 3, 3, 3, 3, 3)
+rings = Array[PackedInt32Array]([PackedInt32Array(0, 1, 2, 3, 4, 5), PackedInt32Array(6, 7, 8, 9, 10, 11)])
+cap_start = false
+bone_length = 0.32
+face_textures = PackedInt32Array(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1)
+face_overlays = PackedInt32Array(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1)
+colors = PackedColorArray(0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0)
+
+[sub_resource type="Resource" id="Resource_g4654"]
+script = ExtResource("3_ss4ui")
+bone = &"head"
+vertices = PackedVector3Array(-0.096, 0, -0.09, 0.096, 0, -0.09, 0.096, 0, 0.09, -0.096, 0, 0.09, -0.096, 0.34000003, -0.09, 0.096, 0.34000003, -0.09, 0.096, 0.34000003, 0.09, -0.096, 0.34000003, 0.09)
+face_indices = PackedInt32Array(0, 1, 2, 3, 4, 7, 6, 5, 0, 4, 5, 1, 1, 5, 6, 2, 2, 6, 7, 3, 3, 7, 4, 0)
+face_counts = PackedInt32Array(4, 4, 4, 4, 4, 4)
+bone_length = 0.34000003
+face_textures = PackedInt32Array(-1, -1, -1, -1, -1, -1)
+face_overlays = PackedInt32Array(-1, -1, -1, -1, -1, -1)
+colors = PackedColorArray(0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0)
+
+[sub_resource type="Resource" id="Resource_ed1tj"]
+script = ExtResource("3_ss4ui")
+bone = &"jaw"
+vertices = PackedVector3Array(-0.072, 0, -0.03, 0.072, 0, -0.03, 0.072, 0, 0.03, -0.072, 0, 0.03, -0.072, 0.2947772, -0.03, 0.072, 0.2947772, -0.03, 0.072, 0.2947772, 0.03, -0.072, 0.2947772, 0.03)
+face_indices = PackedInt32Array(0, 1, 2, 3, 4, 7, 6, 5, 0, 4, 5, 1, 1, 5, 6, 2, 2, 6, 7, 3, 3, 7, 4, 0)
+face_counts = PackedInt32Array(4, 4, 4, 4, 4, 4)
+bone_length = 0.2947772
+face_textures = PackedInt32Array(-1, -1, -1, -1, -1, -1)
+face_overlays = PackedInt32Array(-1, -1, -1, -1, -1, -1)
+colors = PackedColorArray(0.75, 0.72, 0.68, 0, 0.75, 0.72, 0.68, 0, 0.75, 0.72, 0.68, 0, 0.75, 0.72, 0.68, 0, 0.75, 0.72, 0.68, 0, 0.75, 0.72, 0.68, 0, 0.75, 0.72, 0.68, 0, 0.75, 0.72, 0.68, 0)
+
+[sub_resource type="Resource" id="Resource_4iglg"]
+script = ExtResource("3_ss4ui")
+bone = &"tail_1"
+vertices = PackedVector3Array(0.048541017, 0, 0.035267115, -0.01854102, 0, 0.05706339, -0.06, 0, 7.347881e-18, -0.01854102, 0, -0.05706339, 0.048541017, 0, -0.035267115, 0.038832817, 0.22499996, 0.028213693, -0.014832816, 0.22499996, 0.045650713, -0.048, 0.22499996, 5.878305e-18, -0.014832816, 0.22499996, -0.045650713, 0.038832817, 0.22499996, -0.028213693, 0, 0.22499995, 3.7252904e-10)
+face_indices = PackedInt32Array(0, 5, 6, 1, 1, 6, 7, 2, 2, 7, 8, 3, 3, 8, 9, 4, 4, 9, 5, 0, 10, 6, 5, 10, 7, 6, 10, 8, 7, 10, 9, 8, 10, 5, 9)
+face_counts = PackedInt32Array(4, 4, 4, 4, 4, 3, 3, 3, 3, 3)
+rings = Array[PackedInt32Array]([PackedInt32Array(0, 1, 2, 3, 4), PackedInt32Array(5, 6, 7, 8, 9)])
+cap_start = false
+bone_length = 0.22499996
+face_textures = PackedInt32Array(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1)
+face_overlays = PackedInt32Array(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1)
+colors = PackedColorArray(0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0)
+
+[sub_resource type="Resource" id="Resource_bbjmg"]
+script = ExtResource("3_ss4ui")
+bone = &"tail_2"
+vertices = PackedVector3Array(0.038832817, 0, 0.028213693, -0.014832816, 0, 0.045650713, -0.048, 0, 5.878305e-18, -0.014832816, 0, -0.045650713, 0.038832817, 0, -0.028213693, 0.014562305, 0.225, 0.010580134, -0.0055623055, 0.225, 0.017119016, -0.018, 0.225, 2.2043642e-18, -0.0055623055, 0.225, -0.017119016, 0.014562305, 0.225, -0.010580134, 0, 0.225, 0)
+face_indices = PackedInt32Array(0, 5, 6, 1, 1, 6, 7, 2, 2, 7, 8, 3, 3, 8, 9, 4, 4, 9, 5, 0, 10, 6, 5, 10, 7, 6, 10, 8, 7, 10, 9, 8, 10, 5, 9)
+face_counts = PackedInt32Array(4, 4, 4, 4, 4, 3, 3, 3, 3, 3)
+rings = Array[PackedInt32Array]([PackedInt32Array(0, 1, 2, 3, 4), PackedInt32Array(5, 6, 7, 8, 9)])
+cap_start = false
+bone_length = 0.225
+face_textures = PackedInt32Array(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1)
+face_overlays = PackedInt32Array(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1)
+colors = PackedColorArray(0.75, 0.76, 0.8, 0, 0.75, 0.76, 0.8, 0, 0.75, 0.76, 0.8, 0, 0.75, 0.76, 0.8, 0, 0.75, 0.76, 0.8, 0, 0.75, 0.76, 0.8, 0, 0.75, 0.76, 0.8, 0, 0.75, 0.76, 0.8, 0, 0.75, 0.76, 0.8, 0, 0.75, 0.76, 0.8, 0, 0.75, 0.76, 0.8, 0)
+
+[sub_resource type="Resource" id="Resource_q76l5"]
+script = ExtResource("3_ss4ui")
+bone = &"upper_front_L"
+vertices = PackedVector3Array(0.057157677, 0, 0.033, 4.0413344e-18, 0, 0.066, -0.057157677, 0, 0.033, -0.057157677, 0, -0.033, -1.2124004e-17, 0, -0.066, 0.057157677, 0, -0.033, 0.046765372, 0.32882363, 0.027, 3.3065463e-18, 0.32882363, 0.054, -0.046765372, 0.32882363, 0.027, -0.046765372, 0.32882363, -0.027, -9.919639e-18, 0.32882363, -0.054, 0.046765372, 0.32882363, -0.027, 0, 0.3288236, -3.1044087e-10)
+face_indices = PackedInt32Array(0, 6, 7, 1, 1, 7, 8, 2, 2, 8, 9, 3, 3, 9, 10, 4, 4, 10, 11, 5, 5, 11, 6, 0, 12, 7, 6, 12, 8, 7, 12, 9, 8, 12, 10, 9, 12, 11, 10, 12, 6, 11)
+face_counts = PackedInt32Array(4, 4, 4, 4, 4, 4, 3, 3, 3, 3, 3, 3)
+rings = Array[PackedInt32Array]([PackedInt32Array(0, 1, 2, 3, 4, 5), PackedInt32Array(6, 7, 8, 9, 10, 11)])
+cap_start = false
+bone_length = 0.32882363
+face_textures = PackedInt32Array(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1)
+face_overlays = PackedInt32Array(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1)
+colors = PackedColorArray(0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0)
+
+[sub_resource type="Resource" id="Resource_8xypo"]
+script = ExtResource("3_ss4ui")
+bone = &"lower_front_L"
+vertices = PackedVector3Array(0.041569218, 0, 0.024, 2.9391524e-18, 0, 0.048, -0.041569218, 0, 0.024, -0.041569218, 0, -0.024, -8.817457e-18, 0, -0.048, 0.041569218, 0, -0.024, 0.033255376, 0.31894356, 0.0192, 2.3513219e-18, 0.31894356, 0.0384, -0.033255376, 0.31894356, 0.0192, -0.033255376, 0.31894356, -0.0192, -7.053966e-18, 0.31894356, -0.0384, 0.033255376, 0.31894356, -0.0192, 0, 0.31894353, 0)
+face_indices = PackedInt32Array(0, 6, 7, 1, 1, 7, 8, 2, 2, 8, 9, 3, 3, 9, 10, 4, 4, 10, 11, 5, 5, 11, 6, 0, 12, 7, 6, 12, 8, 7, 12, 9, 8, 12, 10, 9, 12, 11, 10, 12, 6, 11)
+face_counts = PackedInt32Array(4, 4, 4, 4, 4, 4, 3, 3, 3, 3, 3, 3)
+rings = Array[PackedInt32Array]([PackedInt32Array(0, 1, 2, 3, 4, 5), PackedInt32Array(6, 7, 8, 9, 10, 11)])
+cap_start = false
+bone_length = 0.31894356
+face_textures = PackedInt32Array(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1)
+face_overlays = PackedInt32Array(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1)
+colors = PackedColorArray(0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0)
+
+[sub_resource type="Resource" id="Resource_u8jyd"]
+script = ExtResource("3_ss4ui")
+bone = &"paw_front_L"
+vertices = PackedVector3Array(-0.042, 0, -0.024, 0.042, 0, -0.024, 0.042, 0, 0.024, -0.042, 0, 0.024, -0.042, 0.11704701, -0.024, 0.042, 0.11704701, -0.024, 0.042, 0.11704701, 0.024, -0.042, 0.11704701, 0.024)
+face_indices = PackedInt32Array(0, 1, 2, 3, 4, 7, 6, 5, 0, 4, 5, 1, 1, 5, 6, 2, 2, 6, 7, 3, 3, 7, 4, 0)
+face_counts = PackedInt32Array(4, 4, 4, 4, 4, 4)
+bone_length = 0.11704701
+face_textures = PackedInt32Array(-1, -1, -1, -1, -1, -1)
+face_overlays = PackedInt32Array(-1, -1, -1, -1, -1, -1)
+colors = PackedColorArray(0.3, 0.3, 0.36, 0, 0.3, 0.3, 0.36, 0, 0.3, 0.3, 0.36, 0, 0.3, 0.3, 0.36, 0, 0.3, 0.3, 0.36, 0, 0.3, 0.3, 0.36, 0, 0.3, 0.3, 0.36, 0, 0.3, 0.3, 0.36, 0)
+
+[sub_resource type="Resource" id="Resource_l801n"]
+script = ExtResource("3_ss4ui")
+bone = &"thigh_L"
+vertices = PackedVector3Array(0.072746135, 0, 0.042, 5.1435166e-18, 0, 0.084, -0.072746135, 0, 0.042, -0.072746135, 0, -0.042, -1.543055e-17, 0, -0.084, 0.072746135, 0, -0.042, 0.051961523, 0.31622773, 0.03, 3.6739405e-18, 0.31622773, 0.06, -0.051961523, 0.31622773, 0.03, -0.051961523, 0.31622773, -0.03, -1.1021821e-17, 0.31622773, -0.06, 0.051961523, 0.31622773, -0.03, 0, 0.3162277, -3.1044087e-10)
+face_indices = PackedInt32Array(0, 6, 7, 1, 1, 7, 8, 2, 2, 8, 9, 3, 3, 9, 10, 4, 4, 10, 11, 5, 5, 11, 6, 0, 12, 7, 6, 12, 8, 7, 12, 9, 8, 12, 10, 9, 12, 11, 10, 12, 6, 11)
+face_counts = PackedInt32Array(4, 4, 4, 4, 4, 4, 3, 3, 3, 3, 3, 3)
+rings = Array[PackedInt32Array]([PackedInt32Array(0, 1, 2, 3, 4, 5), PackedInt32Array(6, 7, 8, 9, 10, 11)])
+cap_start = false
+bone_length = 0.31622773
+face_textures = PackedInt32Array(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1)
+face_overlays = PackedInt32Array(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1)
+colors = PackedColorArray(0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0)
+
+[sub_resource type="Resource" id="Resource_n8l4m"]
+script = ExtResource("3_ss4ui")
+bone = &"shin_L"
+vertices = PackedVector3Array(0.041569218, 0, 0.024, 2.9391524e-18, 0, 0.048, -0.041569218, 0, 0.024, -0.041569218, 0, -0.024, -8.817457e-18, 0, -0.048, 0.041569218, 0, -0.024, 0.031176914, 0.3138471, 0.018, 2.2043642e-18, 0.3138471, 0.036, -0.031176914, 0.3138471, 0.018, -0.031176914, 0.3138471, -0.018, -6.6130923e-18, 0.3138471, -0.036, 0.031176914, 0.3138471, -0.018, 0, 0.3138471, 0)
+face_indices = PackedInt32Array(0, 6, 7, 1, 1, 7, 8, 2, 2, 8, 9, 3, 3, 9, 10, 4, 4, 10, 11, 5, 5, 11, 6, 0, 12, 7, 6, 12, 8, 7, 12, 9, 8, 12, 10, 9, 12, 11, 10, 12, 6, 11)
+face_counts = PackedInt32Array(4, 4, 4, 4, 4, 4, 3, 3, 3, 3, 3, 3)
+rings = Array[PackedInt32Array]([PackedInt32Array(0, 1, 2, 3, 4, 5), PackedInt32Array(6, 7, 8, 9, 10, 11)])
+cap_start = false
+bone_length = 0.3138471
+face_textures = PackedInt32Array(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1)
+face_overlays = PackedInt32Array(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1)
+colors = PackedColorArray(0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0, 0.5, 0.53, 0.62, 0)
+
+[sub_resource type="Resource" id="Resource_jy8rm"]
+script = ExtResource("3_ss4ui")
+bone = &"paw_back_L"
+vertices = PackedVector3Array(-0.042, 0, -0.024, 0.042, 0, -0.024, 0.042, 0, 0.024, -0.042, 0, 0.024, -0.042, 0.11704701, -0.024, 0.042, 0.11704701, -0.024, 0.042, 0.11704701, 0.024, -0.042, 0.11704701, 0.024)
+face_indices = PackedInt32Array(0, 1, 2, 3, 4, 7, 6, 5, 0, 4, 5, 1, 1, 5, 6, 2, 2, 6, 7, 3, 3, 7, 4, 0)
+face_counts = PackedInt32Array(4, 4, 4, 4, 4, 4)
+bone_length = 0.11704701
+face_textures = PackedInt32Array(-1, -1, -1, -1, -1, -1)
+face_overlays = PackedInt32Array(-1, -1, -1, -1, -1, -1)
+colors = PackedColorArray(0.3, 0.3, 0.36, 0, 0.3, 0.3, 0.36, 0, 0.3, 0.3, 0.36, 0, 0.3, 0.3, 0.36, 0, 0.3, 0.3, 0.36, 0, 0.3, 0.3, 0.36, 0, 0.3, 0.3, 0.36, 0, 0.3, 0.3, 0.36, 0)
+
+[sub_resource type="Resource" id="Resource_qy8jt"]
+script = ExtResource("4_ovqmj")
+plan = &"quadruped"
+proportions = {
+"body_length": 1.1,
+"head_length": 0.34,
+"hip_height": 0.7,
+"neck_length": 0.32,
+"shoulder_height": 0.75,
+"thickness": 1.2
+}
+pieces = Array[ExtResource("3_ss4ui")]([SubResource("Resource_473j8"), SubResource("Resource_qq8qr"), SubResource("Resource_di1yd"), SubResource("Resource_jpwdn"), SubResource("Resource_g4654"), SubResource("Resource_ed1tj"), SubResource("Resource_4iglg"), SubResource("Resource_bbjmg"), SubResource("Resource_q76l5"), SubResource("Resource_8xypo"), SubResource("Resource_u8jyd"), SubResource("Resource_l801n"), SubResource("Resource_n8l4m"), SubResource("Resource_jy8rm")])
+animations = Array[ExtResource("2_c1f0f")]([SubResource("Resource_md1fp"), SubResource("Resource_cavh0"), SubResource("Resource_06ufs"), SubResource("Resource_n5eao"), SubResource("Resource_afhmo"), SubResource("Resource_hyx12"), SubResource("Resource_hf1an"), SubResource("Resource_hufuh"), SubResource("Resource_pkb8s")])
+
+[node name="WolfosModel" type="Node3D" unique_id=650945398]
+script = ExtResource("1_ew5an")
+data = SubResource("Resource_qy8jt")

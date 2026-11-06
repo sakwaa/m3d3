@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="N64Effect" format=3]
+
+[ext_resource type="Script" path="res://addons/n64_runtime/effects/n64_effect.gd" id="1_sytws"]
+[ext_resource type="Texture2D" path="res://game/effects/sprites/spark.png" id="2_6exk2"]
+
+[sub_resource type="Gradient" id="Gradient_mlntg"]
+offsets = PackedFloat32Array(0, 0.6, 1)
+colors = PackedColorArray(1, 0.95, 0.6, 1, 0.7, 0.9, 1, 1, 0.6, 0.8, 1, 0)
+
+[resource]
+resource_name = "sparkle"
+script = ExtResource("1_sytws")
+texture = ExtResource("2_6exk2")
+blend = 1
+burst = 6
+max_sprites = 12
+radius = 0.25
+lifetime = Vector2(0.5, 0.9)
+speed = Vector2(0.3, 0.8)
+spread = 180.0
+gravity = -0.3
+spin = Vector2(0.2, 0.6)
+size = Vector2(0.14, 0.22)
+size_end = 0.0
+color = SubResource("Gradient_mlntg")

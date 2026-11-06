@@ -1,0 +1,47 @@
+[gd_scene load_steps=8 format=3]
+
+[sub_resource type="StandardMaterial3D" id="grip_mat"]
+albedo_color = Color(0.36, 0.22, 0.12, 1)
+roughness = 1.0
+
+[sub_resource type="StandardMaterial3D" id="metal_mat"]
+albedo_color = Color(0.78, 0.8, 0.84, 1)
+metallic = 0.4
+roughness = 0.5
+
+[sub_resource type="StandardMaterial3D" id="guard_mat"]
+albedo_color = Color(0.7, 0.55, 0.2, 1)
+roughness = 0.7
+
+[sub_resource type="BoxMesh" id="grip"]
+size = Vector3(0.03, 0.12, 0.03)
+
+[sub_resource type="BoxMesh" id="guard"]
+size = Vector3(0.14, 0.025, 0.035)
+
+[sub_resource type="BoxMesh" id="blade"]
+size = Vector3(0.045, 0.5, 0.012)
+
+[sub_resource type="PrismMesh" id="tip"]
+size = Vector3(0.045, 0.06, 0.012)
+
+[node name="PracticeSword" type="Node3D"]
+
+[node name="Grip" type="MeshInstance3D" parent="."]
+mesh = SubResource("grip")
+surface_material_override/0 = SubResource("grip_mat")
+
+[node name="Guard" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.07, 0)
+mesh = SubResource("guard")
+surface_material_override/0 = SubResource("guard_mat")
+
+[node name="Blade" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.3325, 0)
+mesh = SubResource("blade")
+surface_material_override/0 = SubResource("metal_mat")
+
+[node name="Tip" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6125, 0)
+mesh = SubResource("tip")
+surface_material_override/0 = SubResource("metal_mat")

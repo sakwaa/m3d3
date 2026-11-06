@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="StoryDatabase" format=3 uid="uid://bvx8hm7fo0m14"]
+
+[ext_resource type="Script" uid="uid://dqejplul73akb" path="res://game/story/character_def.gd" id="1_sed2a"]
+[ext_resource type="Script" uid="uid://brhbotcl5xqjm" path="res://game/story/flag_def.gd" id="2_ei84t"]
+[ext_resource type="Script" uid="uid://hejabi86rpry" path="res://game/story/item_def.gd" id="3_ontyy"]
+[ext_resource type="Script" uid="uid://cfy8pvuag3lp" path="res://game/story/schedule/npc_schedule.gd" id="4_glj78"]
+[ext_resource type="Script" uid="uid://kwjwluggdq02" path="res://game/story/story_database.gd" id="5_k0h8i"]
+
+[resource]
+script = ExtResource("5_k0h8i")

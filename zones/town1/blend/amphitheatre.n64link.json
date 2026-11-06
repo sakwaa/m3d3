@@ -1,0 +1,1 @@
+{"context":{"key":"1793221727","path":"/Users/sakwa/workspace/m3d3/zones/town1/blend/amphitheatre.n64context.json"},"report":[{"message":"2 zero-area faces.","object":"Amphitheatre"},{"message":"1 bent faces (not flat): paint smears on them; triangulate or flatten.","object":"Amphitheatre"}],"select":{},"settings":{"angle":7.5,"budget":0,"grid":0.1}}

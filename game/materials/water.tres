@@ -1,0 +1,27 @@
+[gd_resource type="ShaderMaterial" format=3]
+
+[ext_resource type="Shader" path="res://addons/n64_runtime/shaders/n64_water.gdshader" id="1_aiusd"]
+[ext_resource type="Texture2D" path="res://textures/shine/water.res" id="2_qq6an"]
+[ext_resource type="Texture2D" path="res://textures/water/water_ripple.res" id="3_st1xm"]
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_aiusd")
+shader_parameter/shine_texture = ExtResource("2_qq6an")
+shader_parameter/shine_strength = 0.8
+shader_parameter/shine_tint = null
+shader_parameter/shine_mode = null
+shader_parameter/hilite_strength = 0.9
+shader_parameter/hilite_size = 0.12
+shader_parameter/hilite_color = null
+shader_parameter/water_texture = ExtResource("3_st1xm")
+shader_parameter/shallow_color = null
+shader_parameter/deep_color = null
+shader_parameter/opacity = null
+shader_parameter/tile_size = null
+shader_parameter/scroll_a = null
+shader_parameter/scroll_b = null
+shader_parameter/layer_b_scale = null
+shader_parameter/wave_height = null
+shader_parameter/wave_speed = null
+shader_parameter/wave_tilt = null

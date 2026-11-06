@@ -1,0 +1,121 @@
+; M3D3 Mesh Builder: a touch-first iOS app for building the game's low-poly models.
+; Its own small GDScript-only project (exports to iOS like any Godot app); the modelling
+; code, textures and characters are symlinks into the main project (same res:// paths),
+; so the app and the desktop editor share code and files. The main project ignores this
+; folder (it has its own project.godot).
+
+config_version=5
+
+[application]
+
+config/name="M3D3 Mesh Builder"
+run/main_scene="res://app/mesh_builder.tscn"
+config/features=PackedStringArray("4.7", "Mobile")
+config/icon="res://icon.svg"
+
+[display]
+
+window/size/viewport_width=1170
+window/size/viewport_height=2532
+window/size/window_width_override=468
+window/size/window_height_override=1013
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+window/handheld/orientation=6
+
+[input_devices]
+
+pointing/emulate_touch_from_mouse=true
+
+[rendering]
+
+textures/vram_compression/import_etc2_astc=true
+renderer/rendering_method="mobile"
+textures/canvas_textures/default_texture_filter=0
+
+[shader_globals]
+
+n64_light_blend={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}
+n64_world_tint={
+"type": "color",
+"value": Color(1, 1, 1, 1)
+}
+n64_weather_tint={
+"type": "color",
+"value": Color(1, 1, 1, 1)
+}
+n64_vertex_ao={
+"type": "float",
+"value": 1.0
+}
+n64_time={
+"type": "float",
+"value": 0.0
+}
+n64_three_point={
+"type": "bool",
+"value": true
+}
+n64_fog_color={
+"type": "color",
+"value": Color(0.5, 0.5, 0.5, 1)
+}
+n64_fog={
+"type": "vec4",
+"value": Vector4(10, 60, 0, 0)
+}
+n64_fog_origin={
+"type": "vec3",
+"value": Vector3(0, 0, 0)
+}
+n64_key_light={
+"type": "vec4",
+"value": Vector4(0.3, 0.9, 0.3, 0.6)
+}
+n64_fog_light_pos0={
+"type": "vec4",
+"value": Vector4(0, -10000, 0, 0)
+}
+n64_fog_light_col0={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}
+n64_fog_light_pos1={
+"type": "vec4",
+"value": Vector4(0, -10000, 0, 0)
+}
+n64_fog_light_col1={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}
+n64_fog_light_pos2={
+"type": "vec4",
+"value": Vector4(0, -10000, 0, 0)
+}
+n64_fog_light_col2={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}
+n64_fog_light_pos3={
+"type": "vec4",
+"value": Vector4(0, -10000, 0, 0)
+}
+n64_fog_light_col3={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}
+n64_fog_lights={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}
+n64_reflect_cam={
+"type": "vec4",
+"value": Vector4(1000000000, 1000000000, 1000000000, 0)
+}
+level_grid_size={
+"type": "float",
+"value": 1.0
+}

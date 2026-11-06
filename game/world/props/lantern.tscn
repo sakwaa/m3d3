@@ -1,0 +1,16 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://game/world/props/lantern_mesh.res" id="1_4p73t"]
+
+[node name="Lantern" type="Node3D" unique_id=1909878121]
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1199435897]
+cast_shadow = 0
+mesh = ExtResource("1_4p73t")
+
+[node name="Light" type="OmniLight3D" parent="." unique_id=967113246]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.22, 0)
+light_color = Color(1, 0.72, 0.42, 1)
+light_energy = 1.2
+light_bake_mode = 1
+omni_range = 4.0

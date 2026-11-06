@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="N64Effect" format=3 uid="uid://bn2tut5m56nx6"]
+
+[ext_resource type="Script" uid="uid://b8b2olhwlgvyw" path="res://addons/n64_runtime/effects/n64_effect.gd" id="1_2tkqq"]
+[ext_resource type="Texture2D" uid="uid://cok7idh6eip5t" path="res://game/effects/sprites/spark.png" id="2_w8ivy"]
+
+[sub_resource type="Gradient" id="Gradient_wddnj"]
+colors = PackedColorArray(1, 0.95, 0.7, 1, 1, 0.45, 0.1, 0)
+
+[resource]
+resource_name = "clash_spark"
+script = ExtResource("1_2tkqq")
+texture = ExtResource("2_w8ivy")
+blend = 1
+burst = 12
+max_sprites = 14
+lifetime = Vector2(0.25, 0.4)
+speed = Vector2(3.5, 6)
+spread = 70.0
+gravity = 9.8
+size = Vector2(0.06, 0.1)
+size_end = 0.5
+color = SubResource("Gradient_wddnj")

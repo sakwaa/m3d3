@@ -1,0 +1,128 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=5
+
+[application]
+
+config/name="m3d3"
+run/main_scene="res://zones/overworld/overworld.tscn"
+config/features=PackedStringArray("4.7", "C#", "Forward Plus")
+
+[autoload]
+
+GameState="*res://game/game_state.gd"
+ZoneManager="*res://game/zone_manager.gd"
+Talk="*res://game/story/talk.gd"
+Schedules="*res://game/story/schedule/schedules.gd"
+Cutscenes="*res://game/story/cutscene/cutscenes.gd"
+
+[display]
+
+window/size/viewport_width=1920
+window/size/viewport_height=1080
+window/size/mode=2
+
+[dotnet]
+
+project/assembly_name="m3d3"
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/n64_actor_tools/plugin.cfg", "res://addons/n64_audio_tools/plugin.cfg", "res://addons/n64_level_tools/plugin.cfg", "res://addons/n64_script_builder/plugin.cfg", "res://addons/n64_story_tools/plugin.cfg", "res://addons/zz_view_debug/plugin.cfg")
+
+[n64]
+
+textures/texels_per_metre=16
+
+[shader_globals]
+
+n64_light_blend={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}
+n64_world_tint={
+"type": "color",
+"value": Color(1, 1, 1, 1)
+}
+n64_weather_tint={
+"type": "color",
+"value": Color(1, 1, 1, 1)
+}
+n64_vertex_ao={
+"type": "float",
+"value": 1.0
+}
+n64_time={
+"type": "float",
+"value": 0.0
+}
+n64_three_point={
+"type": "bool",
+"value": true
+}
+n64_fog_color={
+"type": "color",
+"value": Color(0.5, 0.5, 0.5, 1)
+}
+n64_fog={
+"type": "vec4",
+"value": Vector4(10, 60, 0, 0)
+}
+n64_fog_origin={
+"type": "vec3",
+"value": Vector3(0, 0, 0)
+}
+n64_key_light={
+"type": "vec4",
+"value": Vector4(0.3, 0.9, 0.3, 0.6)
+}
+n64_fog_light_pos0={
+"type": "vec4",
+"value": Vector4(0, -10000, 0, 0)
+}
+n64_fog_light_col0={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}
+n64_fog_light_pos1={
+"type": "vec4",
+"value": Vector4(0, -10000, 0, 0)
+}
+n64_fog_light_col1={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}
+n64_fog_light_pos2={
+"type": "vec4",
+"value": Vector4(0, -10000, 0, 0)
+}
+n64_fog_light_col2={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}
+n64_fog_light_pos3={
+"type": "vec4",
+"value": Vector4(0, -10000, 0, 0)
+}
+n64_fog_light_col3={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}
+n64_fog_lights={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}
+n64_reflect_cam={
+"type": "vec4",
+"value": Vector4(1000000000, 1000000000, 1000000000, 0)
+}
+level_grid_size={
+"type": "float",
+"value": 0.5
+}

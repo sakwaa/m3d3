@@ -1,0 +1,85 @@
+[gd_scene format=3 uid="uid://dbb3rfcka62b1"]
+
+[ext_resource type="Script" uid="uid://bav17pmnx06uq" path="res://game/world/zone.gd" id="1_p3rq7"]
+[ext_resource type="Shader" uid="uid://d4lmj1kn8lx7c" path="res://game/sky/n64_sky.gdshader" id="2_ag55k"]
+[ext_resource type="Script" uid="uid://bcvc33m1lfa5c" path="res://game/sky/dynamic_sky.gd" id="2_tqrli"]
+[ext_resource type="Texture2D" uid="uid://cocicdg4an5we" path="res://textures/sky/clouds.res" id="3_8cwth"]
+[ext_resource type="Script" uid="uid://rmol5sj7jl8o" path="res://game/world/day_night_sun.gd" id="3_ag55k"]
+[ext_resource type="Script" uid="uid://dbof576xv25u5" path="res://addons/n64_level_tools/level_root.gd" id="4_8cwth"]
+[ext_resource type="Resource" uid="uid://cbxdkdylc50ie" path="res://zones/town1/town1_level.tres" id="5_fknv1"]
+[ext_resource type="Script" uid="uid://0pm0hwpaajhf" path="res://game/world/spawn_point.gd" id="6_d7se1"]
+[ext_resource type="Texture2D" uid="uid://cvpasknkdji24" path="res://screenshots/town-grid-20ppm.png" id="9_8cwth"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_fknv1"]
+shader = ExtResource("2_ag55k")
+shader_parameter/zenith = Color(0.18, 0.42, 0.88, 1)
+shader_parameter/horizon = Color(0.62, 0.78, 0.95, 1)
+shader_parameter/cloud_light = Color(1, 1, 1, 1)
+shader_parameter/cloud_dark = Color(0.66, 0.72, 0.84, 1)
+shader_parameter/stars = 0.0
+shader_parameter/cloud_cover = 0.3
+shader_parameter/cloud_softness = 0.3
+shader_parameter/cloud_offset = Vector2(0.43169495, 0.9483763)
+shader_parameter/cloud_scale = 0.25
+shader_parameter/cloud_tex = ExtResource("3_8cwth")
+shader_parameter/star_angle = 3.141592653589793
+shader_parameter/star_density = 36.0
+shader_parameter/star_fill = 0.4
+shader_parameter/star_size = 0.002
+shader_parameter/star_softness = 0.35
+shader_parameter/star_twinkle = 0.3
+shader_parameter/disc_dir = Vector3(-2.1855694e-08, 1, -3.7855173e-08)
+shader_parameter/disc_color = Color(1, 0.92, 0.75, 1)
+shader_parameter/disc_size = 0.9993
+shader_parameter/disc_glow = 0.35
+shader_parameter/flash = 0.0
+shader_parameter/dither = true
+
+[sub_resource type="Sky" id="Sky_d7se1"]
+sky_material = SubResource("ShaderMaterial_fknv1")
+radiance_size = 0
+
+[sub_resource type="Environment" id="Environment_cq65v"]
+background_mode = 2
+sky = SubResource("Sky_d7se1")
+ambient_light_source = 2
+ambient_light_color = Color(0.4, 0.59999996, 0.91499996, 1)
+ambient_light_energy = 0.6
+reflected_light_source = 1
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_kutus"]
+size = Vector3(150, 0.2, 150)
+
+[node name="Town1" type="Node3D" unique_id=1866634826]
+script = ExtResource("1_p3rq7")
+display_name = "Town 1"
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=43134165]
+environment = SubResource("Environment_cq65v")
+script = ExtResource("2_tqrli")
+
+[node name="Sun" type="DirectionalLight3D" parent="." unique_id=626509949]
+transform = Transform3D(0.8660254, -0.38302222, 0.32139382, 0, 0.64278764, 0.76604444, -0.5, -0.66341394, 0.5566704, 0, 0, 0)
+script = ExtResource("3_ag55k")
+
+[node name="Level" type="Node3D" parent="." unique_id=1631139572]
+script = ExtResource("4_8cwth")
+data = ExtResource("5_fknv1")
+
+[node name="Spawn_default" type="Marker3D" parent="." unique_id=1084826183]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 2)
+script = ExtResource("6_d7se1")
+
+[node name="Reference" type="Node3D" parent="." unique_id=327786692]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -9.991089, 0)
+
+[node name="Sprite3D" type="Sprite3D" parent="Reference" unique_id=405861166]
+transform = Transform3D(0.99999994, 0, 0, 0, 0.99999994, 0, 0, 0, 1, 9, 9, 9)
+pixel_size = 0.05
+axis = 1
+texture = ExtResource("9_8cwth")
+
+[node name="StaticBody3D" type="StaticBody3D" parent="Reference/Sprite3D" unique_id=105418832]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Reference/Sprite3D/StaticBody3D" unique_id=1385129943]
+shape = SubResource("BoxShape3D_kutus")

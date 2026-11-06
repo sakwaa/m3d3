@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="N64Effect" format=3 uid="uid://dbhv6y8wm62oc"]
+
+[ext_resource type="Script" uid="uid://b8b2olhwlgvyw" path="res://addons/n64_runtime/effects/n64_effect.gd" id="1_5235p"]
+[ext_resource type="Texture2D" uid="uid://c6acrn8ikbfug" path="res://game/effects/sprites/ring.png" id="2_tyjer"]
+
+[sub_resource type="Gradient" id="Gradient_fqu7h"]
+colors = PackedColorArray(0.9, 0.95, 1, 0.75, 0.9, 0.95, 1, 0)
+
+[resource]
+resource_name = "splash_ring"
+script = ExtResource("1_5235p")
+texture = ExtResource("2_tyjer")
+facing = 1
+burst = 1
+max_sprites = 2
+lifetime = Vector2(0.5, 0.5)
+speed = Vector2(0, 0)
+spread = 0.0
+size = Vector2(0.35, 0.35)
+size_end = 3.0
+color = SubResource("Gradient_fqu7h")

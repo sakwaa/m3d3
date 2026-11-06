@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="RopeHang" format=3]
+
+[ext_resource type="Script" path="res://addons/n64_level_tools/rope_hang.gd" id="1_ffi78"]
+
+[resource]
+script = ExtResource("1_ffi78")
+kind = 2
+size = Vector2(0.16, 0.36)
+crossed = false
+offset = 0.5

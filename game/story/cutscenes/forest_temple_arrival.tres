@@ -1,0 +1,99 @@
+[gd_resource type="Resource" script_class="Cutscene" format=3]
+
+[ext_resource type="Script" path="res://game/story/cutscene/cutscene_cue.gd" id="1_hrc64"]
+[ext_resource type="Script" path="res://game/story/story_effect.gd" id="2_eualh"]
+[ext_resource type="Resource" path="res://game/effects/sparkle.tres" id="3_20ngy"]
+[ext_resource type="Script" path="res://game/story/cutscene/cutscene.gd" id="4_0go1c"]
+
+[sub_resource type="Resource" id="Resource_dotsi"]
+script = ExtResource("1_hrc64")
+kind = 3
+duration = 0.0
+event = 4
+
+[sub_resource type="Resource" id="Resource_xu1pp"]
+script = ExtResource("1_hrc64")
+duration = 0.0
+move = 0
+transform = Transform3D(0.83205026, 0.19765349, -0.5182908, 0, 0.93436205, 0.35632494, 0.55470014, -0.29648027, 0.77743626, -3, 6.5, 10)
+fov = 55.0
+
+[sub_resource type="Resource" id="Resource_cevij"]
+script = ExtResource("1_hrc64")
+kind = 1
+action = 2
+position = Vector3(0, 0, 2)
+facing = -49.0
+
+[sub_resource type="Resource" id="Resource_kqq57"]
+script = ExtResource("1_hrc64")
+kind = 3
+time = 0.1
+duration = 1.2
+event = 4
+color = Color(0, 0, 0, 0)
+
+[sub_resource type="Resource" id="Resource_2de3e"]
+script = ExtResource("1_hrc64")
+time = 1.5
+duration = 3.0
+transform = Transform3D(0.9103665, 0.040894713, -0.41177723, 0, 0.9951047, 0.09882654, 0.41380292, -0.08996837, 0.90590996, 2.5, 1.6, 5.5)
+fov = 50.0
+look_at = &"player"
+
+[sub_resource type="Resource" id="Resource_5hnwt"]
+script = ExtResource("1_hrc64")
+kind = 1
+time = 1.6
+duration = 0.0
+position = Vector3(8, 0, 3.6)
+
+[sub_resource type="Resource" id="Resource_ypaik"]
+script = ExtResource("1_hrc64")
+time = 4.8
+duration = 0.0
+move = 0
+transform = Transform3D(0.9246781, 0.030962225, -0.37948883, 0, 0.9966881, 0.08131908, 0.38074982, -0.07519397, 0.92161566, 6.6, 2.9, -1.6)
+fov = 45.0
+
+[sub_resource type="Resource" id="Resource_h0x40"]
+script = ExtResource("1_hrc64")
+kind = 3
+time = 5.1
+position = Vector3(8, 2.6, -4.6)
+event = 1
+effect = ExtResource("3_20ngy")
+
+[sub_resource type="Resource" id="Resource_g8ayl"]
+script = ExtResource("2_eualh")
+flag = "forest_temple/door_seen"
+
+[sub_resource type="Resource" id="Resource_5i7x6"]
+script = ExtResource("1_hrc64")
+kind = 3
+time = 5.6
+effects = Array[ExtResource("2_eualh")]([SubResource("Resource_g8ayl")])
+
+[sub_resource type="Resource" id="Resource_lrpid"]
+script = ExtResource("1_hrc64")
+time = 6.6
+duration = 0.0
+move = 0
+transform = Transform3D(0.9444968, -0.059697546, 0.32305118, 0, 0.98335105, 0.18171623, -0.32852072, -0.1716304, 0.92877185, 9.6, 2.3, 8.2)
+fov = 55.0
+look_at = &"player"
+
+[sub_resource type="Resource" id="Resource_wr6ta"]
+script = ExtResource("1_hrc64")
+time = 7.0
+duration = 1.5
+transform = Transform3D(0.99681526, -0.020006701, 0.07719469, 0, 0.9680174, 0.25088298, -0.07974515, -0.25008398, 0.9649345, 8.4, 2.9, 7)
+fov = 55.0
+look_at = &"player"
+
+[resource]
+script = ExtResource("4_0go1c")
+id = &"forest_temple_arrival"
+length = 8.5
+zone = "res://zones/forest_temple/forest_temple_zone.tscn"
+cues = Array[ExtResource("1_hrc64")]([SubResource("Resource_dotsi"), SubResource("Resource_xu1pp"), SubResource("Resource_cevij"), SubResource("Resource_kqq57"), SubResource("Resource_2de3e"), SubResource("Resource_5hnwt"), SubResource("Resource_ypaik"), SubResource("Resource_h0x40"), SubResource("Resource_5i7x6"), SubResource("Resource_lrpid"), SubResource("Resource_wr6ta")])

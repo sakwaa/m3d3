@@ -1,0 +1,51 @@
+[gd_resource type="Resource" script_class="StrokeAlphabet" format=3]
+
+[ext_resource type="Script" path="res://addons/n64_level_tools/glyphs/stroke_alphabet.gd" id="1_o4kl6"]
+
+[resource]
+script = ExtResource("1_o4kl6")
+strokes = {
+"CH": [PackedVector2Array(0, 0, -0.5, 0.8660254)],
+"F": [PackedVector2Array(0, 0, 0.38856405, 0.35301268, 0.5, 0.8660254)],
+"HH": [PackedVector2Array(0, 0, 0.8660254, 0.5)],
+"K": [PackedVector2Array(0, 0, 1, 0)],
+"L": [PackedVector2Array(0, 0, 0.111435935, -0.5130127, 0.5, -0.8660254)],
+"M": [PackedVector2Array(0, 0, 0.5, 0.18, 1, 0)],
+"N": [PackedVector2Array(0, 0, 0.5, -0.18, 1, 0)],
+"P": [PackedVector2Array(0, 0, 0.5, 0.8660254)],
+"R": [PackedVector2Array(0, 0, 0.8660254, -0.5)],
+"S": [PackedVector2Array(0, 0, 0.2, -0.2, 0.4, 0), PackedVector2Array(0.4, 0, 0.2, 0.2, 0, 0)],
+"SH": [PackedVector2Array(0, 0, -0.38856405, 0.35301268, -0.5, 0.8660254)],
+"T": [PackedVector2Array(0, 0, 0, 1)],
+"TH": [PackedVector2Array(0, 0, 0.18, 0.5, 0, 1)],
+"W": [PackedVector2Array(0.4, 0, 0.2, -0.2, 0, 0), PackedVector2Array(0, 0, 0, 0.85)],
+"Y": [PackedVector2Array(-0.4, 0, -0.2, -0.2, 0, 0), PackedVector2Array(0, 0, 0, 0.85)]
+}
+voiced = {
+"B": "P",
+"D": "T",
+"DH": "TH",
+"G": "K",
+"JH": "CH",
+"NG": "N",
+"V": "F",
+"Z": "S",
+"ZH": "SH"
+}
+vowels = {
+"AA": [0, "dot", true],
+"AE": [0, "dot", false],
+"AH": [1, "dash", false],
+"AO": [0, "dash", true],
+"AW": [2, "^", false],
+"AY": [0, "v", false],
+"EH": [1, "dot", false],
+"ER": [1, "dash", false],
+"EY": [1, "dot", true],
+"IH": [2, "dot", false],
+"IY": [2, "dot", true],
+"OW": [1, "dash", true],
+"OY": [0, "<", false],
+"UH": [2, "dash", false],
+"UW": [2, "dash", true]
+}

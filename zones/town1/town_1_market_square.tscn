@@ -1,0 +1,87 @@
+[gd_scene format=3 uid="uid://dey64awnygjgd"]
+
+[ext_resource type="Script" uid="uid://bav17pmnx06uq" path="res://game/world/zone.gd" id="1_u6usy"]
+[ext_resource type="Shader" uid="uid://d4lmj1kn8lx7c" path="res://game/sky/n64_sky.gdshader" id="2_68k5h"]
+[ext_resource type="Script" uid="uid://d3axvhxk7pjyl" path="res://game/world/fog_settings.gd" id="2_kxs3f"]
+[ext_resource type="Texture2D" uid="uid://cocicdg4an5we" path="res://textures/sky/clouds.res" id="3_kxs3f"]
+[ext_resource type="Script" uid="uid://bcvc33m1lfa5c" path="res://game/sky/dynamic_sky.gd" id="4_g7afi"]
+[ext_resource type="Script" uid="uid://rmol5sj7jl8o" path="res://game/world/day_night_sun.gd" id="5_kwrea"]
+[ext_resource type="Script" uid="uid://dbof576xv25u5" path="res://addons/n64_level_tools/level_root.gd" id="6_nrb72"]
+[ext_resource type="Resource" uid="uid://dclhhskkqbyy5" path="res://zones/town1/town_1_market_square_level.tres" id="7_quiwk"]
+[ext_resource type="Script" uid="uid://0pm0hwpaajhf" path="res://game/world/spawn_point.gd" id="8_sqndc"]
+[ext_resource type="Texture2D" uid="uid://bl1455r88l5l3" path="res://maps/town1/01-market-square-20ppm.png" id="9_u6usy"]
+
+[sub_resource type="Resource" id="Resource_ytxeh"]
+script = ExtResource("2_kxs3f")
+start = 60.0
+end = 150.0
+metadata/_custom_type_script = "uid://d3axvhxk7pjyl"
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_fknv1"]
+shader = ExtResource("2_68k5h")
+shader_parameter/zenith = Color(0.18, 0.42, 0.88, 1)
+shader_parameter/horizon = Color(0.62, 0.78, 0.95, 1)
+shader_parameter/cloud_light = Color(1, 1, 1, 1)
+shader_parameter/cloud_dark = Color(0.66, 0.72, 0.84, 1)
+shader_parameter/stars = 0.0
+shader_parameter/cloud_cover = 0.3
+shader_parameter/cloud_softness = 0.3
+shader_parameter/cloud_offset = Vector2(0.9797204, 0.79279083)
+shader_parameter/cloud_scale = 0.25
+shader_parameter/cloud_tex = ExtResource("3_kxs3f")
+shader_parameter/star_angle = 3.141592653589793
+shader_parameter/star_density = 36.0
+shader_parameter/star_fill = 0.4
+shader_parameter/star_size = 0.002
+shader_parameter/star_softness = 0.35
+shader_parameter/star_twinkle = 0.3
+shader_parameter/disc_dir = Vector3(-2.1855694e-08, 1, -3.7855173e-08)
+shader_parameter/disc_color = Color(1, 0.92, 0.75, 1)
+shader_parameter/disc_size = 0.9993
+shader_parameter/disc_glow = 0.35
+shader_parameter/flash = 0.0
+shader_parameter/dither = true
+
+[sub_resource type="Sky" id="Sky_d7se1"]
+sky_material = SubResource("ShaderMaterial_fknv1")
+radiance_size = 0
+
+[sub_resource type="Environment" id="Environment_cq65v"]
+background_mode = 2
+sky = SubResource("Sky_d7se1")
+ambient_light_source = 2
+ambient_light_color = Color(0.4, 0.59999996, 0.91499996, 1)
+ambient_light_energy = 0.6
+reflected_light_source = 1
+
+[node name="Town1" type="Node3D" unique_id=1866634826]
+script = ExtResource("1_u6usy")
+display_name = "Town 1"
+fog = SubResource("Resource_ytxeh")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=43134165]
+environment = SubResource("Environment_cq65v")
+script = ExtResource("4_g7afi")
+
+[node name="Sun" type="DirectionalLight3D" parent="." unique_id=626509949]
+transform = Transform3D(0.8660254, -0.38302222, 0.32139382, 0, 0.64278764, 0.76604444, -0.5, -0.66341394, 0.5566704, 0, 0, 0)
+script = ExtResource("5_kwrea")
+
+[node name="Level" type="Node3D" parent="." unique_id=1631139572]
+script = ExtResource("6_nrb72")
+data = ExtResource("7_quiwk")
+
+[node name="Spawn_default" type="Marker3D" parent="." unique_id=1084826183]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 2)
+script = ExtResource("8_sqndc")
+
+[node name="Reference" type="Node3D" parent="." unique_id=327786692 groups=["editor_only"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4929695, 0)
+
+[node name="Sprite3D" type="Sprite3D" parent="Reference" unique_id=405861166]
+transform = Transform3D(0.99999994, 0, 0, 0, 0.99999994, 0, 0, 0, 1, 0, 0, 0)
+visible = false
+modulate = Color(1, 1, 1, 0.27058825)
+pixel_size = 0.05
+axis = 1
+texture = ExtResource("9_u6usy")

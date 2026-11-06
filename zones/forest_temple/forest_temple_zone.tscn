@@ -1,0 +1,100 @@
+[gd_scene format=3 uid="uid://bymoebrc4fymg"]
+
+[ext_resource type="Script" uid="uid://bav17pmnx06uq" path="res://game/world/zone.gd" id="1_5rk7r"]
+[ext_resource type="Script" uid="uid://d3axvhxk7pjyl" path="res://game/world/fog_settings.gd" id="2_0grn3"]
+[ext_resource type="Script" uid="uid://dbof576xv25u5" path="res://addons/n64_level_tools/level_root.gd" id="2_22nc8"]
+[ext_resource type="Resource" uid="uid://mamk5s6etjr2" path="res://zones/forest_temple/forest_temple_zone_level.tres" id="3_qc3mq"]
+[ext_resource type="Script" uid="uid://0pm0hwpaajhf" path="res://game/world/spawn_point.gd" id="4_0grn3"]
+[ext_resource type="Script" uid="uid://nabeyx1w2i7k" path="res://game/world/passage.gd" id="5_22nc8"]
+[ext_resource type="Script" uid="uid://dk0pgbf4mj375" path="res://game/world/door.gd" id="6_qc3mq"]
+[ext_resource type="Script" uid="uid://dsb5etcp42bwx" path="res://game/world/opening_dressing.gd" id="8_0yd42"]
+[ext_resource type="Texture2D" path="res://textures/doors/rustic_cross_panel.res" id="8_stko7"]
+[ext_resource type="Texture2D" uid="uid://ofa8qf185hqn" path="res://textures/concrete/concrete_bare.res" id="9_stko7"]
+[ext_resource type="Script" uid="uid://ck7ndu85sntea" path="res://game/actors/enemies/wolfos/wolfos.gd" id="20_wolfos"]
+
+[sub_resource type="Resource" id="Resource_qjapc"]
+script = ExtResource("2_0grn3")
+color = Color(0.13333334, 0.16862746, 0.13333334, 1)
+amount = 0.5
+metadata/_custom_type_script = "uid://d3axvhxk7pjyl"
+
+[sub_resource type="Environment" id="Environment_qv5jb"]
+background_mode = 1
+background_color = Color(0.02, 0.02, 0.03, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.35, 0.33, 0.3, 1)
+ambient_light_energy = 0.5
+reflected_light_source = 1
+
+[sub_resource type="Resource" id="Resource_o18a2"]
+script = ExtResource("8_0yd42")
+texture = ExtResource("9_stko7")
+metadata/_custom_type_script = "uid://dsb5etcp42bwx"
+
+[node name="ForestTempleZone" type="Node3D" unique_id=449778796]
+script = ExtResource("1_5rk7r")
+display_name = "Forest Temple Zone"
+time_flows = false
+shadow_strength = 0.35
+fog = SubResource("Resource_qjapc")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1951830399]
+environment = SubResource("Environment_qv5jb")
+
+[node name="Light" type="OmniLight3D" parent="." unique_id=1370106854]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 0)
+light_color = Color(1, 0.48333335, 0, 1)
+light_energy = 1.5
+omni_range = 12.0
+
+[node name="Light2" type="OmniLight3D" parent="." unique_id=271393185]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.357021, 11.924964, 12.190531)
+light_energy = 1.5
+omni_range = 12.0
+
+[node name="Level" type="Node3D" parent="." unique_id=853964045]
+script = ExtResource("2_22nc8")
+data = ExtResource("3_qc3mq")
+
+[node name="Spawn_default" type="Marker3D" parent="." unique_id=1803663831]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 2)
+script = ExtResource("4_0grn3")
+
+[node name="Passage" type="Node3D" parent="." unique_id=1571044329 node_paths=PackedStringArray("level")]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 9, 0, 20)
+script = ExtResource("5_22nc8")
+level = NodePath("../Level")
+floor_tag = &"passage_4db3c90a"
+dressing_ao = PackedFloat32Array()
+
+[node name="Door" type="Node3D" parent="." unique_id=762516680]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, -4.9999995)
+script = ExtResource("6_qc3mq")
+mode = 1
+door_id = &"door"
+panel_texture = ExtResource("8_stko7")
+wall_depth = 2.0
+dressing = SubResource("Resource_o18a2")
+dressing_ao = PackedFloat32Array(1, 0.71875, 1, 0.71875, 1, 0.625, 1, 0.625, 1, 0.71875, 0.71875, 0.8125, 0.859375, 0.625, 1, 0.484375, 0.859375, 0.859375, 0.859375, 0.859375, 0.90625, 0.53125, 0.90625, 0.90625, 0.859375, 0.859375, 0.953125, 0.578125, 1, 1, 0.90625, 0.90625, 1, 0.625, 1, 1, 0.8125, 0.8125, 1, 0.625, 0.8125, 0.625, 0.578125, 0.765625, 0.625, 0.4375, 0.8125, 0.25, 1, 0.625, 1, 0.71875, 1, 0.71875, 1, 0.625, 1, 0.625, 1, 0.484375, 0.859375, 0.625, 0.71875, 0.8125, 1, 0.71875, 0.859375, 0.859375, 0.578125, 0.953125, 0.859375, 0.859375, 0.90625, 0.90625, 0.578125, 0.953125, 0.90625, 0.90625, 1, 1, 0.625, 1, 0.953125, 0.953125, 1, 1, 0.625, 1, 0.8125, 0.859375, 0.625, 0.8125, 0.625, 1, 0.8125, 0.25, 0.625, 0.4375, 0.8125, 0.578125, 1, 1, 1, 1, 0.625, 0.765625, 0.765625, 0.671875, 1, 0.671875, 1, 0.671875, 1, 0.671875, 0.671875, 1, 1, 0.859375, 0.859375, 1, 0.671875, 1, 1, 0.8125, 0.8125, 1, 0.671875, 1, 1, 0.859375, 0.8125, 1, 0.671875, 1, 1, 0.625, 0.625, 0.625, 1, 0.625, 1, 0.671875, 0.71875, 1, 0.71875, 1, 1, 1, 1, 1, 1, 0.71875, 0.71875, 1, 0.390625, 0.90625, 0.71875, 0.765625, 0.859375, 0.859375, 0.859375, 0.859375, 0.4375, 0.8125, 0.90625, 0.90625, 0.90625, 0.90625, 0.4375, 0.8125, 1, 1, 0.953125, 0.953125, 0.484375, 0.859375, 1, 1, 0.8125, 0.859375, 0.484375, 0.859375, 0.578125, 0.765625, 0.8125, 0.578125, 0.25, 0.765625, 0.390625, 0.625, 0.484375, 0.859375, 0.71875, 0.953125, 0.671875, 1, 1, 1, 1, 1, 0.765625, 0.8125, 0.4375, 1, 0.71875, 1, 1, 0.71875, 0.8125, 0.859375, 0.859375, 0.484375, 0.859375, 0.859375, 0.859375, 0.90625, 0.90625, 0.53125, 0.859375, 0.859375, 0.953125, 1, 0.953125, 0.578125, 0.90625, 0.90625, 0.953125, 1, 0.953125, 0.578125, 0.8125, 0.8125, 0.765625, 0.578125, 0.953125, 0.578125, 0.4375, 0.625, 0.25, 0.8125, 0.578125, 0.765625, 0.953125, 1, 0.953125, 1, 0.671875, 0.859375, 0.859375, 0.625, 0.484375, 0.859375, 0.484375, 0.859375, 0.484375, 0.484375, 0.859375, 1, 0.953125, 0.90625, 0.90625, 0.484375, 0.859375, 1, 0.953125, 0.859375, 0.859375, 0.484375, 0.859375, 1, 0.953125, 0.765625, 0.859375, 0.484375, 0.859375, 0.953125, 0.90625, 0.625, 0.625, 0.578125, 0.90625, 0.53125, 0.484375, 0.859375)
+dressing_ao_key = 3053829491
+recess_tag = &"door_91cb1507"
+recess_hashes = {
+&"door_91cb1507_room": 1058506861,
+&"door_91cb1507_wall": 1103772344
+}
+
+[node name="Door2" type="Node3D" parent="." unique_id=205480367]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 1.9999999, -20)
+script = ExtResource("6_qc3mq")
+door_id = &"door_2"
+wall_depth = 2.0
+dressing_ao = PackedFloat32Array()
+recess_tag = &"door_66ed7144"
+recess_hashes = {
+&"door_66ed7144_room": 659016643,
+&"door_66ed7144_wall": 494678611
+}
+
+[node name="Wolfos" type="CharacterBody3D" parent="." unique_id=1188112001]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 8)
+script = ExtResource("20_wolfos")

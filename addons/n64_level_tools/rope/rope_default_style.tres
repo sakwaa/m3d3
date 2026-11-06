@@ -1,0 +1,8 @@
+[gd_resource type="Resource" script_class="RopeStyle" format=3 uid="uid://b2o6rtdlnnd72"]
+
+[ext_resource type="Script" uid="uid://brbih07u41w2l" path="res://addons/n64_level_tools/rope_style.gd" id="1_gmsj4"]
+[ext_resource type="Texture2D" path="res://textures/rope/rope_default.res" id="2_kjluc"]
+
+[resource]
+script = ExtResource("1_gmsj4")
+texture = ExtResource("2_kjluc")

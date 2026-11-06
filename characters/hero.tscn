@@ -1,0 +1,13 @@
+[gd_scene format=3 uid="uid://02hmoqufegf2"]
+
+[ext_resource type="Script" uid="uid://nmpsm53epl0l" path="res://addons/n64_actor_tools/actor_model.gd" id="1_hsbtt"]
+[ext_resource type="Script" uid="uid://l0s0trdw1ddy" path="res://addons/n64_actor_tools/actor_animation.gd" id="2_xpvg0"]
+[ext_resource type="Script" uid="uid://bqmwoyc34o8o2" path="res://addons/n64_actor_tools/actor_piece.gd" id="3_i8fah"]
+[ext_resource type="Script" uid="uid://c3td138uv5veb" path="res://addons/n64_actor_tools/actor_model_data.gd" id="4_qdh66"]
+
+[sub_resource type="Resource" id="Resource_2oi4w"]
+script = ExtResource("4_qdh66")
+
+[node name="Hero" type="Node3D" unique_id=1827387654]
+script = ExtResource("1_hsbtt")
+data = SubResource("Resource_2oi4w")

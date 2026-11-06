@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="N64Effect" format=3]
+
+[ext_resource type="Script" path="res://addons/n64_runtime/effects/n64_effect.gd" id="1_abln8"]
+[ext_resource type="Texture2D" path="res://game/effects/sprites/flame.png" id="2_0gibf"]
+
+[sub_resource type="Gradient" id="Gradient_lsbkb"]
+offsets = PackedFloat32Array(0, 0.12, 0.6, 1)
+colors = PackedColorArray(1, 0.85, 0.4, 0, 1, 0.75, 0.3, 1, 1, 0.35, 0.08, 0.8, 0.6, 0.1, 0.02, 0)
+
+[resource]
+resource_name = "torch_fire"
+script = ExtResource("1_abln8")
+texture = ExtResource("2_0gibf")
+frames = 4
+columns = 4
+fps = 12.0
+blend = 1
+burst = 0
+rate = 14.0
+max_sprites = 16
+lifetime = Vector2(0.45, 0.7)
+speed = Vector2(0.5, 0.9)
+spread = 12.0
+gravity = -0.8
+drag = 1.0
+size = Vector2(0.32, 0.4)
+size_end = 0.35
+color = SubResource("Gradient_lsbkb")

@@ -1,0 +1,161 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://game/world/zone.gd" id="1_n005a"]
+[ext_resource type="Script" path="res://game/world/room.gd" id="2_sgkxl"]
+[ext_resource type="Script" path="res://addons/n64_level_tools/level_root.gd" id="3_uim5k"]
+[ext_resource type="Resource" path="res://zones/temple/entrance_level.tres" id="4_6s742"]
+[ext_resource type="Script" path="res://game/actors/spinner.gd" id="5_kqvw7"]
+[ext_resource type="Resource" path="res://zones/temple/hall_level.tres" id="6_q5qqj"]
+[ext_resource type="Resource" path="res://zones/temple/vault_level.tres" id="7_wxgf7"]
+[ext_resource type="Script" path="res://game/actors/flag_pickup.gd" id="8_5084k"]
+[ext_resource type="Script" path="res://game/world/door.gd" id="10_n005a"]
+[ext_resource type="Script" path="res://game/world/passage.gd" id="10_sfkeb"]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_iuyna"]
+sky_top_color = Color(0.1, 0.1, 0.18, 1)
+
+[sub_resource type="Sky" id="Sky_cungx"]
+sky_material = SubResource("ProceduralSkyMaterial_iuyna")
+
+[sub_resource type="Environment" id="Environment_khhku"]
+background_mode = 2
+sky = SubResource("Sky_cungx")
+ambient_light_energy = 0.4
+
+[node name="Temple" type="Node3D" unique_id=1724707118 node_paths=PackedStringArray("start_room")]
+script = ExtResource("1_n005a")
+zone_id = &"temple"
+display_name = "Temple"
+time_flows = false
+start_room = NodePath("Entrance")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=284870355]
+environment = SubResource("Environment_khhku")
+
+[node name="Light" type="DirectionalLight3D" parent="." unique_id=1234353970]
+transform = Transform3D(0.9396926, -0.29619813, 0.17101005, 0, 0.49999997, 0.86602545, -0.34202012, -0.8137977, 0.46984628, 0, 0, 0)
+light_energy = 0.6
+light_bake_mode = 0
+
+[node name="Entrance" type="Node3D" parent="." unique_id=880290930]
+script = ExtResource("2_sgkxl")
+room_id = &"entrance"
+
+[node name="Geometry" type="Node3D" parent="Entrance" unique_id=1759082021]
+script = ExtResource("3_uim5k")
+data = ExtResource("4_6s742")
+
+[node name="Actors" type="Node3D" parent="Entrance" unique_id=779269527]
+
+[node name="Crystal" type="MeshInstance3D" parent="Entrance/Actors" unique_id=556648803]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 1.2, 0)
+script = ExtResource("5_kqvw7")
+
+[node name="Torch" type="OmniLight3D" parent="Entrance" unique_id=1738756246]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.3, 2.4, 0)
+light_color = Color(1, 0.68, 0.38, 1)
+light_energy = 2.4
+omni_range = 7.5
+
+[node name="Torch2" type="OmniLight3D" parent="Entrance" unique_id=177470909]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.3, 2.4, 0)
+light_color = Color(1, 0.68, 0.38, 1)
+light_energy = 2.4
+omni_range = 7.5
+
+[node name="Hall" type="Node3D" parent="." unique_id=1878030264]
+script = ExtResource("2_sgkxl")
+room_id = &"hall"
+
+[node name="Geometry" type="Node3D" parent="Hall" unique_id=313468748]
+script = ExtResource("3_uim5k")
+data = ExtResource("6_q5qqj")
+
+[node name="Actors" type="Node3D" parent="Hall" unique_id=1507382397]
+
+[node name="Crystal" type="MeshInstance3D" parent="Hall/Actors" unique_id=1996878602]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 1.2, -11)
+script = ExtResource("5_kqvw7")
+color = Color(0.6, 1, 0.4, 1)
+
+[node name="SmallKey" type="Area3D" parent="Hall/Actors" unique_id=860161482]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 0.8, -11)
+script = ExtResource("8_5084k")
+flag_id = "temple/hall_key"
+small_key = true
+color = Color(0.6, 0.85, 1, 1)
+
+[node name="Torch" type="OmniLight3D" parent="Hall" unique_id=1537381258]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.3, 2.4, -11)
+light_color = Color(1, 0.68, 0.38, 1)
+light_energy = 2.4
+omni_range = 7.5
+
+[node name="Torch2" type="OmniLight3D" parent="Hall" unique_id=185466176]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.3, 2.4, -11)
+light_color = Color(1, 0.68, 0.38, 1)
+light_energy = 2.4
+omni_range = 7.5
+
+[node name="Vault" type="Node3D" parent="." unique_id=204190202]
+script = ExtResource("2_sgkxl")
+room_id = &"vault"
+
+[node name="Geometry" type="Node3D" parent="Vault" unique_id=1575608163]
+script = ExtResource("3_uim5k")
+data = ExtResource("7_wxgf7")
+
+[node name="Actors" type="Node3D" parent="Vault" unique_id=500772942]
+
+[node name="Crystal" type="MeshInstance3D" parent="Vault/Actors" unique_id=49012987]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 1.2, -20.607143)
+script = ExtResource("5_kqvw7")
+color = Color(1, 0.4, 0.6, 1)
+
+[node name="Gem" type="Area3D" parent="Vault/Actors" unique_id=1334979015]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, -24)
+script = ExtResource("8_5084k")
+flag_id = "temple/vault_gem"
+
+[node name="Torch" type="OmniLight3D" parent="Vault" unique_id=12180315]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.8, -22)
+light_color = Color(1, 0.68, 0.38, 1)
+light_energy = 2.4
+omni_range = 7.5
+
+[node name="Passage" type="Node3D" parent="." unique_id=373749065 node_paths=PackedStringArray("room", "level")]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 5)
+script = ExtResource("10_sfkeb")
+target_zone = "res://zones/overworld/overworld.tscn"
+target_spawn = &"from_temple"
+spawn_id = &"entrance"
+room = NodePath("../Entrance")
+level = NodePath("../Entrance/Geometry")
+floor_tag = &"passage_to_overworld"
+
+[node name="EntranceHallDoor" type="Node3D" parent="." unique_id=1755182797 node_paths=PackedStringArray("room_a", "room_b")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -5)
+script = ExtResource("10_n005a")
+style = 1
+room_a = NodePath("../Hall")
+room_b = NodePath("../Entrance")
+wall_depth = 0.5
+
+[node name="VaultDoor" type="Node3D" parent="." unique_id=424525818 node_paths=PackedStringArray("room_a", "room_b")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -17)
+script = ExtResource("10_n005a")
+style = 1
+room_a = NodePath("../Vault")
+room_b = NodePath("../Hall")
+lock = 2
+door_id = &"vault"
+wall_depth = 0.5
+
+[node name="VaultExit" type="Node3D" parent="." unique_id=1473545282 node_paths=PackedStringArray("arrival_room")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -26.67)
+script = ExtResource("10_n005a")
+mode = 1
+target_zone = "res://zones/overworld/overworld.tscn"
+target_spawn = &"vault_exit"
+spawn_id = &"vault_door"
+arrival_room = NodePath("../Vault")

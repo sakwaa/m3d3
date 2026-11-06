@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="N64Effect" format=3 uid="uid://h8tbcdg4wop1"]
+
+[ext_resource type="Script" uid="uid://b8b2olhwlgvyw" path="res://addons/n64_runtime/effects/n64_effect.gd" id="1_gfm7i"]
+[ext_resource type="Texture2D" uid="uid://cok7idh6eip5t" path="res://game/effects/sprites/spark.png" id="2_bysfu"]
+[ext_resource type="Resource" uid="uid://bpgt1sbv13fm8" path="res://game/effects/hit_sparks.tres" id="3_f7qkl"]
+
+[sub_resource type="Gradient" id="Gradient_eieeh"]
+colors = PackedColorArray(1, 1, 1, 1, 1, 0.9, 0.5, 0)
+
+[resource]
+resource_name = "hit_flash"
+script = ExtResource("1_gfm7i")
+texture = ExtResource("2_bysfu")
+blend = 1
+burst = 1
+max_sprites = 2
+lifetime = Vector2(0.12, 0.12)
+speed = Vector2(0, 0)
+spread = 0.0
+spin = Vector2(0.5, 0.5)
+size = Vector2(0.7, 0.7)
+size_end = 1.6
+color = SubResource("Gradient_eieeh")
+with = Array[ExtResource("1_gfm7i")]([ExtResource("3_f7qkl")])

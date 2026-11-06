@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="RopeHang" format=3]
+
+[ext_resource type="Script" path="res://addons/n64_level_tools/rope_hang.gd" id="1_mcv84"]
+
+[resource]
+script = ExtResource("1_mcv84")
+kind = 3
+size = Vector2(0.5, 1.2)
+crossed = false
+placement = 1
+cloth_color = Color(0.93, 0.92, 0.86, 1)
+trim_color = Color(0.7, 0.12, 0.1, 1)

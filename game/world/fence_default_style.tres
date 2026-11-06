@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="FenceStyle" format=3 uid="uid://cgb6cxcp2eyrp"]
+
+[ext_resource type="Script" uid="uid://bwefsjouajc75" path="res://game/world/fence_style.gd" id="1_ctidm"]
+[ext_resource type="Texture2D" uid="uid://cs388foy6c2xe" path="res://game/world/fence_default_style_arch.res" id="1_ufd7f"]
+[ext_resource type="Texture2D" uid="uid://b3qd6mgfnqawo" path="res://game/world/fence_default_style_cap.res" id="2_vbaru"]
+[ext_resource type="Texture2D" uid="uid://b6n5h6cclwu8h" path="res://game/world/fence_default_style_panel.res" id="3_wnxjl"]
+[ext_resource type="Texture2D" path="res://textures/wood/wood_2.res" id="4_tkoqn"]
+[ext_resource type="Texture2D" uid="uid://bmpelaiyudm7b" path="res://game/world/fence_default_style_post.res" id="5_mw0du"]
+
+[resource]
+script = ExtResource("1_ctidm")
+panel_texture = ExtResource("3_wnxjl")
+post_texture = ExtResource("5_mw0du")
+end_cap_texture = ExtResource("2_vbaru")
+end_cap_width = 0.4
+arch_texture = ExtResource("1_ufd7f")
+rail_material = ExtResource("4_tkoqn")
+post_material = ExtResource("4_tkoqn")
+material_grain = 1

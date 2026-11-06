@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="N64Effect" format=3 uid="uid://cdt7w7er26qg"]
+
+[ext_resource type="Script" uid="uid://b8b2olhwlgvyw" path="res://addons/n64_runtime/effects/n64_effect.gd" id="1_rpfqo"]
+[ext_resource type="Texture2D" uid="uid://bsfdudvxsd77" path="res://game/effects/sprites/puff.png" id="2_ohv45"]
+
+[sub_resource type="Gradient" id="Gradient_y4tax"]
+colors = PackedColorArray(0.76, 0.66, 0.52, 0.75, 0.72, 0.62, 0.48, 0)
+
+[resource]
+resource_name = "dust_puff"
+script = ExtResource("1_rpfqo")
+texture = ExtResource("2_ohv45")
+burst = 5
+max_sprites = 8
+radius = 0.12
+lifetime = Vector2(0.35, 0.55)
+speed = Vector2(0.4, 0.9)
+spread = 75.0
+gravity = -0.4
+drag = 4.0
+spin = Vector2(0.1, 0.4)
+size = Vector2(0.24, 0.34)
+size_end = 2.4
+color = SubResource("Gradient_y4tax")
