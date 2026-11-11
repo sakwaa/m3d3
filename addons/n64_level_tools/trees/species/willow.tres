@@ -1,0 +1,72 @@
+[gd_resource type="Resource" script_class="TreeSpecies" format=3]
+
+[ext_resource type="Texture2D" path="res://textures/wood/tree_bark.res" id="1_sqyjs"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_willow_1_t0.res" id="2_qyglv"]
+[ext_resource type="Texture2D" path="res://textures/plants/leaves_willow.res" id="2_ujc3w"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_willow_1_t1.res" id="3_bhedl"]
+[ext_resource type="Script" path="res://addons/n64_level_tools/trees/tree_level.gd" id="3_brvqj"]
+[ext_resource type="Script" path="res://addons/n64_level_tools/trees/tree_species.gd" id="4_10vu5"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_willow_1_t2.res" id="4_fxdch"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_willow_1_t3.res" id="5_ulx6y"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_willow_2_t0.res" id="6_wl0q4"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_willow_2_t1.res" id="7_0erwt"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_willow_2_t2.res" id="8_7purc"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_willow_2_t3.res" id="9_0owds"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_willow_3_t0.res" id="10_floc3"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_willow_3_t1.res" id="11_ukg5v"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_willow_3_t2.res" id="12_81412"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_willow_3_t3.res" id="13_ejrco"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_willow_4_t0.res" id="14_w8rox"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_willow_4_t1.res" id="15_mi2l6"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_willow_4_t2.res" id="16_o0e0n"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_willow_4_t3.res" id="17_a6mcb"]
+
+[sub_resource type="Resource" id="Resource_v1aee"]
+script = ExtResource("3_brvqj")
+count = 7
+angle = 18.0
+angle_var = 12.0
+length = 0.85
+curve = -115.0
+curve_power = 3.5
+radius = 0.6
+segments = 4
+
+[sub_resource type="Resource" id="Resource_bh50i"]
+script = ExtResource("3_brvqj")
+count = 3
+start = 0.4
+angle = 40.0
+angle_var = 15.0
+length = 0.4
+curve = -40.0
+curve_power = 2.0
+radius = 0.45
+bark = false
+segments = 2
+
+[resource]
+script = ExtResource("4_10vu5")
+display_name = "Weeping willow"
+reference = "Salix babylonica / x sepulcralis: 10-20 m, crown broad and rounded, wider than tall (~1.2x), short trunk 1.5-3 m dividing into several ascending limbs that arch over; branchlets hang straight down, nearly to the ground. Game scale 10 m."
+height = 11.0
+trunk_radius = 0.45
+trunk_taper = 0.45
+trunk_top = 0.4
+segments = 3
+clear = 0.25
+crown = 3
+crown_profile = PackedFloat32Array()
+levels = Array[ExtResource("3_brvqj")]([SubResource("Resource_v1aee"), SubResource("Resource_bh50i")])
+cards = 2
+leaf_texture = ExtResource("2_ujc3w")
+bark_texture = ExtResource("1_sqyjs")
+card_textures = Array[Texture2D]([ExtResource("2_qyglv"), ExtResource("3_bhedl"), ExtResource("4_fxdch"), ExtResource("5_ulx6y"), ExtResource("6_wl0q4"), ExtResource("7_0erwt"), ExtResource("8_7purc"), ExtResource("9_0owds"), ExtResource("10_floc3"), ExtResource("11_ukg5v"), ExtResource("12_81412"), ExtResource("13_ejrco"), ExtResource("14_w8rox"), ExtResource("15_mi2l6"), ExtResource("16_o0e0n"), ExtResource("17_a6mcb")])
+card_aspects = PackedFloat32Array(1.3359375, 1.3671875, 1.2421875, 1.4414063)
+card_tiles = Vector2i(2, 2)
+card_size = 1.6
+inner_clumps = 3
+leaf_start = 0.3
+hang_length = 8.0
+bark_color = Color(0.5, 0.45, 0.38, 1)
+crown_ao = 0.35

@@ -55,6 +55,8 @@ var _placing := false
 var _brush_ops: Control
 var _geometry_ops: Control
 var _snap_button: Button
+var _props_button: Button
+var _props_popup: PopupPanel
 var _snap_popup: PopupPanel
 var _snap_spin: SpinBox
 var _debug_button: Button
@@ -141,6 +143,10 @@ func _init() -> void:
 	door.toggled.connect(_on_shape_toggled.bind(SHAPE_ICONS.size() + 1))
 	shapes.add_child(door)
 	_shape_buttons.append(door)
+	_props_button = _button(_svg("props"), "Props: signs, ropes, fences and other things to place", false, "P")
+	_props_button.pressed.connect(_open_props_popup)
+	shapes.add_child(_props_button)
+	_build_props_popup()
 
 	# Modes + contextual operations.
 	_rule()
@@ -164,8 +170,6 @@ func _init() -> void:
 		[_svg("cleanup"), "Clean up: merge matching flat faces (removes strips left by cuts), then\ncut them back into a grid on world lines one snap apart, for vertex lighting.\nPaint is kept; bake lighting / AO again afterwards", &"cleanup", "C"],
 		[_editor_icon(&"ExternalLink"), "Edit in Blender: a set piece's .blend opens in Blender;\nother brushes move into a new one (a set piece: shaped in Blender,\nplaced and painted here). Saving in Blender updates it here.", &"blender", "Bl"],
 		[_editor_icon(&"Unlinked"), "Unlink from Blender: the selected set piece brushes go back\nto the brush tools (the .blend stays)", &"blender_unlink", "U"],
-		[_svg("fence"), "Fence: drops a fence on the ground where the view looks and selects it:\ndrag its points (snapped, on the ground), click a section's + to split it,\nShift+click the ground to extend, Alt+click a point / section to remove / open it.\nVertex mode with a line of vertices selected: follows them instead.", &"fence", "▥"],
-		[_svg("rope"), "Rope: click where it hangs from, then where it goes to (anchors snap to\ncorners near the mouse: building corners, posts). It sags between its points and\nrepeats its style's texture along itself. Selected: drag its points, Shift+click to\nextend, click a section's + to add a point, Alt+click a point / section to remove / leave it out.", &"rope", "~"],
 	])
 	_geometry_ops = _action_grid([
 		[_svg("extrude"), "Extrude one snap step (E)\n(or %s+drag a gizmo arrow)" % ("Cmd" if OS.get_name() == "macOS" else "Ctrl") + "\nVertex mode: selected border vertices grow walls\nShift+E: border grows outwards on every side (a floor gets bigger)", &"extrude", "E"],
@@ -175,7 +179,6 @@ func _init() -> void:
 		[_svg("subdivide"), "Subdivide selected faces (Face mode)\ninto quads; press again for finer", &"subdivide", "S"],
 		[_svg("retopo"), "Retopo selected faces: a clean grid sized to the snap\n(cells fit the selection, not world snap; heights resampled,\nneighbours stitched)", &"retopo", "R"],
 		[_svg("cleanup"), "Clean up selected faces: merge matching flat faces, then a grid\non world lines one snap apart (paint kept; bake lighting / AO again)", &"cleanup", "C"],
-		[_svg("fence"), "Fence: drops a fence on the ground where the view looks and selects it:\ndrag its points (snapped, on the ground), click a section's + to split it,\nShift+click the ground to extend, Alt+click a point / section to remove / open it.\nVertex mode with a line of vertices selected: follows them instead.", &"fence", "▥"],
 		[_svg("ramp"), "Ramp (R): even slope between two rows. Raise the top row to its\nheight, then select the top, the foot row and everything between (vertices\nor faces): the top stays, the low row farthest from it stays, the rest slope evenly", &"ramp", "/"],
 		[_editor_icon(&"ToolMove"), "Move by exact X / Y / Z…\n(or arrow keys / PgUp / PgDn, Shift x10)", &"move_dialog", "M"],
 	])
@@ -223,9 +226,12 @@ func _init() -> void:
 	var play := _button(_editor_icon(&"PlayScene"), "Quick Play: bake, save and run this zone as you see it\nstarting on the reference character, or where the view is centred", false, "▶")
 	play.pressed.connect(func(): action_requested.emit(&"play_here"))
 	bake_grid.add_child(play)
-	var build_play := _button(_editor_icon(&"PlayStart"), "Build & Play: bake as the export does (faces keep only the vertices their\nshape and lighting need, inside each chunk), save and run from the same spot.\nSlower; your brushes aren't changed (the next Bake replaces the build's bake)", false, "▶▶")
+	var build_play := _button(_editor_icon(&"PlayStart"), "Build & Play: bake as the export does (hidden faces culled, Blender's limited\ndissolve merging flat faces, relit, simplified inside each chunk), save and run from the\nsame spot. Slower (the market: ~11 s); your brushes aren't changed (the next Bake\nreplaces the build's bake)", false, "▶▶")
 	build_play.pressed.connect(func(): action_requested.emit(&"build_play"))
 	bake_grid.add_child(build_play)
+	var report := _button(_editor_icon(&"Search"), "Build report: build this zone as the export does and write what it ships\n(triangles, chunks, worst camera views, heaviest brushes, problems) to\nbuild_reports/ as summary.md + report.json (for an agent to check). Bakes aren't changed", false, "R")
+	report.pressed.connect(func(): action_requested.emit(&"build_report"))
+	bake_grid.add_child(report)
 	var ao_bake := _button(_editor_icon(&"VoxelGI"), "Bake AO only: darkens corners and creases into the vertex AO channel.\nKeeps real-time lighting (Dynamic). Settings: Paint panel > Vertex colour.", false, "AO")
 	ao_bake.pressed.connect(func(): action_requested.emit(&"bake_vertex_ao"))
 	bake_grid.add_child(ao_bake)
@@ -498,6 +504,39 @@ func _build_snap_popup() -> void:
 		b.pressed.connect(func(): _snap_spin.value = v; _snap_popup.hide())
 		presets.add_child(b)
 	add_child(_snap_popup)
+
+
+## The Props toolbar: one row of placeable things beside the Props button.
+func _build_props_popup() -> void:
+	_props_popup = PopupPanel.new()
+	_props_popup.add_theme_stylebox_override(&"panel", _panel_style())
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override(&"separation", int(2 * _scale))
+	_props_popup.add_child(row)
+	for spec in [
+		[_svg("prop"), "Prop: drops a prop brush where the view looks, facing you, and selects it. Pick what\nit is in the Inspector (sign, stall, rain drip, bird flock, NPC spot) and set it up there;\nmove, turn and duplicate it like any brush. The quicker buttons beside this make the\ncommon ones ready set up.", &"prop", "P"],
+		[_svg("tree"), "Tree: drops a generated tree where the view looks (the species last placed, sycamore\nat first) with a new seed, and selects it. Species, seed (tick New Seed for another tree\nof the species), size and far card in the Inspector. Species presets live in\naddons/n64_level_tools/trees/species (tools/tree_import makes more from photos).", &"tree", "Tr"],
+		[_svg("sign"), "Sign: drops a signpost where the view looks, facing you, and selects it.\nSet what it says (Text) and its look in the Inspector; the player reads it with interact.", &"sign", "S"],
+		[_svg("house"), "House: drops a Kakariko-style house where the view looks, its front facing you,\nwith a door (to its own interior zone) and windows, and selects it. Size, storeys,\nroof, textures and trim in the Inspector (House). Drag the door and windows along\nits walls; add more with the Door tool and Window.", &"house", "H"],
+		[_svg("shop"), "Shop: a house with a shopfront (counter, awning and noren curtain, shelves inside)\nand a sign over it, placed like House. Shopfront settings in the Inspector (House > Shop).", &"shop", "Sh"],
+		[_svg("tent"), "Tent stall: poles, a peaked cloth canopy with a striped valance and a table of\ngoods, dropped where the view looks. Kind, size, goods and colours in the Inspector.", &"stall_tent", "T"],
+		[_svg("carpet"), "Carpet seller: a rug on the ground with goods set out on it and a cushion behind.", &"stall_carpet", "Ca"],
+		[_svg("cart"), "Cart seller: a hand cart of goods under a parasol.", &"stall_cart", "Cr"],
+		[_svg("goods"), "Goods: a pile of crates, baskets, sacks, pots or produce to dress any stall or corner.", &"stall_goods", "G"],
+		[_svg("drips"), "Roof drips: rain running off every house's eaves (and shop awnings) in the level,\nas rain drip prop brushes. Houses that already have drips are left alone, so moved,\nstretched or deleted drips stay as you left them. Shows only in rain.", &"drips", "D"],
+		[_svg("window"), "Window: cuts a window into the wall where the view looks (frame, sill, dark pane)\nand selects it. Drag it to move it (the opening follows); size and look in the Inspector.", &"window", "W"],
+		[_svg("rope"), "Rope: click where it hangs from, then where it goes to (anchors snap to\ncorners near the mouse: building corners, posts). It sags between its points and\nrepeats its style's texture along itself. Selected: drag its points, Shift+click to\nextend, click a section's + to add a point, Alt+click a point / section to remove / leave it out.", &"rope", "~"],
+		[_svg("fence"), "Fence: drops a fence on the ground where the view looks and selects it:\ndrag its points (snapped, on the ground), click a section's + to split it,\nShift+click the ground to extend, Alt+click a point / section to remove / open it.\nVertex mode with a line of vertices selected: follows them instead.", &"fence", "▥"],
+	]:
+		var b := _button(spec[0], spec[1], false, spec[3])
+		b.pressed.connect(func(): _props_popup.hide(); action_requested.emit(spec[2]))
+		row.add_child(b)
+	add_child(_props_popup)
+
+
+func _open_props_popup() -> void:
+	_props_popup.position = Vector2i(_props_button.get_screen_position() + Vector2(_props_button.size.x + 8 * _scale, 0))
+	_props_popup.popup()
 
 
 func _open_snap_popup() -> void:

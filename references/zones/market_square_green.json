@@ -1,0 +1,103 @@
+{
+ "note": "Market square greening (2026-11-10). Ground faces painted mud (palette 1) become green ground cover (157_green_grass) except the dirt walkways below; cobbles (ring, Hillside terrace), cement (back alley), concrete patches and the SE courtyard are left as they are. Rects are [x0, z0, x1, z1] in level metres (map: 140 m, centre 0,0, north -z). A face stays dirt when its centre is in any walkway rect or circle.",
+ "green_texture": "res://textures/grass/157_green_grass.res",
+ "dirt_rects": [
+  [
+   -3.0,
+   -70.0,
+   3.0,
+   -34.0
+  ],
+  [
+   -3.0,
+   34.0,
+   3.0,
+   70.0
+  ],
+  [
+   -70.0,
+   -3.0,
+   -34.0,
+   3.0
+  ],
+  [
+   -3.0,
+   -8.0,
+   3.0,
+   30.0
+  ],
+  [
+   -30.0,
+   -2.5,
+   30.0,
+   2.5
+  ],
+  [
+   -35.0,
+   -53.0,
+   -9.0,
+   -49.5
+  ],
+  [
+   9.0,
+   -53.0,
+   35.0,
+   -49.5
+  ],
+  [
+   -50.5,
+   -35.0,
+   -47.0,
+   -9.0
+  ],
+  [
+   -50.5,
+   9.0,
+   -47.0,
+   35.0
+  ],
+  [
+   -43.5,
+   -9.0,
+   -40.5,
+   9.0
+  ],
+  [
+   -46.0,
+   46.5,
+   -9.0,
+   53.5
+  ],
+  [
+   -9.0,
+   48.0,
+   -3.0,
+   52.0
+  ],
+  [
+   -14.0,
+   -9.0,
+   14.0,
+   -6.0
+  ]
+ ],
+ "dirt_circles": [
+  [
+   0.0,
+   0.0,
+   5.5
+  ],
+  [
+   -17.0,
+   22.0,
+   3.5
+  ]
+ ],
+ "grass": {
+  "mat_band": 2.5,
+  "height": 0.45,
+  "height_var": 0.06,
+  "tufts": 0.1,
+  "edge_tufts": 3.0
+ }
+}

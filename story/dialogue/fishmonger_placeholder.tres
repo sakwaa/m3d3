@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="Dialogue" format=3]
+
+[ext_resource type="Script" path="res://game/story/dialogue/dialogue_node.gd" id="1_ly8d0"]
+[ext_resource type="Script" path="res://game/story/dialogue/dialogue_line.gd" id="2_2dxpg"]
+[ext_resource type="Script" path="res://game/story/dialogue/dialogue.gd" id="3_yteoa"]
+
+[sub_resource type="Resource" id="Resource_5iao0"]
+script = ExtResource("2_2dxpg")
+speaker = &"fishmonger"
+text = "Up before the sun to get these. Riverside's finest."
+id = "hello"
+
+[resource]
+script = ExtResource("3_yteoa")
+id = &"fishmonger_placeholder"
+start = "hello"
+nodes = Array[ExtResource("1_ly8d0")]([SubResource("Resource_5iao0")])
+notes = "Placeholder for the scheduling trial."

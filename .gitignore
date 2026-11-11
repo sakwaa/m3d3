@@ -1,3 +1,11 @@
 .godot/
 /android/
 *.tmp
+
+# Build reports (N64 Level Tools)
+/build_reports/
+
+# Tool scratch (venvs, per-clip work dirs, caches)
+.venv*/
+tools/*/work/
+__pycache__/

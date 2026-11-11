@@ -5,14 +5,14 @@ extends RefCounted
 ## Layer 0 is the base layer (per-face texture); layer n is overlay n - 1;
 ## VERTEX_LAYER paints per-vertex colours.
 
-enum Tool { BRUSH, ERASE, FILL_FACE, FILL_NORMAL, FACE, FILL_SAME, SCATTER, PLACE, GRADIENT, BORDER }
+enum Tool { BRUSH, ERASE, FILL_FACE, FILL_NORMAL, FACE, FILL_SAME, SCATTER, PLACE, GRADIENT, BORDER, GRASS, TREES }
 const VERTEX_LAYER := -1
 ## Paints per-face Surface overrides (footstep sound | gameplay flags), whole faces.
 const SURFACE_LAYER := -2
 ## AUTO: whatever the clicked face is (floor -> facing up, wall -> walls, ceiling -> down).
 enum Direction { UP, DOWN, WALLS, ALL, AUTO }
 const TOOL_NAMES := ["Brush", "Erase", "Fill Face", "Fill by Normal", "Paint Face", "Fill Same Texture",
-	"Scatter", "Place", "Gradient", "Border"]
+	"Scatter", "Place", "Gradient", "Border", "Grass", "Trees"]
 const DIRECTION_NAMES := ["Facing up", "Facing down", "Walls", "All faces", "Auto (clicked face)"]
 
 var tool := Tool.BRUSH
@@ -109,10 +109,16 @@ var undo: EditorUndoRedoManager:
 		undo = value
 		scatter.undo = value
 		gradient.undo = value
+		grass.undo = value
+		trees.undo = value
 ## Scatter / Place: flowers, grass tufts (ScatterSet).
 var scatter := LevelScatterTool.new()
 ## Gradient: coverage ramps for overlay layers.
 var gradient := LevelGradientTool.new()
+## Grass: the grass carpet (painted coverage and height).
+var grass := LevelGrassTool.new()
+## Trees: tree brushes scattered by a stroke.
+var trees := LevelTreeTool.new()
 ## The brush the current stroke is held to (stay_on_brush), else null.
 var _only: LevelBrush
 

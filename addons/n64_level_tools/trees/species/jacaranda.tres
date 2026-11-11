@@ -1,0 +1,55 @@
+[gd_resource type="Resource" script_class="TreeSpecies" format=3]
+
+[ext_resource type="Texture2D" path="res://textures/wood/tree_bark.res" id="1_62bak"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_jacaranda_t0.res" id="2_td16k"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_jacaranda_t1.res" id="3_esknt"]
+[ext_resource type="Texture2D" path="res://textures/plants/leaves_jacaranda.res" id="3_wo1tc"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_jacaranda_t2.res" id="4_o1c0r"]
+[ext_resource type="Script" path="res://addons/n64_level_tools/trees/tree_level.gd" id="4_td16k"]
+[ext_resource type="Script" path="res://addons/n64_level_tools/trees/tree_species.gd" id="5_esknt"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_jacaranda_t3.res" id="5_tvdo1"]
+
+[sub_resource type="Resource" id="Resource_o1c0r"]
+script = ExtResource("4_td16k")
+count = 7
+angle = 65.0
+angle_var = 12.0
+length = 0.435282589030703
+curve = 25.0
+curve_power = 1.5
+wander = 10.0
+radius = 0.6
+
+[sub_resource type="Resource" id="Resource_tvdo1"]
+script = ExtResource("4_td16k")
+count = 4
+angle = 50.0
+angle_var = 15.0
+curve = -10.0
+wander = 15.0
+bark = false
+segments = 1
+
+[resource]
+script = ExtResource("5_esknt")
+display_name = "Jacaranda"
+latin = "Jacaranda mimosifolia"
+reference = "Imported from 5JACMIM0.BMP (Jacaranda mimosifolia, archetype spreading, real height ~12 m): crown 0.98x the height, bare trunk 23%, widest at 41% of the crown."
+height = 7.199999999999999
+trunk_radius = 0.10692
+trunk_top = 0.45
+wander = 8.0
+clear = 0.188
+crown = 4
+crown_profile = PackedFloat32Array(0.3657, 0.423, 0.4257, 0.4209, 0.4395, 0.483, 0.4904, 0.4719, 0.4448, 0.4352, 0.4119, 0.3577, 0.2665, 0.2235, 0.19, 0.0902)
+levels = Array[ExtResource("4_td16k")]([SubResource("Resource_o1c0r"), SubResource("Resource_tvdo1")])
+leaf_texture = ExtResource("3_wo1tc")
+bark_texture = ExtResource("1_62bak")
+card_textures = Array[Texture2D]([ExtResource("2_td16k"), ExtResource("3_esknt"), ExtResource("4_o1c0r"), ExtResource("5_tvdo1")])
+card_aspects = PackedFloat32Array(0.981)
+card_tiles = Vector2i(2, 2)
+card_aspect = 0.981
+card_size = 1.7279999999999998
+inner_clumps = 2
+leaf_start = 0.3
+bark_color = Color(0.37419355, 0.4064516, 0.21129033, 1)

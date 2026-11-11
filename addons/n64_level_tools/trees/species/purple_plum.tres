@@ -1,0 +1,56 @@
+[gd_resource type="Resource" script_class="TreeSpecies" format=3]
+
+[ext_resource type="Texture2D" path="res://textures/wood/tree_bark.res" id="1_l02fc"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_purple_plum_t0.res" id="2_4if2k"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_purple_plum_t1.res" id="3_ojfm5"]
+[ext_resource type="Texture2D" path="res://textures/plants/leaves_purple_plum.res" id="3_yn4p3"]
+[ext_resource type="Script" path="res://addons/n64_level_tools/trees/tree_level.gd" id="4_4if2k"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_purple_plum_t2.res" id="4_28810"]
+[ext_resource type="Script" path="res://addons/n64_level_tools/trees/tree_species.gd" id="5_ojfm5"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_purple_plum_t3.res" id="5_v5suv"]
+
+[sub_resource type="Resource" id="Resource_28810"]
+script = ExtResource("4_4if2k")
+count = 9
+angle = 58.0
+angle_var = 12.0
+length = 0.45600513398588505
+curve = 20.0
+wander = 7.0
+radius = 0.55
+segments = 2
+
+[sub_resource type="Resource" id="Resource_v5suv"]
+script = ExtResource("4_4if2k")
+count = 3
+angle = 50.0
+angle_var = 15.0
+length = 0.55
+curve = -5.0
+wander = 10.0
+bark = false
+segments = 1
+
+[resource]
+script = ExtResource("5_ojfm5")
+display_name = "Purple Plum"
+latin = "Prunus cerasifera"
+reference = "Imported from 4PRUCET0.BMP (Prunus cerasifera, archetype broadleaf, real height ~7 m): crown 1.00x the height, bare trunk 20%, widest at 34% of the crown."
+height = 4.2
+trunk_radius = 0.09471
+trunk_top = 0.65
+clear = 0.161
+crown = 4
+crown_profile = PackedFloat32Array(0.3466, 0.4394, 0.4405, 0.4802, 0.4683, 0.5011, 0.4812, 0.4168, 0.3965, 0.39, 0.383, 0.2983, 0.2634, 0.2548, 0.1931, 0.1025)
+levels = Array[ExtResource("4_4if2k")]([SubResource("Resource_28810"), SubResource("Resource_v5suv")])
+leaf_texture = ExtResource("3_yn4p3")
+bark_texture = ExtResource("1_l02fc")
+card_textures = Array[Texture2D]([ExtResource("2_4if2k"), ExtResource("3_ojfm5"), ExtResource("4_28810"), ExtResource("5_v5suv")])
+card_aspects = PackedFloat32Array(1.004)
+card_tiles = Vector2i(2, 2)
+card_aspect = 1.004
+card_size = 1.2
+clumps = 2
+inner_clumps = 2
+leaf_start = 0.3
+bark_color = Color(0.45483872, 0.4016129, 0.3451613, 1)

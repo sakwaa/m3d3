@@ -1,0 +1,49 @@
+[gd_resource type="Resource" script_class="NpcSchedule" format=3]
+
+[ext_resource type="Resource" path="res://story/dialogue/tea_keeper_placeholder.tres" id="1_actyp"]
+[ext_resource type="Script" path="res://game/story/schedule/schedule_entry.gd" id="2_jcipy"]
+[ext_resource type="Script" path="res://game/story/story_condition.gd" id="3_hqitu"]
+[ext_resource type="Script" path="res://game/story/story_effect.gd" id="4_i8uwi"]
+[ext_resource type="Script" path="res://game/story/schedule/npc_schedule.gd" id="5_uorw4"]
+
+[sub_resource type="Resource" id="Resource_vv4ru"]
+script = ExtResource("2_jcipy")
+label = "Takes tea to the tables"
+from_hour = 10.0
+to_hour = 10.5
+activity = 1
+zone = "res://zones/town1/town_1_market_square.tscn"
+place = &"tea_round"
+
+[sub_resource type="Resource" id="Resource_68ds0"]
+script = ExtResource("2_jcipy")
+label = "Takes tea to the tables"
+from_hour = 15.0
+to_hour = 15.5
+activity = 1
+zone = "res://zones/town1/town_1_market_square.tscn"
+place = &"tea_round"
+
+[sub_resource type="Resource" id="Resource_qtkws"]
+script = ExtResource("2_jcipy")
+label = "Runs the tea house"
+from_hour = 6.0
+to_hour = 22.0
+zone = "res://zones/town1/town_1_market_square.tscn"
+place = &"tea_door"
+
+[sub_resource type="Resource" id="Resource_ve1q6"]
+script = ExtResource("2_jcipy")
+label = "Elsewhere"
+from_hour = 0.0
+to_hour = 0.0
+zone = "res://zones/nowhere/nowhere.tscn"
+place = &"offstage_tea_keeper"
+
+[resource]
+script = ExtResource("5_uorw4")
+id = &"tea_keeper"
+character = &"tea_keeper"
+dialogue = ExtResource("1_actyp")
+entries = Array[ExtResource("2_jcipy")]([SubResource("Resource_vv4ru"), SubResource("Resource_68ds0"), SubResource("Resource_qtkws"), SubResource("Resource_ve1q6")])
+notes = "Market square scheduling trial."

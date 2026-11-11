@@ -12,9 +12,10 @@ extends RefCounted
 const MIN_PIECE := 0.25  # of a cell: thinnest strip a cut may leave
 
 
-## Cleans `faces` (indices) of `b` in place. Returns {before, after} (face counts) or
-## {error}.
-static func clean_up(b: LevelBrush, faces: Array[int], cell: float, density: float) -> Dictionary:
+## Cleans `faces` (indices) of `b` in place. `regrid_single` off (the build): faces nothing
+## merged into stay whole (a building's wall isn't cut into cells). Returns {before, after}
+## (face counts) or {error}.
+static func clean_up(b: LevelBrush, faces: Array[int], cell: float, density: float, regrid_single := true) -> Dictionary:
 	if b.is_fence() or b.is_rope() or b.is_passage() or b.is_door():
 		return {error = "generated brushes (fences, ropes, passages, doors) rebuild themselves"}
 	if not b.corner_uvs.is_empty():
@@ -37,7 +38,7 @@ static func clean_up(b: LevelBrush, faces: Array[int], cell: float, density: flo
 			compat.append(["keep", f])
 			continue
 		compat.append([b.get_face_texture(f), b.get_face_uv(f), b.get_face_surface(f), b.get_face_layer_set(f),
-			b.face_bake[f] if f < b.face_bake.size() else 0, _tone(b, f)])
+			b.face_bake[f] if f < b.face_bake.size() else 0, _tone(b, f), b.get_face_lod(f)])
 	var merged := BrushOps.merge_coplanar(verts, polys, compat)
 
 	# 2. Grid: each merged polygon cut on world lines `cell` apart (in its planar UV, the
@@ -50,7 +51,7 @@ static func clean_up(b: LevelBrush, faces: Array[int], cell: float, density: flo
 	for m in merged.faces.size():
 		var poly: PackedInt32Array = merged.faces[m]
 		var members: Array = merged.members[m]
-		if not chosen.has(members[0]):
+		if not chosen.has(members[0]) or (not regrid_single and members.size() == 1):
 			out_faces.append(poly)
 			parent.append(m)
 			continue

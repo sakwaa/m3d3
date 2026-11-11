@@ -1,0 +1,191 @@
+{
+ "name": "Stab",
+ "fps": 30,
+ "length": 16,
+ "loop": false,
+ "root": "auto",
+ "source": "OoT remake front view 64WRm0sZn0E (60 fps) + MM3D Swordsman's School AXzZe1vsjxk, read by eye",
+ "measured": false,
+ "windows": {
+  "windup": [
+   0,
+   4
+  ],
+  "active": [
+   5,
+   9
+  ],
+  "cancel": [
+   10,
+   16
+  ],
+  "opening": [
+   11,
+   16
+  ]
+ },
+ "keys": [
+  {
+   "upper_arm_L": [
+    5,
+    25
+   ],
+   "forearm_L": [
+    40,
+    15
+   ],
+   "thigh_L": 18,
+   "shin_L": -6,
+   "thigh_R": -14,
+   "shin_R": -22,
+   "upper_arm_R": [
+    10,
+    20
+   ],
+   "forearm_R": [
+    70,
+    10
+   ],
+   "lean": 6,
+   "frame": 0,
+   "ease": "smooth"
+  },
+  {
+   "upper_arm_L": [
+    5,
+    25
+   ],
+   "forearm_L": [
+    40,
+    15
+   ],
+   "thigh_L": [
+    26,
+    6
+   ],
+   "shin_L": -16,
+   "thigh_R": [
+    -6,
+    6
+   ],
+   "shin_R": -38,
+   "upper_arm_R": [
+    -35,
+    25
+   ],
+   "forearm_R": [
+    75,
+    10
+   ],
+   "lean": 4,
+   "twist": 25,
+   "hip_twist": 12,
+   "lift": -0.02,
+   "blade_R": [
+    88,
+    5
+   ],
+   "frame": 4,
+   "ease": "ease_in"
+  },
+  {
+   "upper_arm_L": [
+    5,
+    25
+   ],
+   "forearm_L": [
+    40,
+    15
+   ],
+   "thigh_L": [
+    36,
+    14
+   ],
+   "shin_L": -4,
+   "thigh_R": [
+    -26,
+    10
+   ],
+   "shin_R": -20,
+   "upper_arm_R": [
+    88,
+    5
+   ],
+   "forearm_R": [
+    90,
+    0
+   ],
+   "lean": 16,
+   "twist": -10,
+   "hip_twist": -6,
+   "blade_R": [
+    90,
+    0
+   ],
+   "frame": 7,
+   "ease": "snap"
+  },
+  {
+   "upper_arm_L": [
+    5,
+    25
+   ],
+   "forearm_L": [
+    40,
+    15
+   ],
+   "thigh_L": [
+    36,
+    14
+   ],
+   "shin_L": -4,
+   "thigh_R": [
+    -26,
+    10
+   ],
+   "shin_R": -20,
+   "upper_arm_R": [
+    85,
+    5
+   ],
+   "forearm_R": [
+    88,
+    0
+   ],
+   "lean": 14,
+   "twist": -10,
+   "hip_twist": -6,
+   "blade_R": [
+    89,
+    0
+   ],
+   "frame": 10,
+   "ease": "ease_out"
+  },
+  {
+   "upper_arm_L": [
+    5,
+    25
+   ],
+   "forearm_L": [
+    40,
+    15
+   ],
+   "thigh_L": 18,
+   "shin_L": -6,
+   "thigh_R": -14,
+   "shin_R": -22,
+   "upper_arm_R": [
+    10,
+    20
+   ],
+   "forearm_R": [
+    70,
+    10
+   ],
+   "lean": 6,
+   "frame": 16,
+   "ease": "smooth"
+  }
+ ]
+}

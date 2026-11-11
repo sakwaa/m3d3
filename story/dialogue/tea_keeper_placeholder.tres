@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="Dialogue" format=3]
+
+[ext_resource type="Script" path="res://game/story/dialogue/dialogue_node.gd" id="1_j2xsx"]
+[ext_resource type="Script" path="res://game/story/dialogue/dialogue_line.gd" id="2_lbaej"]
+[ext_resource type="Script" path="res://game/story/dialogue/dialogue.gd" id="3_8mevu"]
+
+[sub_resource type="Resource" id="Resource_fdmvo"]
+script = ExtResource("2_lbaej")
+speaker = &"tea_keeper"
+text = "Sit, sit. The kettle's always on."
+id = "hello"
+
+[resource]
+script = ExtResource("3_8mevu")
+id = &"tea_keeper_placeholder"
+start = "hello"
+nodes = Array[ExtResource("1_j2xsx")]([SubResource("Resource_fdmvo")])
+notes = "Placeholder for the scheduling trial."

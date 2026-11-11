@@ -1,7 +1,7 @@
 @tool
 extends HSplitContainer
 ## The Script Builder tab: pick a glyph on the left (consonants, vowel marks, finals,
-## punctuation, whole syllables, spelling marks), draw it pixel by pixel in the middle, see text written in
+## punctuation, whole syllables, spelling marks, word symbols), draw it pixel by pixel in the middle, see text written in
 ## the script on the right. Every stroke is saved to the alphabet (with undo) and rebuilds
 ## banners using it.
 ##
@@ -13,7 +13,8 @@ const GlyphText := preload("res://addons/n64_level_tools/glyphs/glyph_text.gd")
 const Gen := preload("res://addons/n64_level_tools/textures/rope_texture_generator.gd")
 const DEFAULT := "res://glyphs/syllabary/alphabet.tres"
 const N := SyllabaryAlphabet.CELL
-const SECTIONS := ["Consonants", "Vowel marks", "Finals", "Punctuation", "Syllables", "Spelling marks"]
+const SECTIONS := ["Consonants", "Vowel marks", "Finals", "Punctuation", "Syllables", "Spelling marks", "Word symbols"]
+const SYMBOLS := 6
 const PAPER := Color(0.93, 0.91, 0.85)
 const INK := Color(0.12, 0.1, 0.1)
 
@@ -36,6 +37,7 @@ var _sample := TextEdit.new()
 var _preview := TextureRect.new()
 var _notes := Label.new()
 var _clipboard := PackedByteArray()
+var _remove_symbol_button: Button
 
 
 func _init() -> void:
@@ -184,6 +186,7 @@ func _section_tokens(i: int) -> Array:
 		2: return SyllabaryAlphabet.CONSONANTS.slice(1).map(func(c): return "-" + c)
 		3: return SyllabaryAlphabet.PUNCT
 		5: return range(1, SyllabaryAlphabet.SPELL_MARKS + 1).map(SyllabaryAlphabet.spell_token)
+		SYMBOLS: return Array(alphabet.symbol_words).map(SyllabaryAlphabet.symbol_token) if alphabet else []
 	var out := []
 	for c in SyllabaryAlphabet.CONSONANTS:
 		for v in SyllabaryAlphabet.VOWELS:
@@ -196,7 +199,7 @@ func _section_tokens(i: int) -> Array:
 func _on_section(i: int) -> void:
 	_fill_palette()
 	var tokens := _section_tokens(i)
-	if not token in tokens:
+	if not token in tokens and not tokens.is_empty():
 		_select(tokens[0])
 
 
@@ -220,6 +223,8 @@ func _fill_palette() -> void:
 		holder.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	holder.add_theme_constant_override(&"h_separation", 10)
 	holder.add_theme_constant_override(&"v_separation", 10)
+	if sec == SYMBOLS:
+		_palette.add_child(_symbol_bar())
 	_palette.add_child(holder)
 	for t: String in _section_tokens(sec):
 		if syllables and t.ends_with("." + SyllabaryAlphabet.VOWELS[0]):
@@ -239,6 +244,82 @@ func _fill_palette() -> void:
 			box.add_child(_small_label(_short_name(t)))
 		_thumbs[t] = tr
 		holder.add_child(box)
+
+
+## Word symbols: a word to add (its square then drawn like any glyph), and removing the
+## current one.
+func _symbol_bar() -> Control:
+	var box := VBoxContainer.new()
+	var note := _small_label("One glyph for a whole word, like a kanji (special names). Signs\nwith the word choose symbol or spelled in their inspector.")
+	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	note.custom_minimum_size.x = 100
+	box.add_child(note)
+	var row := HBoxContainer.new()
+	var word := LineEdit.new()
+	word.placeholder_text = "word or name"
+	word.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var add := Button.new()
+	add.text = "Add"
+	add.pressed.connect(func(): _add_symbol(word.text))
+	word.text_submitted.connect(func(t: String): _add_symbol(t))
+	row.add_child(word)
+	row.add_child(add)
+	box.add_child(row)
+	var remove := Button.new()
+	remove.text = "Remove this symbol"
+	remove.disabled = not token.begins_with(SyllabaryAlphabet.SYMBOL)
+	remove.pressed.connect(_remove_symbol)
+	box.add_child(remove)
+	_remove_symbol_button = remove
+	return box
+
+
+## Adds `word` (letters and apostrophes, lower case) to the alphabet's word symbols and
+## selects its (empty) square.
+func _add_symbol(raw: String) -> void:
+	var w := raw.strip_edges().to_lower()
+	if alphabet == null or w.is_empty() or not RegEx.create_from_string("^[a-z']+$").search(w):
+		push_warning("Script Builder: a word symbol is for one word (letters only).")
+		return
+	if not w in alphabet.symbol_words:
+		var words := alphabet.symbol_words.duplicate()
+		words.append(w)
+		undo_redo.create_action("Add Word Symbol", UndoRedo.MERGE_DISABLE, alphabet)
+		undo_redo.add_do_property(alphabet, &"symbol_words", words)
+		undo_redo.add_undo_property(alphabet, &"symbol_words", alphabet.symbol_words)
+		undo_redo.add_do_method(self, &"_save")
+		undo_redo.add_undo_method(self, &"_save")
+		undo_redo.add_do_method(self, &"_fill_palette")
+		undo_redo.add_undo_method(self, &"_fill_palette")
+		undo_redo.commit_action()
+	_select(SyllabaryAlphabet.symbol_token(w))
+	_fill_palette()
+
+
+## Removes the current word symbol (its word and its square), as one undo step.
+func _remove_symbol() -> void:
+	if alphabet == null or not token.begins_with(SyllabaryAlphabet.SYMBOL):
+		return
+	var w := token.trim_prefix(SyllabaryAlphabet.SYMBOL)
+	var words := alphabet.symbol_words.duplicate()
+	words.remove_at(words.find(w))
+	var g := alphabet.glyphs.duplicate()
+	g.erase(token)
+	undo_redo.create_action("Remove Word Symbol", UndoRedo.MERGE_DISABLE, alphabet)
+	undo_redo.add_do_property(alphabet, &"symbol_words", words)
+	undo_redo.add_undo_property(alphabet, &"symbol_words", alphabet.symbol_words)
+	undo_redo.add_do_property(alphabet, &"glyphs", g)
+	undo_redo.add_undo_property(alphabet, &"glyphs", alphabet.glyphs)
+	undo_redo.add_do_method(self, &"_save")
+	undo_redo.add_undo_method(self, &"_save")
+	undo_redo.add_do_method(self, &"_fill_palette")
+	undo_redo.add_undo_method(self, &"_fill_palette")
+	undo_redo.commit_action()
+	var left := _section_tokens(SYMBOLS)
+	if not left.is_empty():
+		_select(left[0])
+	_fill_palette()
 
 
 func _small_label(text: String) -> Label:
@@ -261,6 +342,8 @@ func _bare(t: String) -> String:
 
 
 func _short_name(t: String) -> String:
+	if t.begins_with(SyllabaryAlphabet.SYMBOL):
+		return t.trim_prefix(SyllabaryAlphabet.SYMBOL)
 	var n: Array = SyllabaryAlphabet.name_of(_bare(t))
 	return "%s\n%s" % [n[0], n[1]]
 
@@ -268,6 +351,9 @@ func _short_name(t: String) -> String:
 func _describe(t: String) -> String:
 	if t in SyllabaryAlphabet.PUNCT:  # before the prefix checks: "-", "--" and "." are punctuation
 		return "Punctuation: %s (%s)" % SyllabaryAlphabet.NAMES[t]
+	if t.begins_with(SyllabaryAlphabet.SYMBOL):
+		return "Word symbol: \"%s\" — one glyph for the whole word, the full square (signs with the word choose it or the spelling in their inspector)%s" % [
+			t.trim_prefix(SyllabaryAlphabet.SYMBOL), "" if _drawn(t) else " — empty: draw it"]
 	if t.begins_with("#"):
 		return "Spelling mark %s: under a word that sounds like others (the %s most common of them)%s" % [t.substr(1),
 			_ordinal(t.substr(1).to_int() + 1), "" if _drawn(t) else " — empty: a tally"]
@@ -318,6 +404,8 @@ func _thumb(t: String) -> Texture2D:
 func _select(t: String) -> void:
 	token = t
 	_title.text = _describe(t)
+	if is_instance_valid(_remove_symbol_button):
+		_remove_symbol_button.disabled = not t.begins_with(SyllabaryAlphabet.SYMBOL)
 	_canvas.queue_redraw()
 
 
@@ -416,6 +504,8 @@ func _import_template() -> void:
 func zone_property() -> StringName:
 	if token in SyllabaryAlphabet.PUNCT:
 		return &""
+	if token.begins_with(SyllabaryAlphabet.SYMBOL):
+		return &""  # the whole square
 	if token.begins_with("#"):
 		return &"zone_spell"
 	if token.begins_with("~"):
@@ -486,7 +576,9 @@ func _refresh_preview() -> void:
 		_preview.texture = null
 		_notes.text = "Pick or make a SyllabaryAlphabet (top left)."
 		return
-	var enc := GlyphText.checked(_sample.text)
+	# The preview writes every word that has a symbol with it.
+	var symbols := alphabet.drawn_symbols()
+	var enc := GlyphText.checked(_sample.text, symbols)
 	var img: Image = Gen.text_banner(Color(0.93, 0.92, 0.86), Color(0.6, 0.14, 0.1), INK, alphabet, enc.items).duplicate()
 	var k := maxi(1, 480 / img.get_height())
 	img.resize(img.get_width() * k, img.get_height() * k, Image.INTERPOLATE_NEAREST)
@@ -496,7 +588,7 @@ func _refresh_preview() -> void:
 	var lines := []
 	if not missing.is_empty():
 		lines.append("Not drawn yet: " + ", ".join(missing))
-	lines.append(GlyphText.breakdown(_sample.text))
+	lines.append(GlyphText.breakdown(_sample.text, symbols))
 	_notes.text = "\n".join(lines)
 
 

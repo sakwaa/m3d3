@@ -18,14 +18,41 @@ extends RefCounted
 ## is null then), collision_parts: Array[ConcavePolygonShape3D], collision_surfaces:
 ## PackedInt32Array (the Surface of each part), stats}.
 
+const GroundCollision := preload("res://addons/n64_level_tools/ground_collision.gd")
 const QUANT := 1000.0
 ## Metres: cell size of the baked mesh chunks. Levels up to 1.5 cells across stay one mesh.
 const CHUNK_SIZE := 32.0
+## Project setting: chunk cell size (metres). Smaller cells cull and swap LOD more finely
+## (fewer triangles in view) but split each material into more draws.
+const CHUNK_SETTING := "n64/build/chunk_size"
+## Project setting: cell size (metres) for everything that swaps by distance (near / far
+## house faces, shop detail, ground). Godot measures a mesh's visibility range to its
+## bounds' centre, so a cell's swap lands up to its radius early or late; smaller cells keep
+## the swap close to the set distance (LOD distances are pushed out by the radius so nothing
+## inside them ever shows its far version).
+const LOD_CELL_SETTING := "n64/build/lod_cell_size"
+const LOD_CELL := 16.0
 
 
 ## Why `data` can't bake right now ("" = fine): right after the tool scripts change, the
 ## editor reloads them and layers / textures briefly aren't their classes; a bake then
 ## would silently drop overlays (moss) or bake untextured.
+## `data` with its hidden faces culled (BuildCull), its brushes copied so the level being
+## edited keeps them: {data, culled}.
+static func _culled_copy(data: LevelData) -> Dictionary:
+	var copy: LevelData = data.duplicate(false)
+	var own: Array[LevelBrush] = []
+	for b in data.brushes:
+		var c: LevelBrush = b.duplicate(false) if b else null
+		if c:
+			c.set_block_signals(true)
+		own.append(c)
+	copy.set_block_signals(true)
+	copy.brushes = own
+	var culled := BuildCull.cull(copy)
+	return {data = copy, culled = culled}
+
+
 static func not_ready_reason(data: LevelData) -> String:
 	for ls in data.layer_set_count():
 		var layers := data.layers_of(ls)
@@ -41,9 +68,16 @@ static func not_ready_reason(data: LevelData) -> String:
 
 static func bake(data: LevelData, merge_coplanar: bool, optimize := false) -> Dictionary:
 	var simplified := {}
+	var hidden := {}
 	if optimize:
 		simplified = BuildSimplify.optimized_copy(data)
 		data = simplified.data
+	else:
+		# Faces nobody can see (ground under houses, walls pressed against a neighbour) out
+		# of every bake, on a copy (the build culls its own copy before relighting).
+		var copy := _culled_copy(data)
+		hidden = copy.culled
+		data = copy.data
 	var timed := LevelData.mode_is_timed(data.lighting_mode)
 	# Stored corner lighting only counts in Baked Vertex mode (Dynamic = real-time lights).
 	var baked_light := data.lighting_mode == LevelData.LightingMode.BAKED_VERTEX
@@ -55,6 +89,7 @@ static func bake(data: LevelData, merge_coplanar: bool, optimize := false) -> Di
 		brushes = 0, source_tris = 0, culled_faces = 0, merged_faces = 0, degenerate_tris = 0,
 		baked_tris = 0, baked_verts = 0, surfaces = 0, collision_tris = 0, chunks = 0,
 		simplified_from = simplified.get("before", 0), simplified_to = simplified.get("after", 0),
+		hidden_ground_faces = hidden.get("ground", 0), hidden_wall_faces = hidden.get("walls", 0),
 	}
 	# Only faces with paint get a mask chart (erased masks stay stored, all zero).
 	var atlas := PaintAtlas.layout(data.brushes, true)
@@ -83,17 +118,28 @@ static func bake(data: LevelData, merge_coplanar: bool, optimize := false) -> Di
 			_add_source(sources, polys, r.verts, BrushOps.unpack_faces(r.indices, r.counts),
 				brush.transform, null, bi, false, true, stats, PackedColorArray(), false, false, false, 1.0, PackedInt32Array(), tread)
 
-	_assign_cells(polys)
+	var grid := _assign_cells(polys)
+	# Distance-swapped polygons (and below, the ground) go in the finer LOD grid, by their
+	# brush's origin: a house's near and far faces must share a cell to swap together.
+	var lgrid := {origin = grid.origin, size = Vector2(lod_cell(), lod_cell())}
+	for poly in polys:
+		if poly.get("lod", LevelBrush.LOD_ALWAYS) != LevelBrush.LOD_ALWAYS:
+			poly.cell = _cell_of(PackedVector3Array([sources[poly.src].xf.origin]), lgrid)
 	_cull_coincident(polys, "visual", stats)
 	_cull_coincident(polys, "collide", stats)
 	if merge_coplanar:
 		polys = _merge_coplanar(sources, polys, stats)
 
 	_assign_stair_runs(sources, polys, data.stair_textures())
+	# The ground goes near-only, cut along the cell lines; its flattened far stand-in is
+	# added per cell below.
+	polys = GroundLOD.split_to_cells(polys, sources, lgrid.origin, lgrid.size)
+	var ground := GroundLOD.mark(polys, sources)
 
 	var surfaces := {}
 	var painted := {}  # surface key -> overlay layers painted on it (any cell)
 	var collision := {}  # Surface -> PackedVector3Array
+	var ground_collision := {}  # the same, for the ground (GroundCollision)
 	for poly in polys:
 		if not (poly.visual or poly.collide):
 			continue
@@ -113,9 +159,10 @@ static func bake(data: LevelData, merge_coplanar: bool, optimize := false) -> Di
 		var chart = null
 		var face_rect := Rect2()
 		if poly.visual:
-			var skey := [poly.cell, poly.key]
+			var lod: int = poly.get("lod", LevelBrush.LOD_ALWAYS)
+			var skey := [poly.cell, lod, poly.key]
 			if not surfaces.has(skey):
-				surfaces[skey] = {cell = poly.cell, key = poly.key, pos = PackedVector3Array(), nrm = PackedVector3Array(), uv = PackedVector2Array(),
+				surfaces[skey] = {cell = poly.cell, lod = lod, key = poly.key, pos = PackedVector3Array(), nrm = PackedVector3Array(), uv = PackedVector2Array(),
 					uv2 = PackedVector2Array(), col = PackedColorArray(), idx = PackedInt32Array(), weld = {},
 					keys = [PackedByteArray(), PackedByteArray(), PackedByteArray(), PackedByteArray()],
 					material = poly.material, texture = poly.texture, overlay = poly.get("overlay", 0), stair_frame = poly.get("stair_frame"),
@@ -153,46 +200,128 @@ static func bake(data: LevelData, merge_coplanar: bool, optimize := false) -> Di
 							kc.append(arr[i] if arr.size() == ids.size() else Color.WHITE)
 					surf.idx.append(_weld(surf, pts[i], n, uv, uv2, col, kc))
 				if poly.collide:
-					if not collision.has(poly.surface):
-						collision[poly.surface] = PackedVector3Array()
-					collision[poly.surface].append(pts[i])
+					# The ground's collision is simplified on its own below (optimize).
+					var into := ground_collision if optimize and poly.get("lod", 0) == LevelBrush.LOD_GROUND_NEAR else collision
+					if not into.has(poly.surface):
+						into[poly.surface] = PackedVector3Array()
+					into[poly.surface].append(pts[i])
 			if poly.visual:
 				stats.baked_tris += 1
 
+	for k in ground_collision:
+		var coarse := GroundCollision.simplify(ground_collision[k])
+		stats.ground_collision_from = stats.get("ground_collision_from", 0) + ground_collision[k].size() / 3
+		stats.ground_collision_to = stats.get("ground_collision_to", 0) + coarse.size() / 3
+		if not collision.has(k):
+			collision[k] = PackedVector3Array()
+		collision[k].append_array(coarse)
+
+	# A layer with nothing painted on it gets no atlas (null: the shader reads unpainted),
+	# instead of a full-size image of zeros in the level, in memory and on the GPU.
 	var masks: Array[ImageTexture] = []
 	for i in data.mask_slot_count():
-		masks.append(ImageTexture.create_from_image(PaintAtlas.build_layer(data.brushes, atlas, i)))
+		var img := PaintAtlas.build_layer(data.brushes, atlas, i)
+		masks.append(ImageTexture.create_from_image(img) if PaintAtlas.mask_painted(img) else null)
 	var meshes := {}  # cell -> ArrayMesh
 	var materials := {}  # surface key -> Material (shared by every cell)
+	if not auto_lod():
+		GroundLOD.add_far(ground, sources, data, lgrid.origin, lgrid.size, atlas.size, masks, keyed, surfaces, materials, stats)
+	# Distance bands: each surface's visibility range (metres; end 0 = no end). Surfaces with
+	# the same range in a cell share a mesh. Always-drawn ones stay in their own chunk mesh
+	# (roofs never swap).
+	# Surfaces sharing a mesh and material are one draw: append them (ground kept apart, named
+	# "ground" for the build report's floor spots).
+	var merged := {}  # [cell, range, key, ground] -> surface dict
 	for sk in surfaces:
 		var s: Dictionary = surfaces[sk]
 		if s.idx.is_empty():
 			continue
+		var targets := [lod_range(s.lod)]
+		var is_ground: bool = s.lod == LevelBrush.LOD_GROUND_NEAR
+		for r: Vector2 in targets:
+			var gkey := [s.cell, r, s.key, is_ground]
+			if not merged.has(gkey):
+				merged[gkey] = {s = s, range = r, ground = is_ground, parts = []}
+			merged[gkey].parts.append(s)
+	for gkey in merged:
+		var g: Dictionary = merged[gkey]
+		var s: Dictionary = g.s
+		var pos := PackedVector3Array()
+		var nrm := PackedVector3Array()
+		var uv := PackedVector2Array()
+		var uv2 := PackedVector2Array()
+		var col := PackedColorArray()
+		var idx := PackedInt32Array()
+		var keys := [PackedByteArray(), PackedByteArray(), PackedByteArray(), PackedByteArray()]
+		for part: Dictionary in g.parts:
+			var base := pos.size()
+			pos.append_array(part.pos)
+			nrm.append_array(part.nrm)
+			uv.append_array(part.uv)
+			uv2.append_array(part.uv2)
+			col.append_array(part.col)
+			for i: int in part.idx:
+				idx.append(base + i)
+			if keyed:
+				for k in 4:
+					keys[k].append_array(part.keys[k])
 		var arrays := []
 		arrays.resize(Mesh.ARRAY_MAX)
-		arrays[Mesh.ARRAY_VERTEX] = s.pos
-		arrays[Mesh.ARRAY_NORMAL] = s.nrm
-		arrays[Mesh.ARRAY_TEX_UV] = s.uv
-		arrays[Mesh.ARRAY_TEX_UV2] = s.uv2
-		arrays[Mesh.ARRAY_COLOR] = s.col
-		arrays[Mesh.ARRAY_INDEX] = s.idx
+		arrays[Mesh.ARRAY_VERTEX] = pos
+		arrays[Mesh.ARRAY_NORMAL] = nrm
+		arrays[Mesh.ARRAY_TEX_UV] = uv
+		arrays[Mesh.ARRAY_TEX_UV2] = uv2
+		arrays[Mesh.ARRAY_COLOR] = col
+		arrays[Mesh.ARRAY_INDEX] = idx
 		var flags := 0
 		if keyed:
 			for k in 4:
-				arrays[Mesh.ARRAY_CUSTOM0 + k] = s.keys[k]
+				arrays[Mesh.ARRAY_CUSTOM0 + k] = keys[k]
 			flags = LevelBrush.KEY_FORMAT
-		if not meshes.has(s.cell):
-			meshes[s.cell] = ArrayMesh.new()
-		var mesh: ArrayMesh = meshes[s.cell]
-		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays, [], {}, flags)
 		if not materials.has(s.key):
 			materials[s.key] = _bake_material(s, data, masks, painted.get(s.key, 0))
-		mesh.surface_set_material(mesh.get_surface_count() - 1, materials[s.key])
-		stats.baked_verts += s.pos.size()
+		# One mesh per chunk cell and visibility range (the "range" meta; LevelRoot applies it).
+		var r: Vector2 = g.range
+		var mkey := [s.cell, r]
+		if not meshes.has(mkey):
+			meshes[mkey] = ArrayMesh.new()
+			if r != Vector2.ZERO:
+				meshes[mkey].set_meta(&"range", r)
+		var mesh: ArrayMesh = meshes[mkey]
+		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays, [], {}, flags)
+		var si := mesh.get_surface_count() - 1
+		mesh.surface_set_material(si, materials[s.key])
+		if g.ground:
+			mesh.surface_set_name(si, "ground")
+			mesh.set_meta(&"ground", true)
+		mesh.set_meta(&"formats", mesh.get_meta(&"formats", PackedInt32Array()) + PackedInt32Array([flags]))
 		stats.surfaces += 1
+	for sk in surfaces:
+		stats.baked_verts += surfaces[sk].pos.size()
+	# Every swapping mesh of a LOD cell gets the same bounds, centred on the cell, so its near
+	# and far versions measure the same distance and swap at the same moment (no gap where
+	# neither shows, no overlap).
+	var column := {}  # cell -> AABB of its swapping meshes
+	for mkey in meshes:
+		if mkey[1] != Vector2.ZERO:
+			var box: AABB = meshes[mkey].get_aabb()
+			column[mkey[0]] = column[mkey[0]].merge(box) if column.has(mkey[0]) else box
+	for mkey in meshes:
+		if mkey[1] == Vector2.ZERO:
+			continue
+		var cell: Vector2i = mkey[0]
+		var all: AABB = column[cell]
+		var centre := Vector3(lgrid.origin.x + (cell.x + 0.5) * lgrid.size.x, all.get_center().y,
+			lgrid.origin.z + (cell.y + 0.5) * lgrid.size.y)
+		var half := (all.end - centre).max(centre - all.position)
+		meshes[mkey].custom_aabb = AABB(centre - half, half * 2.0)
 	var chunks: Array[ArrayMesh] = []
 	for cell in meshes:
-		chunks.append(meshes[cell])
+		var mesh: ArrayMesh = meshes[cell]
+		if auto_lod():
+			mesh = with_auto_lods(mesh)
+		mesh.remove_meta(&"formats")
+		chunks.append(mesh)
 	stats.chunks = chunks.size()
 	var parts: Array[ConcavePolygonShape3D] = []
 	var part_surfaces := PackedInt32Array()
@@ -225,9 +354,71 @@ static func _bake_material(s: Dictionary, data: LevelData, masks: Array[ImageTex
 	return mat
 
 
+## Project setting: 0 = the hand-made LOD (far stand-ins swapped in by distance), 1 =
+## automatic: no stand-ins, every chunk simplified by Godot's mesh LOD (meshoptimizer),
+## picked by its size on screen.
+const LOD_MODE_SETTING := "n64/build/lod_mode"
+
+
+static func auto_lod() -> bool:
+	return int(ProjectSettings.get_setting(LOD_MODE_SETTING, 0)) == 1
+
+
+## `mesh` with Godot's automatic LOD levels (ImporterMesh.generate_lods, meshoptimizer)
+## added to every surface; materials, surface names and metadata kept.
+static func with_auto_lods(mesh: ArrayMesh) -> ArrayMesh:
+	var formats: PackedInt32Array = mesh.get_meta(&"formats", PackedInt32Array())
+	var im := ImporterMesh.new()
+	for si in mesh.get_surface_count():
+		var flags := formats[si] if si < formats.size() else 0
+		im.add_surface(Mesh.PRIMITIVE_TRIANGLES, mesh.surface_get_arrays(si), [], {}, mesh.surface_get_material(si),
+			mesh.surface_get_name(si), flags)
+	im.generate_lods(25.0, 60.0, [])
+	var out := im.get_mesh()
+	for m in mesh.get_meta_list():
+		out.set_meta(m, mesh.get_meta(m))
+	out.custom_aabb = mesh.custom_aabb
+	return out
+
+
+## The visibility range (begin, end; metres, end 0 = none) faces of `lod` are drawn in.
+static func chunk_size() -> float:
+	return maxf(float(ProjectSettings.get_setting(CHUNK_SETTING, CHUNK_SIZE)), 4.0)
+
+
+static func lod_cell() -> float:
+	return maxf(float(ProjectSettings.get_setting(LOD_CELL_SETTING, LOD_CELL)), 4.0)
+
+
+## A LOD band's visibility range: the set distance plus the LOD cell's radius (the swap is
+## measured to the cell's centre), so nothing within the distance shows its far version.
+static func lod_range(lod: int) -> Vector2:
+	if auto_lod():
+		return Vector2.ZERO
+	var r := lod_cell() * 0.7072
+	match lod:
+		LevelBrush.LOD_NEAR: return Vector2(0, LevelRoot.lod_distance() + r)
+		LevelBrush.LOD_FAR: return Vector2(LevelRoot.lod_distance() + r, 0)
+		LevelBrush.LOD_GROUND_NEAR: return Vector2(0, GroundLOD.distance() + r)
+		LevelBrush.LOD_GROUND_FAR: return Vector2(GroundLOD.distance() + r, 0)
+		LevelBrush.LOD_DETAIL_NEAR: return Vector2(0, LevelRoot.detail_distance() + r)
+		LevelBrush.LOD_DETAIL_FAR: return Vector2(LevelRoot.detail_distance() + r, 0)
+	return Vector2.ZERO
+
+
 ## Puts every polygon in a CHUNK_SIZE cell (by centre, on a grid from the level's corner);
-## levels that fit in about one cell get a single cell.
-static func _assign_cells(polys: Array[Dictionary]) -> void:
+## levels that fit in about one cell get a single cell. Returns the grid: {origin, size}
+## (a cell's XZ size).
+## The cell of `grid` ({origin, size}) holding the polygon's centre.
+static func _cell_of(pts: PackedVector3Array, grid: Dictionary) -> Vector2i:
+	var centre := Vector3.ZERO
+	for p: Vector3 in pts:
+		centre += p
+	centre /= pts.size()
+	return Vector2i(floori((centre.x - grid.origin.x) / grid.size.x), floori((centre.z - grid.origin.z) / grid.size.y))
+
+
+static func _assign_cells(polys: Array[Dictionary]) -> Dictionary:
 	var box := AABB()
 	var first := true
 	for poly in polys:
@@ -237,7 +428,8 @@ static func _assign_cells(polys: Array[Dictionary]) -> void:
 				first = false
 			else:
 				box = box.expand(p)
-	var split := maxf(box.size.x, box.size.z) > CHUNK_SIZE * 1.5
+	var size := chunk_size()
+	var split := maxf(box.size.x, box.size.z) > size * 1.5
 	for poly in polys:
 		var c := Vector2i.ZERO
 		if split:
@@ -245,8 +437,9 @@ static func _assign_cells(polys: Array[Dictionary]) -> void:
 			for p: Vector3 in poly.pts:
 				centre += p
 			centre /= poly.pts.size()
-			c = Vector2i(floori((centre.x - box.position.x) / CHUNK_SIZE), floori((centre.z - box.position.z) / CHUNK_SIZE))
+			c = Vector2i(floori((centre.x - box.position.x) / size), floori((centre.z - box.position.z) / size))
 		poly.cell = c
+	return {origin = box.position, size = Vector2(size, size) if split else Vector2(maxf(box.size.x, box.size.z), maxf(box.size.x, box.size.z))}
 
 
 static func _add_source(sources: Array[Dictionary], polys: Array[Dictionary], verts: PackedVector3Array,
@@ -256,7 +449,9 @@ static func _add_source(sources: Array[Dictionary], polys: Array[Dictionary], ve
 	if not (visual or collide):
 		return
 	var mirrored := xf.basis.determinant() < 0.0
-	sources.append({verts = verts, xf = xf, mirrored = mirrored, brush = brush, brush_index = brush_index, colors = colors})
+	# A copy: packed arrays are shared, and the bake adds corners to a source's list
+	# (GroundLOD.split_to_cells), which would otherwise grow the brush's own vertices.
+	sources.append({verts = verts.duplicate(), xf = xf, mirrored = mirrored, brush = brush, brush_index = brush_index, colors = colors})
 	var brush_visual := visual
 	var brush_collide := collide
 	for f in faces.size():
@@ -267,6 +462,13 @@ static func _add_source(sources: Array[Dictionary], polys: Array[Dictionary], ve
 			visual = brush.face_visual(f)
 			collide = brush_collide and brush.face_collides(f)
 			if not (visual or collide):
+				continue
+		# Far stand-ins are only seen, never walked on (the near faces collide).
+		var lod := brush.get_face_lod(f) if brush else LevelBrush.LOD_ALWAYS
+		if lod == LevelBrush.LOD_FAR or lod == LevelBrush.LOD_DETAIL_FAR:
+			collide = false
+			# Automatic LOD: no hand-made stand-ins (the near faces are drawn at every distance).
+			if not visual or auto_lod():
 				continue
 		var ids := faces[f].duplicate()
 		if mirrored:
@@ -335,7 +537,7 @@ static func _add_source(sources: Array[Dictionary], polys: Array[Dictionary], ve
 					if mirrored:
 						kc.reverse()
 					key_colors.append(kc)
-		polys.append({src = sources.size() - 1, ids = ids, pts = pts, normal = n, visual = visual, collide = collide,
+		polys.append({src = sources.size() - 1, ids = ids, pts = pts, normal = n, visual = visual, collide = collide, lod = lod,
 			colored = colored, corner_colors = corner_colors, key_colors = key_colors,
 			key = ("mat:%d" % material.get_instance_id()) if material else ("tex:%d:%d:%d%s" % [texture, overlay, layer_set, ":cut" if cut else ""]),
 			texture = texture, overlay = overlay, layer_set = layer_set, cutout = cut, exact_uvs = exact_uvs, material = material, masked_face = masked, uv_tweak = tweak,
@@ -391,7 +593,7 @@ static func _cull_coincident(polys: Array[Dictionary], channel: String, stats: D
 			for y in range(x + 1, ids.size()):
 				var a: Dictionary = polys[ids[x]]
 				var b: Dictionary = polys[ids[y]]
-				if not (a[channel] and b[channel]):
+				if not (a[channel] and b[channel]) or a.get("lod", 0) != b.get("lod", 0):
 					continue
 				var d: float = a.normal.dot(b.normal)
 				if d < -0.99:
@@ -426,7 +628,7 @@ static func _merge_coplanar(sources: Array[Dictionary], polys: Array[Dictionary]
 			var tone := _uniform_tone(poly) if poly.colored else []
 			var unique: bool = poly.masked_face >= 0 or (poly.colored and tone.is_empty()) or not poly.get("exact_uvs", PackedVector2Array()).is_empty()
 			compat.append([poly.visual, poly.collide, poly.key, poly.uv_tweak, i if unique else -1, poly.cell, tone,
-				poly.surface if poly.collide else 0])
+				poly.surface if poly.collide else 0, poly.get("lod", 0)])
 		var merged := BrushOps.merge_coplanar(sources[src].verts, faces, compat)
 		var visual_before := group.filter(func(p): return p.visual).size()
 		for f in merged.faces.size():
@@ -458,6 +660,7 @@ static func _first_with(group: Array, flags: Array) -> Dictionary:
 	for poly in group:
 		if poly.visual == flags[0] and poly.collide == flags[1] and poly.key == flags[2] and poly.uv_tweak == flags[3] \
 				and poly.cell == flags[5] and poly.masked_face < 0 and (poly.surface if poly.collide else 0) == flags[7] \
+				and poly.get("lod", 0) == flags[8] \
 				and ((not poly.colored and flags[6].is_empty()) or (poly.colored and _uniform_tone(poly) == flags[6])):
 			return poly
 	return group[0]

@@ -1,0 +1,56 @@
+[gd_resource type="Resource" script_class="TreeSpecies" format=3]
+
+[ext_resource type="Texture2D" path="res://textures/wood/tree_bark.res" id="1_04ldl"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_peach_t0.res" id="2_7v5w2"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_peach_t1.res" id="3_7fpa1"]
+[ext_resource type="Texture2D" path="res://textures/plants/leaves_peach.res" id="3_u0h42"]
+[ext_resource type="Script" path="res://addons/n64_level_tools/trees/tree_level.gd" id="4_7v5w2"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_peach_t2.res" id="4_kmq7w"]
+[ext_resource type="Script" path="res://addons/n64_level_tools/trees/tree_species.gd" id="5_7fpa1"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_peach_t3.res" id="5_h0iqa"]
+
+[sub_resource type="Resource" id="Resource_kmq7w"]
+script = ExtResource("4_7v5w2")
+count = 9
+angle = 58.0
+angle_var = 12.0
+length = 0.5424220655465644
+curve = 20.0
+wander = 7.0
+radius = 0.55
+segments = 2
+
+[sub_resource type="Resource" id="Resource_h0iqa"]
+script = ExtResource("4_7v5w2")
+count = 3
+angle = 50.0
+angle_var = 15.0
+length = 0.55
+curve = -5.0
+wander = 10.0
+bark = false
+segments = 1
+
+[resource]
+script = ExtResource("5_7fpa1")
+display_name = "Peach"
+latin = "Prunus persica"
+reference = "Imported from 5PRUPER0.BMP (Prunus persica, archetype broadleaf, real height ~5 m): crown 1.16x the height, bare trunk 19%, widest at 47% of the crown."
+height = 4.0
+trunk_radius = 0.518
+trunk_top = 0.65
+clear = 0.153
+crown = 4
+crown_profile = PackedFloat32Array(0.5437, 0.551, 0.5633, 0.5621, 0.567, 0.5486, 0.5707, 0.58, 0.5664, 0.5713, 0.484, 0.4453, 0.4274, 0.4016, 0.3407, 0.2054)
+levels = Array[ExtResource("4_7v5w2")]([SubResource("Resource_kmq7w"), SubResource("Resource_h0iqa")])
+leaf_texture = ExtResource("3_u0h42")
+bark_texture = ExtResource("1_04ldl")
+card_textures = Array[Texture2D]([ExtResource("2_7v5w2"), ExtResource("3_7fpa1"), ExtResource("4_kmq7w"), ExtResource("5_h0iqa")])
+card_aspects = PackedFloat32Array(1.181)
+card_tiles = Vector2i(2, 2)
+card_aspect = 1.181
+card_size = 1.2
+clumps = 2
+inner_clumps = 2
+leaf_start = 0.3
+bark_color = Color(0.82903224, 0.5629032, 0.5967742, 1)

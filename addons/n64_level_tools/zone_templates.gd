@@ -1,7 +1,7 @@
 @tool
 extends RefCounted
 ## Starter zone scenes for Project > Tools > M3D World. Each gets a Zone root, a LevelRoot
-## with a floor grid (LevelData saved next to the scene as <name>_level.tres) and a
+## with a floor grid (LevelData saved next to the scene as <name>_level.res, binary: quick to load) and a
 ## `default` SpawnPoint, plus:
 ##  - outdoor: DynamicSky WorldEnvironment (weather + time of day) and a DayNightSun "Sun";
 ##  - indoor: a dark ambient WorldEnvironment (no weather), a ceiling light, clock paused.
@@ -15,7 +15,7 @@ const SPAWN_SCRIPT := "res://game/world/spawn_point.gd"
 ## Builds and saves the zone scene at `path` (.tscn). Returns OK or an error.
 static func create(path: String, outdoor: bool) -> Error:
 	var zone_name := path.get_file().get_basename()
-	var data_path := path.get_basename() + "_level.tres"
+	var data_path := path.get_basename() + "_level.res"
 	if FileAccess.file_exists(data_path):
 		push_error("M3D World: %s already exists; pick another zone name." % data_path)
 		return ERR_ALREADY_EXISTS

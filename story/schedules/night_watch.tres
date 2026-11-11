@@ -1,0 +1,41 @@
+[gd_resource type="Resource" script_class="NpcSchedule" format=3]
+
+[ext_resource type="Resource" path="res://story/dialogue/night_watch_placeholder.tres" id="1_r0arw"]
+[ext_resource type="Script" path="res://game/story/schedule/schedule_entry.gd" id="2_4eimx"]
+[ext_resource type="Script" path="res://game/story/story_condition.gd" id="3_4cruj"]
+[ext_resource type="Script" path="res://game/story/story_effect.gd" id="4_1fx55"]
+[ext_resource type="Script" path="res://game/story/schedule/npc_schedule.gd" id="5_i6g2t"]
+
+[sub_resource type="Resource" id="Resource_oleis"]
+script = ExtResource("2_4eimx")
+label = "Night rounds with clappers"
+from_hour = 20.0
+to_hour = 24.0
+activity = 1
+zone = "res://zones/town1/town_1_market_square.tscn"
+place = &"watch_loop"
+
+[sub_resource type="Resource" id="Resource_3e3x5"]
+script = ExtResource("2_4eimx")
+label = "Night rounds with clappers"
+from_hour = 0.0
+to_hour = 4.0
+activity = 1
+zone = "res://zones/town1/town_1_market_square.tscn"
+place = &"watch_loop"
+
+[sub_resource type="Resource" id="Resource_r2mgx"]
+script = ExtResource("2_4eimx")
+label = "Elsewhere"
+from_hour = 0.0
+to_hour = 0.0
+zone = "res://zones/nowhere/nowhere.tscn"
+place = &"offstage_night_watch"
+
+[resource]
+script = ExtResource("5_i6g2t")
+id = &"night_watch"
+character = &"night_watch"
+dialogue = ExtResource("1_r0arw")
+entries = Array[ExtResource("2_4eimx")]([SubResource("Resource_oleis"), SubResource("Resource_3e3x5"), SubResource("Resource_r2mgx")])
+notes = "Market square scheduling trial."

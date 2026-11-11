@@ -1,0 +1,55 @@
+[gd_resource type="Resource" script_class="TreeSpecies" format=3]
+
+[ext_resource type="Texture2D" path="res://textures/wood/tree_bark.res" id="1_ktlcp"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_coast_live_oak_t0.res" id="2_ehlhi"]
+[ext_resource type="Texture2D" path="res://textures/plants/leaves_coast_live_oak.res" id="3_g6fc0"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_coast_live_oak_t1.res" id="3_i4rda"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_coast_live_oak_t2.res" id="4_5ap7o"]
+[ext_resource type="Script" path="res://addons/n64_level_tools/trees/tree_level.gd" id="4_ehlhi"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_coast_live_oak_t3.res" id="5_bsnbe"]
+[ext_resource type="Script" path="res://addons/n64_level_tools/trees/tree_species.gd" id="5_i4rda"]
+
+[sub_resource type="Resource" id="Resource_5ap7o"]
+script = ExtResource("4_ehlhi")
+count = 7
+angle = 65.0
+angle_var = 12.0
+length = 0.6697503968102325
+curve = 25.0
+curve_power = 1.5
+wander = 10.0
+radius = 0.6
+
+[sub_resource type="Resource" id="Resource_bsnbe"]
+script = ExtResource("4_ehlhi")
+count = 4
+angle = 50.0
+angle_var = 15.0
+curve = -10.0
+wander = 15.0
+bark = false
+segments = 1
+
+[resource]
+script = ExtResource("5_i4rda")
+display_name = "Coast Live Oak"
+latin = "Quercus agrifolia"
+reference = "Imported from 4QUEAGR0.BMP (Quercus agrifolia, archetype spreading, real height ~15 m): crown 1.41x the height, bare trunk 23%, widest at 22% of the crown."
+height = 9.0
+trunk_radius = 0.2628
+trunk_top = 0.45
+wander = 8.0
+clear = 0.194
+crown = 4
+crown_profile = PackedFloat32Array(0.6111, 0.6488, 0.6472, 0.703, 0.6897, 0.6679, 0.6652, 0.6265, 0.6158, 0.5526, 0.5, 0.4596, 0.3927, 0.381, 0.3507, 0.2726)
+levels = Array[ExtResource("4_ehlhi")]([SubResource("Resource_5ap7o"), SubResource("Resource_bsnbe")])
+leaf_texture = ExtResource("3_g6fc0")
+bark_texture = ExtResource("1_ktlcp")
+card_textures = Array[Texture2D]([ExtResource("2_ehlhi"), ExtResource("3_i4rda"), ExtResource("4_5ap7o"), ExtResource("5_bsnbe")])
+card_aspects = PackedFloat32Array(1.43)
+card_tiles = Vector2i(2, 2)
+card_aspect = 1.43
+card_size = 2.16
+inner_clumps = 2
+leaf_start = 0.3
+bark_color = Color(0.21290323, 0.2451613, 0.20806451, 1)

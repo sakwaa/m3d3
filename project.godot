@@ -40,11 +40,79 @@ enabled=PackedStringArray("res://addons/n64_actor_tools/plugin.cfg", "res://addo
 
 textures/texels_per_metre=16
 
+[rendering]
+
+occlusion_culling/use_occlusion_culling=true
+
 [shader_globals]
 
+n64_rain_cover={
+"type": "sampler2D",
+"value": ""
+}
+n64_rain_cover_area={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}
+n64_rain_cover_height={
+"type": "vec2",
+"value": Vector2(0, 1)
+}
+n64_rain_light={
+"type": "sampler2D",
+"value": ""
+}
+n64_rain_light_area={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}
+n64_rain_light_dims={
+"type": "vec4",
+"value": Vector4(1, 1, 1, 0)
+}
+n64_rain_light_keys={
+"type": "vec4",
+"value": Vector4(1, 1, 1, 1)
+}
+n64_rain={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}
+n64_wind={
+"type": "vec4",
+"value": Vector4(1, 0, 0.35, 0.5)
+}
+n64_bender0={
+"type": "vec4",
+"value": Vector4(0, -1000, 0, 0)
+}
+n64_divot={
+"type": "vec4",
+"value": Vector4(0, -1000, 0, 0)
+}
+n64_bender1={
+"type": "vec4",
+"value": Vector4(0, -1000, 0, 0)
+}
+n64_bender2={
+"type": "vec4",
+"value": Vector4(0, -1000, 0, 0)
+}
+n64_bender3={
+"type": "vec4",
+"value": Vector4(0, -1000, 0, 0)
+}
+n64_wetness={
+"type": "float",
+"value": 0.0
+}
 n64_light_blend={
 "type": "vec4",
 "value": Vector4(0, 0, 0, 0)
+}
+n64_ambient_light={
+"type": "color",
+"value": Color(1, 1, 1, 1)
 }
 n64_world_tint={
 "type": "color",

@@ -1,0 +1,70 @@
+[gd_resource type="Resource" script_class="TreeSpecies" format=3 uid="uid://c32vwajgncifg"]
+
+[ext_resource type="Texture2D" path="res://textures/wood/tree_bark.res" id="1_xy467"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_oak_1_t0.res" id="2_jj38p"]
+[ext_resource type="Texture2D" path="res://textures/plants/leaves_oak.res" id="2_tfdd4"]
+[ext_resource type="Script" uid="uid://y0x3hn8qn10u" path="res://addons/n64_level_tools/trees/tree_level.gd" id="3_10b1y"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_oak_1_t1.res" id="3_qor6i"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_oak_1_t2.res" id="4_cmn3d"]
+[ext_resource type="Script" uid="uid://d26o5yijavm2h" path="res://addons/n64_level_tools/trees/tree_species.gd" id="4_jiyk8"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_oak_1_t3.res" id="5_tlyc3"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_oak_2_t0.res" id="6_fstak"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_oak_2_t1.res" id="7_xq63x"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_oak_2_t2.res" id="8_3xqjr"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_oak_2_t3.res" id="9_gqpmu"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_oak_3_t0.res" id="10_kkrty"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_oak_3_t1.res" id="11_bigkv"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_oak_3_t2.res" id="12_2btvm"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_oak_3_t3.res" id="13_c0rxl"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_oak_4_t0.res" id="14_ro4gf"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_oak_4_t1.res" id="15_vxxst"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_oak_4_t2.res" id="16_r2f54"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_oak_4_t3.res" id="17_rdq4f"]
+
+[sub_resource type="Resource" id="Resource_b3w58"]
+script = ExtResource("3_10b1y")
+count = 8
+angle = 62.0
+angle_var = 7.0
+length = 0.6
+length_var = 0.07
+curve = 25.0
+curve_power = 1.5
+wander = 8.0
+radius = 0.6
+
+[sub_resource type="Resource" id="Resource_lvrd5"]
+script = ExtResource("3_10b1y")
+count = 4
+angle = 50.0
+angle_var = 12.0
+length_var = 0.1
+curve = -10.0
+wander = 12.0
+bark = false
+segments = 1
+
+[resource]
+script = ExtResource("4_jiyk8")
+display_name = "Oak"
+reference = "Quercus robur (English oak, open-grown): 20-40 m, crown as wide as tall or wider, short bole 3-5 m, dividing low into heavy sinuous limbs spreading 50-70 deg from vertical, rising again at their ends. Game scale 12 m."
+trunk_radius = 0.6
+trunk_taper = 0.4
+root_flare = 0.3
+trunk_top = 0.45
+wander = 8.0
+segments = 3
+clear = 0.22
+crown = 2
+crown_profile = PackedFloat32Array()
+levels = Array[ExtResource("3_10b1y")]([SubResource("Resource_b3w58"), SubResource("Resource_lvrd5")])
+leaf_texture = ExtResource("2_tfdd4")
+bark_texture = ExtResource("1_xy467")
+card_textures = Array[Texture2D]([ExtResource("2_jj38p"), ExtResource("3_qor6i"), ExtResource("4_cmn3d"), ExtResource("5_tlyc3"), ExtResource("6_fstak"), ExtResource("7_xq63x"), ExtResource("8_3xqjr"), ExtResource("9_gqpmu"), ExtResource("10_kkrty"), ExtResource("11_bigkv"), ExtResource("12_2btvm"), ExtResource("13_c0rxl"), ExtResource("14_ro4gf"), ExtResource("15_vxxst"), ExtResource("16_r2f54"), ExtResource("17_rdq4f")])
+card_aspects = PackedFloat32Array(1.3007813, 1.2460938, 1.296875, 1.4257813)
+card_tiles = Vector2i(2, 2)
+card_size = 2.6
+clumps = 2
+inner_clumps = 2
+leaf_start = 0.35
+bark_color = Color(0.46, 0.42, 0.37, 1)

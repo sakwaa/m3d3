@@ -1,0 +1,39 @@
+[gd_resource type="Resource" script_class="NpcSchedule" format=3]
+
+[ext_resource type="Resource" path="res://story/dialogue/councillor_placeholder.tres" id="1_u7le8"]
+[ext_resource type="Script" path="res://game/story/schedule/schedule_entry.gd" id="2_0ivsa"]
+[ext_resource type="Script" path="res://game/story/story_condition.gd" id="3_agujc"]
+[ext_resource type="Script" path="res://game/story/story_effect.gd" id="4_uvyv0"]
+[ext_resource type="Script" path="res://game/story/schedule/npc_schedule.gd" id="5_5ryxu"]
+
+[sub_resource type="Resource" id="Resource_8jf6m"]
+script = ExtResource("2_0ivsa")
+label = "Metal day announcement"
+days = 8
+from_hour = 9.0
+zone = "res://zones/town1/town_1_market_square.tscn"
+place = &"council_announce"
+
+[sub_resource type="Resource" id="Resource_g3jnv"]
+script = ExtResource("2_0ivsa")
+label = "Council business"
+days = 23
+from_hour = 9.0
+zone = "res://zones/town1/town_1_market_square.tscn"
+place = &"council_door"
+
+[sub_resource type="Resource" id="Resource_dwwit"]
+script = ExtResource("2_0ivsa")
+label = "Elsewhere"
+from_hour = 0.0
+to_hour = 0.0
+zone = "res://zones/nowhere/nowhere.tscn"
+place = &"offstage_councillor"
+
+[resource]
+script = ExtResource("5_5ryxu")
+id = &"councillor"
+character = &"councillor"
+dialogue = ExtResource("1_u7le8")
+entries = Array[ExtResource("2_0ivsa")]([SubResource("Resource_8jf6m"), SubResource("Resource_g3jnv"), SubResource("Resource_dwwit")])
+notes = "Market square scheduling trial."

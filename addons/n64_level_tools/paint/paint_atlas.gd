@@ -343,6 +343,7 @@ static func apply_layers(mat: ShaderMaterial, data: LevelData, masks: Array) -> 
 	mat.set_shader_parameter(&"light_keys", keys)
 	mat.set_shader_parameter(&"timed_bake", timed)
 	mat.set_shader_parameter(&"light_contrast", data.light_contrast)
+	mat.set_shader_parameter(&"light_floor", data.light_floor)
 	mat.set_shader_parameter(&"bake_strength", data.light_bake_strength)
 	var animated := false
 	for i in LevelData.MAX_LAYERS:

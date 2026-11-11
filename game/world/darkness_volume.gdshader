@@ -1,7 +1,11 @@
 shader_type spatial;
-// Multiplies every opaque pixel inside the box toward black along local -Z.
+// Darkens every opaque pixel inside the box toward black along local -Z, as if the surface
+// there were black: blended toward the fog that black would still show at that distance
+// (the pixels are already fogged), so in fog the corridor fades into the fog, not a void.
 // Drawn as back faces without depth test so it also works with the camera inside.
-render_mode unshaded, blend_mul, cull_front, depth_test_disabled, depth_draw_never, shadows_disabled, fog_disabled;
+render_mode unshaded, blend_mix, cull_front, depth_test_disabled, depth_draw_never, shadows_disabled, fog_disabled;
+
+#include "res://addons/n64_runtime/shaders/n64_sampling.gdshaderinc"
 
 uniform sampler2D depth_texture : hint_depth_texture, filter_nearest, repeat_disable;
 uniform vec3 box_min = vec3(-1.5, -0.5, -5.0);
@@ -68,5 +72,11 @@ void fragment() {
 	float into = clamp((box_max.z - p.z) / max(box_max.z - box_min.z, 0.001), 0.0, 1.0);
 	// Half linear, half eased: darkening starts visibly at the front edge, no hard knee.
 	float t = clamp((into - fade_start) / max(fade_end - fade_start, 0.001), 0.0, 1.0);
-	ALBEDO = vec3(1.0 - mix(t, t * t * (3.0 - 2.0 * t), 0.5));
+	float dark = mix(t, t * t * (3.0 - 2.0 * t), 0.5);
+	// Fogged pixel C = mix(S, fog, f); the same surface darkened by `dark`:
+	// mix(S * (1 - dark), fog, f) = C * (1 - dark) + fog * f * dark.
+	vec3 world = (MODEL_MATRIX * vec4(p, 1.0)).xyz;
+	float f = n64_fog_amount(distance(world, n64_fog_origin)) * n64_fog.w;
+	ALBEDO = n64_fog_color.rgb * f;
+	ALPHA = dark;
 }

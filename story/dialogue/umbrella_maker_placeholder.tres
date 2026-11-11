@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="Dialogue" format=3]
+
+[ext_resource type="Script" path="res://game/story/dialogue/dialogue_node.gd" id="1_1qmt8"]
+[ext_resource type="Script" path="res://game/story/dialogue/dialogue_line.gd" id="2_lsogy"]
+[ext_resource type="Script" path="res://game/story/dialogue/dialogue.gd" id="3_18bfw"]
+
+[sub_resource type="Resource" id="Resource_tadlg"]
+script = ExtResource("2_lsogy")
+speaker = &"umbrella_maker"
+text = "Rain's my best customer."
+id = "hello"
+
+[resource]
+script = ExtResource("3_18bfw")
+id = &"umbrella_maker_placeholder"
+start = "hello"
+nodes = Array[ExtResource("1_1qmt8")]([SubResource("Resource_tadlg")])
+notes = "Placeholder for the scheduling trial."

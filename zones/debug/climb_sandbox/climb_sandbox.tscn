@@ -1,0 +1,31 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://game/world/zone.gd" id="1_erd13"]
+[ext_resource type="Script" path="res://game/sky/dynamic_sky.gd" id="2_3fvvf"]
+[ext_resource type="Script" path="res://game/world/day_night_sun.gd" id="3_mmsys"]
+[ext_resource type="Script" path="res://addons/n64_level_tools/level_root.gd" id="4_gr7xp"]
+[ext_resource type="Resource" path="res://zones/debug/climb_sandbox/climb_sandbox_level.res" id="5_g7xj8"]
+[ext_resource type="Script" path="res://game/world/spawn_point.gd" id="6_rqg4q"]
+
+[sub_resource type="Environment" id="Environment_jbivh"]
+background_mode = 2
+
+[node name="ClimbSandbox" type="Node3D" unique_id=1312246101]
+script = ExtResource("1_erd13")
+display_name = "Climb Sandbox"
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=2023219562]
+environment = SubResource("Environment_jbivh")
+script = ExtResource("2_3fvvf")
+
+[node name="Sun" type="DirectionalLight3D" parent="." unique_id=995936551]
+transform = Transform3D(0.8660254, -0.38302222, 0.32139382, 0, 0.64278764, 0.76604444, -0.5, -0.66341394, 0.5566704, 0, 0, 0)
+script = ExtResource("3_mmsys")
+
+[node name="Level" type="Node3D" parent="." unique_id=1411390010]
+script = ExtResource("4_gr7xp")
+data = ExtResource("5_g7xj8")
+
+[node name="Spawn_default" type="Marker3D" parent="." unique_id=549276440]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 6)
+script = ExtResource("6_rqg4q")

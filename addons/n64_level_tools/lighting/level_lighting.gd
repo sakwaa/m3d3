@@ -109,6 +109,9 @@ static func bake(target: LevelRoot, occluders: Array, lights: Array, ambient := 
 		var ao_known := ao_list.size() == brush.face_indices.size()
 		if not ao_known:
 			ao_list.resize(brush.face_indices.size())
+		# With baked vertex AO the shader darkens by it already: the ambient here stays open
+		# (occluding it as well squared the AO, near black under the contrast curve).
+		var own_ao := brush.vertex_ao.is_empty()
 		for f in brush.get_face_count():
 			var nf := brush.get_face_normal(f)
 			var ids := brush.get_face_vertex_ids(f)
@@ -121,7 +124,9 @@ static func bake(target: LevelRoot, occluders: Array, lights: Array, ambient := 
 					if ng.dot(nf) >= smooth:
 						ns += ng
 				var n := (nb * (ns if ns != Vector3.ZERO else nf)).normalized()
-				var ao := ao_list[start + k] if ao_known else _ambient_occlusion(xf * brush.vertices[vi] + n * BIAS, n, data, occ, samples)
+				var ao := 1.0
+				if own_ao:
+					ao = ao_list[start + k] if ao_known else _ambient_occlusion(xf * brush.vertices[vi] + n * BIAS, n, data, occ, samples)
 				ao_list[start + k] = ao
 				colors[start + k] = _light_point(xf * brush.vertices[vi], n, data, sky, ground, lights, occ, ao)
 		out[brush] = colors
@@ -258,6 +263,85 @@ static func bake_keys(target: LevelRoot, occluders: Array, lights: Array, schedu
 				out[brush] = []
 			out[brush].append(lit[brush])
 	return out
+
+
+## Metres between the rain light grid's points, and the most points it may have.
+const RAIN_CELL := 1.0
+const RAIN_MAX_POINTS := 160000
+
+
+## The light rain catches in the air around `target`'s lamps (omni lights): a grid of
+## points every RAIN_CELL metres over the lamps' reach, each the lamps' light there with
+## shadows (rain under a roof or behind a wall from a lamp stays dark). Stored on the level
+## (LevelData.rain_light_*) for its RainCover to publish (n64_rain_light.gdshaderinc).
+## Baked Timed levels keep each key's lamp strength (local_lights) to scale it by the hour.
+static func bake_rain_light(target: LevelRoot, occluders: Array, lights: Array) -> void:
+	var data := target.data
+	if not lights.is_empty() and lights[0] is Light3D:
+		lights = describe(lights)
+	var lamps := lights.filter(func(l: Dictionary): return l.type == "omni" and l.color != Vector3.ZERO and l.range > 0.0)
+	data.rain_light_image = null
+	if lamps.is_empty():
+		return
+	var to_level := target.global_transform.affine_inverse()
+	var box := AABB()
+	for i in lamps.size():
+		var l: Dictionary = lamps[i]
+		var lb := AABB(to_level * l.pos - Vector3.ONE * l.range, Vector3.ONE * l.range * 2.0)
+		box = lb if i == 0 else box.merge(lb)
+	var cell := RAIN_CELL
+	while (floori(box.size.x / cell) + 1) * (floori(box.size.y / cell) + 1) * (floori(box.size.z / cell) + 1) > RAIN_MAX_POINTS:
+		cell *= 1.25
+	var nx := floori(box.size.x / cell) + 1
+	var ny := floori(box.size.y / cell) + 1
+	var nz := floori(box.size.z / cell) + 1
+	var occ := occluders if _is_prepared(occluders) else _occluder_list(occluders)
+	var light := PackedVector3Array()
+	light.resize(nx * ny * nz)
+	var from_level := target.global_transform
+	for l: Dictionary in lamps:
+		var lp: Vector3 = to_level * l.pos
+		var r: float = l.range
+		var i0 := maxi(0, floori((lp.x - r - box.position.x) / cell))
+		var i1 := mini(nx - 1, ceili((lp.x + r - box.position.x) / cell))
+		var j0 := maxi(0, floori((lp.y - r - box.position.y) / cell))
+		var j1 := mini(ny - 1, ceili((lp.y + r - box.position.y) / cell))
+		var k0 := maxi(0, floori((lp.z - r - box.position.z) / cell))
+		var k1 := mini(nz - 1, ceili((lp.z + r - box.position.z) / cell))
+		for j in range(j0, j1 + 1):
+			for k in range(k0, k1 + 1):
+				for i in range(i0, i1 + 1):
+					var p := box.position + Vector3(i, j, k) * cell
+					var dist := p.distance_to(lp)
+					if dist >= r:
+						continue
+					var atten := pow(1.0 - dist / r, 2.0)
+					if atten < 0.004:
+						continue
+					var wp := from_level * p
+					var wl: Vector3 = l.pos
+					if dist > 0.1 and _occluded(wp, wl - (wl - wp).normalized() * 0.05, occ):
+						continue
+					light[(j * nz + k) * nx + i] += l.color * atten
+	# RGBA8, light / 2 (lamps brighter than 1 still fit); one XZ layer per height, stacked.
+	var img := Image.create(nx, nz * ny, false, Image.FORMAT_RGBA8)
+	for j in ny:
+		for k in nz:
+			for i in nx:
+				var c := light[(j * nz + k) * nx + i] * 0.5
+				img.set_pixel(i, j * nz + k, Color(minf(c.x, 1.0), minf(c.y, 1.0), minf(c.z, 1.0), 1.0))
+	var keys := Vector4.ONE
+	if LevelData.mode_is_timed(data.lighting_mode):
+		var schedule := LightingSchedule.load_project()
+		if schedule:
+			var sk := schedule.sorted_keys()
+			for i in mini(sk.size(), 4):
+				keys[i] = sk[i].local_lights
+	data.rain_light_image = img
+	data.rain_light_origin = box.position
+	data.rain_light_cell = cell
+	data.rain_light_layers = ny
+	data.rain_light_keys = keys
 
 
 ## Ambient occlusion at `origin` (already lifted off the surface) facing `n`.
@@ -397,8 +481,9 @@ static func _occluded(from: Vector3, to: Vector3, occ: Array) -> bool:
 	return false
 
 
-## World triangles of every door / passage dressing under `scene_root` (built at runtime
-## by the node, so not part of any LevelRoot), as extra occluders for the bakes.
+## World triangles of every door / passage dressing and prop (stalls, signs) under
+## `scene_root` (built at runtime by the node, so not part of any LevelRoot), as extra
+## occluders for the bakes.
 static func dressing_occluders(scene_root: Node) -> Array:
 	var out := []
 	if scene_root == null:
@@ -409,6 +494,20 @@ static func dressing_occluders(scene_root: Node) -> Array:
 		for v in mi.mesh.get_faces():
 			tris.append(mi.global_transform * v)
 		out.append({tris = tris})
+	# Props (stalls, carts, signs): their near meshes shade the ground and walls around them.
+	if not scene_root.is_inside_tree():
+		return out
+	for parts in scene_root.get_tree().get_nodes_in_group(PropBatch.GROUP):
+		if not scene_root.is_ancestor_of(parts):
+			continue
+		var tris := PackedVector3Array()
+		for mi: MeshInstance3D in PropBatch.meshes_of(parts):
+			if mi.visibility_range_begin > 0.0:
+				continue  # far stand-ins
+			for v in mi.mesh.get_faces():
+				tris.append(mi.global_transform * v)
+		if not tris.is_empty():
+			out.append({tris = tris})
 	return out
 
 

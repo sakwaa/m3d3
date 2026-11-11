@@ -10,13 +10,14 @@ extends Resource
 ##    teleport, face a direction or another actor, play an animation clip, show or hide.
 ##  - LINE (Dialogue track): a dialogue entry; `wait` holds the timeline until it closes.
 ##  - EVENT (Events track): story effects (flags, items, weather), a sprite effect, a
-##    sound, music, a screen fade, waiting for a button, or setting the clock.
+##    sound, music, a screen fade, waiting for a button, setting the clock, or a title
+##    card (big white N64 lettering fading in and out over `duration`).
 ## Positions are in the zone's space.
 
 enum Kind { SHOT, ACTOR, LINE, EVENT }
 enum Move { CUT, LINEAR, SMOOTH }
 enum Action { WALK, RUN, TELEPORT, FACE, ANIMATE, SHOW, HIDE }
-enum Event { STORY, EFFECT, SOUND, MUSIC, FADE, WAIT_INPUT, SET_TIME }
+enum Event { STORY, EFFECT, SOUND, MUSIC, FADE, WAIT_INPUT, SET_TIME, TITLE }
 
 const PLAYER := &"player"
 
@@ -139,6 +140,11 @@ const PLAYER := &"player"
 	set(value):
 		hour = value
 		emit_changed()
+## TITLE: the words shown ("" = the zone's display name).
+@export var title := "":
+	set(value):
+		title = value
+		emit_changed()
 @export_group("")
 
 
@@ -181,6 +187,8 @@ func label() -> String:
 			return "Fade in" if color.a < 0.5 else "Fade out"
 		Event.WAIT_INPUT:
 			return "Wait for button"
+		Event.TITLE:
+			return "Title " + (title if title != "" else "(zone name)")
 	return "Time %s" % StoryCondition._hour_text(hour)
 
 
@@ -190,7 +198,7 @@ func span() -> float:
 		Kind.SHOT:
 			return 0.0 if move == Move.CUT or camera_id > 0 else duration
 		Kind.EVENT:
-			return duration if event == Event.FADE else 0.0
+			return duration if event in [Event.FADE, Event.TITLE] else 0.0
 	return 0.0
 
 
@@ -199,7 +207,7 @@ func _validate_property(property: Dictionary) -> void:
 		Kind.SHOT: ["move", "transform", "fov", "camera_id", "look_at"],
 		Kind.ACTOR: ["actor", "action", "position", "facing", "face_actor", "animation", "loop"],
 		Kind.LINE: ["dialogue", "entry", "speaker", "wait"],
-		Kind.EVENT: ["event", "effects", "effect", "sound", "color", "hour"],
+		Kind.EVENT: ["event", "effects", "effect", "sound", "color", "hour", "title"],
 	}
 	var name := String(property.name)
 	if name == "position" and kind == Kind.EVENT and event in [Event.EFFECT, Event.SOUND]:
@@ -215,8 +223,8 @@ func _validate_property(property: Dictionary) -> void:
 			property.usage = PROPERTY_USAGE_NO_EDITOR
 	if kind == Kind.EVENT:
 		var by_event := {effects = [Event.STORY], effect = [Event.EFFECT], sound = [Event.SOUND, Event.MUSIC],
-			color = [Event.FADE], hour = [Event.SET_TIME]}
+			color = [Event.FADE], hour = [Event.SET_TIME], title = [Event.TITLE]}
 		if by_event.has(name) and not event in by_event[name]:
 			property.usage = PROPERTY_USAGE_NO_EDITOR
-	if name == "duration" and not (kind == Kind.SHOT or (kind == Kind.EVENT and event == Event.FADE) or (kind == Kind.ACTOR and action in [Action.WALK, Action.RUN])):
+	if name == "duration" and not (kind == Kind.SHOT or (kind == Kind.EVENT and event in [Event.FADE, Event.TITLE]) or (kind == Kind.ACTOR and action in [Action.WALK, Action.RUN])):
 		property.usage = PROPERTY_USAGE_NO_EDITOR

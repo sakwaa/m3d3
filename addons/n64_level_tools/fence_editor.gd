@@ -37,12 +37,12 @@ func _init(p: EditorPlugin) -> void:
 	plugin = p
 
 
-## The fence or rope brush being edited: the only brush selected in Object mode, or null.
+## The fence, rope or NPC path brush being edited: the only brush selected in Object mode, or null.
 func selected_fence() -> LevelBrush:
 	if plugin.mode != plugin.Mode.OBJECT or plugin.sel_brushes.size() != 1 or not plugin._level_ok():
 		return null
 	var b: LevelBrush = plugin.sel_brushes[0]
-	return b if b and (b.is_fence() or b.is_rope()) and plugin.level.has_brush(b) else null
+	return b if b and (b.is_fence() or b.is_rope() or b.is_npc_path()) and plugin.level.has_brush(b) else null
 
 
 func _xf(fence: LevelBrush) -> Transform3D:
@@ -317,7 +317,7 @@ func draw_placing(overlay: Control, camera: Camera3D) -> void:
 
 
 static func _noun(b: LevelBrush) -> String:
-	return "rope" if b.is_rope() else "fence"
+	return "rope" if b.is_rope() else ("path" if b.is_npc_path() else "fence")
 
 
 ## Nearest level hit along a ray ({root} added), skipping fences' and ropes' own brushes.

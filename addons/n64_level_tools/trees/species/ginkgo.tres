@@ -1,0 +1,56 @@
+[gd_resource type="Resource" script_class="TreeSpecies" format=3]
+
+[ext_resource type="Texture2D" path="res://textures/wood/tree_bark.res" id="1_o4tnq"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_ginkgo_t0.res" id="2_uwoja"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_ginkgo_t1.res" id="3_d0sxy"]
+[ext_resource type="Texture2D" path="res://textures/plants/leaves_ginkgo.res" id="3_h3mtq"]
+[ext_resource type="Script" path="res://addons/n64_level_tools/trees/tree_level.gd" id="4_uwoja"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_ginkgo_t2.res" id="4_vr7q1"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_ginkgo_t3.res" id="5_6y0xe"]
+[ext_resource type="Script" path="res://addons/n64_level_tools/trees/tree_species.gd" id="5_d0sxy"]
+
+[sub_resource type="Resource" id="Resource_vr7q1"]
+script = ExtResource("4_uwoja")
+count = 9
+angle = 58.0
+angle_var = 12.0
+length = 0.3449096829834132
+curve = 20.0
+wander = 7.0
+radius = 0.55
+segments = 2
+
+[sub_resource type="Resource" id="Resource_6y0xe"]
+script = ExtResource("4_uwoja")
+count = 3
+angle = 50.0
+angle_var = 15.0
+length = 0.55
+curve = -5.0
+wander = 10.0
+bark = false
+segments = 1
+
+[resource]
+script = ExtResource("5_d0sxy")
+display_name = "Ginkgo"
+latin = "Ginkgo biloba"
+reference = "Imported from 4GINBIL1.BMP (Ginkgo biloba, archetype broadleaf, real height ~18 m): crown 0.78x the height, bare trunk 23%, widest at 16% of the crown."
+height = 10.8
+trunk_radius = 0.08
+trunk_top = 0.65
+clear = 0.187
+crown = 4
+crown_profile = PackedFloat32Array(0.2941, 0.3638, 0.3886, 0.373, 0.3411, 0.3286, 0.3038, 0.3119, 0.3108, 0.3157, 0.1886, 0.2005, 0.2032, 0.1584, 0.06, 0.0184)
+levels = Array[ExtResource("4_uwoja")]([SubResource("Resource_vr7q1"), SubResource("Resource_6y0xe")])
+leaf_texture = ExtResource("3_h3mtq")
+bark_texture = ExtResource("1_o4tnq")
+card_textures = Array[Texture2D]([ExtResource("2_uwoja"), ExtResource("3_d0sxy"), ExtResource("4_vr7q1"), ExtResource("5_6y0xe")])
+card_aspects = PackedFloat32Array(0.835)
+card_tiles = Vector2i(2, 2)
+card_aspect = 0.835
+card_size = 2.5919999999999996
+clumps = 2
+inner_clumps = 2
+leaf_start = 0.3
+bark_color = Color(0.7241936, 0.68064517, 0.45645162, 1)

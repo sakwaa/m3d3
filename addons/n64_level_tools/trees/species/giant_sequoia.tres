@@ -1,0 +1,50 @@
+[gd_resource type="Resource" script_class="TreeSpecies" format=3]
+
+[ext_resource type="Texture2D" path="res://textures/wood/tree_bark.res" id="1_aosn8"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_giant_sequoia_t0.res" id="2_ldrad"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_giant_sequoia_t1.res" id="3_pesa7"]
+[ext_resource type="Texture2D" path="res://textures/plants/leaves_giant_sequoia.res" id="3_wf77r"]
+[ext_resource type="Script" path="res://addons/n64_level_tools/trees/tree_level.gd" id="4_ldrad"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_giant_sequoia_t2.res" id="4_nj67q"]
+[ext_resource type="Script" path="res://addons/n64_level_tools/trees/tree_species.gd" id="5_pesa7"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_giant_sequoia_t3.res" id="5_usc27"]
+
+[sub_resource type="Resource" id="Resource_nj67q"]
+script = ExtResource("4_ldrad")
+count = 4
+whorls = 9
+end = 0.97
+angle = 78.0
+angle_var = 8.0
+length = 0.22292704638029115
+length_var = 0.2
+curve = -12.0
+radius = 0.35
+bark = false
+segments = 2
+
+[resource]
+script = ExtResource("5_pesa7")
+display_name = "Giant Sequoia"
+latin = "Sequoiadendron giganteum"
+reference = "Imported from 4SEQGIG0.BMP (Sequoiadendron giganteum, archetype conifer, real height ~40 m): crown 0.60x the height, bare trunk 0%, widest at 9% of the crown."
+height = 18.0
+trunk_radius = 0.9
+trunk_taper = 0.1
+trunk_top = 1.0
+lean = 1.0
+wander = 1.5
+clear = 0.0
+crown = 4
+crown_profile = PackedFloat32Array(0.295, 0.3023, 0.2841, 0.2701, 0.2484, 0.24, 0.2117, 0.205, 0.1634, 0.1477, 0.1365, 0.1207, 0.0924, 0.0693, 0.049, 0.0238)
+levels = Array[ExtResource("4_ldrad")]([SubResource("Resource_nj67q")])
+leaf_texture = ExtResource("3_wf77r")
+bark_texture = ExtResource("1_aosn8")
+card_textures = Array[Texture2D]([ExtResource("2_ldrad"), ExtResource("3_pesa7"), ExtResource("4_nj67q"), ExtResource("5_usc27")])
+card_aspects = PackedFloat32Array(0.605)
+card_tiles = Vector2i(2, 2)
+card_aspect = 0.605
+card_size = 3.8
+leaf_start = 0.15
+bark_color = Color(0.36935484, 0.41290322, 0.28064516, 1)
+crown_ao = 0.4

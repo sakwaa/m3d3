@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="Dialogue" format=3]
+
+[ext_resource type="Script" path="res://game/story/dialogue/dialogue_node.gd" id="1_xeyuc"]
+[ext_resource type="Script" path="res://game/story/dialogue/dialogue_line.gd" id="2_ktq72"]
+[ext_resource type="Script" path="res://game/story/dialogue/dialogue.gd" id="3_elpdh"]
+
+[sub_resource type="Resource" id="Resource_io17m"]
+script = ExtResource("2_ktq72")
+speaker = &"dumpling_seller"
+text = "Hot dumplings! Not on fire day, mind."
+id = "hello"
+
+[resource]
+script = ExtResource("3_elpdh")
+id = &"dumpling_seller_placeholder"
+start = "hello"
+nodes = Array[ExtResource("1_xeyuc")]([SubResource("Resource_io17m")])
+notes = "Placeholder for the scheduling trial."

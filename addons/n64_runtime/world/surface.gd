@@ -20,15 +20,17 @@ const DAMAGE := 1 << 9
 const VOID := 1 << 10
 ## The camera passes through (leafy canopies, thin railings, the player's side of a wall).
 const NO_CAMERA := 1 << 11
-## Stored for the climb state (ladders, vines); nothing reads it yet.
+## Walls and ceilings the player can climb (vines): LocoClimb, LocoCeiling.
 const CLIMBABLE := 1 << 12
 ## Stored for the hookshot (wooden targets); nothing reads it yet.
 const HOOKSHOT := 1 << 13
+## Ledges here can't be caught or hung from (LocoHang): on the top or the wall below it.
+const NO_LEDGE := 1 << 14
 ## Bits 16 – 23: a CameraZone's camera_id (0 = none): standing here uses that camera.
 const CAMERA_SHIFT := 16
 const CAMERA_MASK := 0xFF << CAMERA_SHIFT
-const FLAGS := [SLIPPERY, DAMAGE, VOID, NO_CAMERA, CLIMBABLE, HOOKSHOT]
-const FLAG_NAMES := ["Slippery", "Damage", "Void-out", "No camera", "Climbable", "Hookshot"]
+const FLAGS := [SLIPPERY, DAMAGE, VOID, NO_CAMERA, CLIMBABLE, HOOKSHOT, NO_LEDGE]
+const FLAG_NAMES := ["Slippery", "Damage", "Void-out", "No camera", "Climbable", "Hookshot", "No ledge grab"]
 ## Flags a hazard check looks at (unsafe to respawn on).
 const HAZARDS := DAMAGE | VOID
 

@@ -1,0 +1,232 @@
+{
+ "name": "SlashD",
+ "fps": 30,
+ "length": 20,
+ "loop": false,
+ "root": "auto",
+ "source": "OoT remake front view 64WRm0sZn0E (60 fps) + MM3D Swordsman's School AXzZe1vsjxk, read by eye",
+ "measured": true,
+ "windows": {
+  "windup": [
+   0,
+   5
+  ],
+  "active": [
+   6,
+   10
+  ],
+  "cancel": [
+   12,
+   20
+  ],
+  "opening": [
+   14,
+   20
+  ]
+ },
+ "keys": [
+  {
+   "upper_arm_L": [
+    5,
+    25
+   ],
+   "forearm_L": [
+    40,
+    15
+   ],
+   "thigh_L": 18,
+   "shin_L": -6,
+   "thigh_R": -14,
+   "shin_R": -22,
+   "upper_arm_R": [
+    10,
+    20
+   ],
+   "forearm_R": [
+    70,
+    10
+   ],
+   "lean": 6,
+   "frame": 0,
+   "ease": "smooth"
+  },
+  {
+   "upper_arm_L": [
+    -15,
+    30
+   ],
+   "forearm_L": [
+    40,
+    15
+   ],
+   "thigh_L": [
+    26,
+    6
+   ],
+   "shin_L": -16,
+   "thigh_R": [
+    -6,
+    6
+   ],
+   "shin_R": -38,
+   "upper_arm_R": [
+    150,
+    50
+   ],
+   "forearm_R": [
+    185,
+    55
+   ],
+   "lean": 2,
+   "twist": 40,
+   "hip_twist": 18,
+   "hip_roll": -6,
+   "lift": -0.03,
+   "blade_R": [
+    195,
+    35
+   ],
+   "frame": 5,
+   "ease": "ease_in"
+  },
+  {
+   "upper_arm_L": [
+    15,
+    25
+   ],
+   "forearm_L": [
+    40,
+    15
+   ],
+   "thigh_L": [
+    36,
+    14
+   ],
+   "shin_L": -4,
+   "thigh_R": [
+    -26,
+    10
+   ],
+   "shin_R": -20,
+   "upper_arm_R": [
+    90,
+    15
+   ],
+   "forearm_R": [
+    85,
+    5
+   ],
+   "lean": 12,
+   "twist": 0,
+   "hip_twist": 0,
+   "hip_roll": 0,
+   "blade_R": [
+    92,
+    -10
+   ],
+   "frame": 8,
+   "ease": "snap"
+  },
+  {
+   "upper_arm_L": [
+    30,
+    20
+   ],
+   "forearm_L": [
+    40,
+    15
+   ],
+   "thigh_L": [
+    36,
+    14
+   ],
+   "shin_L": -4,
+   "thigh_R": [
+    -26,
+    10
+   ],
+   "shin_R": -20,
+   "upper_arm_R": [
+    40,
+    -45
+   ],
+   "forearm_R": [
+    25,
+    -60
+   ],
+   "lean": 16,
+   "twist": -40,
+   "hip_twist": -20,
+   "hip_roll": 8,
+   "blade_R": [
+    60,
+    -75
+   ],
+   "frame": 11,
+   "ease": "ease_out"
+  },
+  {
+   "upper_arm_L": [
+    28,
+    20
+   ],
+   "forearm_L": [
+    40,
+    15
+   ],
+   "thigh_L": [
+    36,
+    14
+   ],
+   "shin_L": -4,
+   "thigh_R": [
+    -26,
+    10
+   ],
+   "shin_R": -20,
+   "upper_arm_R": [
+    42,
+    -45
+   ],
+   "forearm_R": [
+    28,
+    -58
+   ],
+   "lean": 14,
+   "twist": -35,
+   "hip_twist": -18,
+   "hip_roll": 6,
+   "blade_R": [
+    62,
+    -72
+   ],
+   "frame": 15,
+   "ease": "smooth"
+  },
+  {
+   "upper_arm_L": [
+    5,
+    25
+   ],
+   "forearm_L": [
+    40,
+    15
+   ],
+   "thigh_L": 18,
+   "shin_L": -6,
+   "thigh_R": -14,
+   "shin_R": -22,
+   "upper_arm_R": [
+    10,
+    20
+   ],
+   "forearm_R": [
+    70,
+    10
+   ],
+   "lean": 6,
+   "frame": 20,
+   "ease": "smooth"
+  }
+ ]
+}

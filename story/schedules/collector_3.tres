@@ -1,0 +1,50 @@
+[gd_resource type="Resource" script_class="NpcSchedule" format=3]
+
+[ext_resource type="Resource" path="res://story/dialogue/collector_placeholder.tres" id="1_k3vl5"]
+[ext_resource type="Script" path="res://game/story/schedule/schedule_entry.gd" id="2_d57th"]
+[ext_resource type="Script" path="res://game/story/story_condition.gd" id="3_ngurb"]
+[ext_resource type="Script" path="res://game/story/story_effect.gd" id="4_ww6uj"]
+[ext_resource type="Script" path="res://game/story/schedule/npc_schedule.gd" id="5_v6ykd"]
+
+[sub_resource type="Resource" id="Resource_tjdlr"]
+script = ExtResource("2_d57th")
+label = "Arrives through the south gate"
+from_hour = 7.0
+to_hour = 8.0
+activity = 1
+zone = "res://zones/town1/town_1_market_square.tscn"
+place = &"collector_in_3"
+
+[sub_resource type="Resource" id="Resource_ayw5w"]
+script = ExtResource("2_d57th")
+label = "Takes things for safekeeping"
+to_hour = 18.0
+zone = "res://zones/town1/town_1_market_square.tscn"
+place = &"collector_3"
+
+[sub_resource type="Resource" id="Resource_p7rpy"]
+script = ExtResource("2_d57th")
+label = "Leaves by the south gate"
+from_hour = 18.5
+to_hour = 19.5
+activity = 1
+zone = "res://zones/town1/town_1_market_square.tscn"
+place = &"collector_in_3"
+reverse = true
+vanish_at_end = true
+
+[sub_resource type="Resource" id="Resource_be2uy"]
+script = ExtResource("2_d57th")
+label = "Elsewhere"
+from_hour = 0.0
+to_hour = 0.0
+zone = "res://zones/nowhere/nowhere.tscn"
+place = &"offstage_collector_3"
+
+[resource]
+script = ExtResource("5_v6ykd")
+id = &"collector_3"
+character = &"collector"
+dialogue = ExtResource("1_k3vl5")
+entries = Array[ExtResource("2_d57th")]([SubResource("Resource_tjdlr"), SubResource("Resource_ayw5w"), SubResource("Resource_p7rpy"), SubResource("Resource_be2uy")])
+notes = "Market square scheduling trial."

@@ -12,7 +12,16 @@ const ARRIVAL_GRACE_MSEC := 500
 	set(value):
 		target_zone = value
 		update_configuration_warnings()
+		notify_property_list_changed()  # (target_spawn's choices)
 @export var target_spawn: StringName = &"default"
+## The spawn in this zone beside this exit, so a `back` exit elsewhere can return here.
+@export var here_spawn: StringName = &""
+## Leads back to the zone the player came from (ZoneManager.previous_zone_path) instead
+## of `target_zone`: the nowhere room's way out.
+@export var back := false:
+	set(value):
+		back = value
+		update_configuration_warnings()
 @export var size := Vector3(2, 3, 1):
 	set(value):
 		size = value
@@ -31,11 +40,15 @@ func _ready() -> void:
 
 func _on_body_entered(body: Node3D) -> void:
 	var manager := get_node_or_null(^"/root/ZoneManager")
-	if manager == null or not body.is_in_group(&"player") or target_zone.is_empty():
+	if manager == null or not body.is_in_group(&"player"):
 		return
 	if Time.get_ticks_msec() - manager.arrived_msec < ARRIVAL_GRACE_MSEC:
 		return
-	manager.travel(target_zone, target_spawn)
+	if back:
+		manager.travel(manager.previous_zone_path, manager.previous_spawn)
+	else:
+		# No target: the manager doesn't know where to put the player, so nowhere.
+		manager.travel(target_zone, target_spawn, here_spawn)
 
 
 func _rebuild() -> void:
@@ -54,4 +67,8 @@ func _rebuild() -> void:
 
 
 func _get_configuration_warnings() -> PackedStringArray:
-	return ["Set target_zone."] if target_zone.is_empty() else []
+	return ["Set target_zone (unset leads to the nowhere room)."] if target_zone.is_empty() and not back else []
+
+
+func _validate_property(property: Dictionary) -> void:
+	ZoneArrivals.hint(property, target_zone)

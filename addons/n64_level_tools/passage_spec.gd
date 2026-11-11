@@ -14,7 +14,9 @@ const NODE_PROPERTIES := [&"target_zone", &"target_spawn", &"spawn_id", &"arriva
 @export_file("*.tscn") var target_zone := "":
 	set(v):
 		target_zone = v
+		notify_property_list_changed()  # (target_spawn's choices)
 		emit_changed()
+## Where in the target zone it arrives: pick from that zone's arrival ids (or type one).
 @export var target_spawn: StringName = &"default":
 	set(v):
 		target_spawn = v
@@ -142,3 +144,7 @@ const NODE_PROPERTIES := [&"target_zone", &"target_spawn", &"spawn_id", &"arriva
 ## The opening sits on the threshold: the brush's own transform.
 func opening_xf(brush_xf: Transform3D) -> Transform3D:
 	return brush_xf
+
+
+func _validate_property(property: Dictionary) -> void:
+	ZoneArrivals.hint(property, target_zone)

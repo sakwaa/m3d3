@@ -8,7 +8,8 @@ extends DialogueNode
 
 ##  BOX: the normal text box (name tag when there's a speaker).
 ##  NARRATION: white text centred on a black screen (dreams, inner voice).
-enum Style { BOX, NARRATION }
+##  SIGN: the box with smaller text, shown at once with no voice (signs, notices).
+enum Style { BOX, NARRATION, SIGN }
 
 ## Character id; "" = no one (signs, the narrator).
 @export var speaker := &""

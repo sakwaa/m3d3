@@ -1,0 +1,46 @@
+[gd_resource type="Resource" script_class="TreeSpecies" format=3]
+
+[ext_resource type="Texture2D" path="res://textures/wood/tree_bark.res" id="1_cje1l"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_italian_cypress_t0.res" id="2_hp7ye"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_italian_cypress_t1.res" id="3_atjxk"]
+[ext_resource type="Texture2D" path="res://textures/plants/leaves_italian_cypress.res" id="3_ysoga"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_italian_cypress_t2.res" id="4_e7ult"]
+[ext_resource type="Script" path="res://addons/n64_level_tools/trees/tree_level.gd" id="4_hp7ye"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_italian_cypress_t3.res" id="5_44bq7"]
+[ext_resource type="Script" path="res://addons/n64_level_tools/trees/tree_species.gd" id="5_atjxk"]
+
+[sub_resource type="Resource" id="Resource_e7ult"]
+script = ExtResource("4_hp7ye")
+count = 14
+angle = 22.0
+angle_var = 8.0
+length = 0.28830245355583356
+curve = 5.0
+wander = 5.0
+radius = 0.4
+bark = false
+segments = 1
+
+[resource]
+script = ExtResource("5_atjxk")
+display_name = "Italian Cypress"
+latin = "Cupressus sempervirens"
+reference = "Imported from 4CUPSEM1.BMP (Cupressus sempervirens, archetype columnar, real height ~18 m): crown 0.26x the height, bare trunk 0%, widest at 28% of the crown."
+height = 10.8
+trunk_radius = 0.8672399999999999
+trunk_top = 1.0
+lean = 1.0
+clear = 0.0
+crown = 4
+crown_profile = PackedFloat32Array(0.1092, 0.126, 0.1294, 0.1287, 0.1321, 0.1321, 0.1213, 0.1206, 0.1125, 0.1098, 0.1038, 0.0991, 0.0869, 0.0775, 0.0633, 0.0425)
+levels = Array[ExtResource("4_hp7ye")]([SubResource("Resource_e7ult")])
+leaf_texture = ExtResource("3_ysoga")
+bark_texture = ExtResource("1_cje1l")
+card_textures = Array[Texture2D]([ExtResource("2_hp7ye"), ExtResource("3_atjxk"), ExtResource("4_e7ult"), ExtResource("5_44bq7")])
+card_aspects = PackedFloat32Array(0.268)
+card_tiles = Vector2i(2, 2)
+card_aspect = 0.268
+card_size = 2.28096
+clumps = 2
+leaf_start = 0.1
+bark_color = Color(0.09516129, 0.16935484, 0.043548387, 1)

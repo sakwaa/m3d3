@@ -1,0 +1,558 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://game/world/zone.gd" id="1_sdtby"]
+[ext_resource type="Shader" path="res://addons/n64_runtime/shaders/n64_textured.gdshader" id="2_nnd5c"]
+[ext_resource type="Texture2D" path="res://textures/rock/cobblestone_square.res" id="3_krtrt"]
+[ext_resource type="Texture2D" path="res://textures/brick/brick_3.res" id="4_lxqea"]
+[ext_resource type="Texture2D" path="res://textures/doors/black_knocker.res" id="5_bkncq"]
+[ext_resource type="Texture2D" path="res://textures/doors/wood_plank_door.res" id="6_7pxcr"]
+[ext_resource type="PackedScene" path="res://game/world/props/lantern.tscn" id="7_vfuhv"]
+[ext_resource type="Script" path="res://game/world/spawn_point.gd" id="8_4ohjb"]
+[ext_resource type="Script" path="res://game/world/zone_exit.gd" id="9_2n4ba"]
+[ext_resource type="Script" path="res://game/world/npc_spot.gd" id="10_bfv6w"]
+
+[sub_resource type="Environment" id="Environment_4fpfn"]
+background_mode = 1
+ambient_light_source = 2
+ambient_light_color = Color(0.16, 0.16, 0.24, 1)
+ambient_light_energy = 0.5
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_wgcgt"]
+render_priority = 0
+shader = ExtResource("2_nnd5c")
+shader_parameter/shine_strength = null
+shader_parameter/shine_tint = null
+shader_parameter/shine_mode = null
+shader_parameter/hilite_strength = 0.0
+shader_parameter/hilite_size = null
+shader_parameter/hilite_color = null
+shader_parameter/albedo_texture = ExtResource("3_krtrt")
+shader_parameter/has_texture = true
+shader_parameter/albedo_color = Color(0.62, 0.64, 0.72, 1)
+shader_parameter/uv_scale = Vector2(2.4, 13.6)
+shader_parameter/uv_scroll = null
+shader_parameter/flip = null
+shader_parameter/anti_tiling = null
+shader_parameter/tint_mode = null
+shader_parameter/tint_dark = null
+shader_parameter/tint_light = null
+shader_parameter/tint_extra = null
+shader_parameter/use_vertex_color = null
+shader_parameter/vertex_ao_in_alpha = null
+shader_parameter/alpha_cutoff = null
+shader_parameter/cutout = null
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_jdgs4"]
+size = Vector2(6, 34)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_xxtfk"]
+size = Vector3(6, 1, 34)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_5ofrq"]
+render_priority = 0
+shader = ExtResource("2_nnd5c")
+shader_parameter/shine_strength = null
+shader_parameter/shine_tint = null
+shader_parameter/shine_mode = null
+shader_parameter/hilite_strength = 0.0
+shader_parameter/hilite_size = null
+shader_parameter/hilite_color = null
+shader_parameter/albedo_texture = ExtResource("4_lxqea")
+shader_parameter/has_texture = true
+shader_parameter/albedo_color = Color(0.55, 0.5, 0.52, 1)
+shader_parameter/uv_scale = Vector2(5, 1.8)
+shader_parameter/uv_scroll = null
+shader_parameter/flip = null
+shader_parameter/anti_tiling = null
+shader_parameter/tint_mode = null
+shader_parameter/tint_dark = null
+shader_parameter/tint_light = null
+shader_parameter/tint_extra = null
+shader_parameter/use_vertex_color = null
+shader_parameter/vertex_ao_in_alpha = null
+shader_parameter/alpha_cutoff = null
+shader_parameter/cutout = null
+
+[sub_resource type="QuadMesh" id="QuadMesh_yrd86"]
+size = Vector2(10, 3.6)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_hsvhf"]
+render_priority = 0
+shader = ExtResource("2_nnd5c")
+shader_parameter/shine_strength = null
+shader_parameter/shine_tint = null
+shader_parameter/shine_mode = null
+shader_parameter/hilite_strength = 0.0
+shader_parameter/hilite_size = null
+shader_parameter/hilite_color = null
+shader_parameter/albedo_texture = ExtResource("4_lxqea")
+shader_parameter/has_texture = true
+shader_parameter/albedo_color = Color(0.55, 0.5, 0.52, 1)
+shader_parameter/uv_scale = Vector2(4, 1.3)
+shader_parameter/uv_scroll = null
+shader_parameter/flip = null
+shader_parameter/anti_tiling = null
+shader_parameter/tint_mode = null
+shader_parameter/tint_dark = null
+shader_parameter/tint_light = null
+shader_parameter/tint_extra = null
+shader_parameter/use_vertex_color = null
+shader_parameter/vertex_ao_in_alpha = null
+shader_parameter/alpha_cutoff = null
+shader_parameter/cutout = null
+
+[sub_resource type="QuadMesh" id="QuadMesh_o4hkh"]
+size = Vector2(8, 2.6)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_hdkrk"]
+render_priority = 0
+shader = ExtResource("2_nnd5c")
+shader_parameter/shine_strength = null
+shader_parameter/shine_tint = null
+shader_parameter/shine_mode = null
+shader_parameter/hilite_strength = 0.0
+shader_parameter/hilite_size = null
+shader_parameter/hilite_color = null
+shader_parameter/albedo_texture = ExtResource("4_lxqea")
+shader_parameter/has_texture = true
+shader_parameter/albedo_color = Color(0.55, 0.5, 0.52, 1)
+shader_parameter/uv_scale = Vector2(4.25, 2.1)
+shader_parameter/uv_scroll = null
+shader_parameter/flip = null
+shader_parameter/anti_tiling = null
+shader_parameter/tint_mode = null
+shader_parameter/tint_dark = null
+shader_parameter/tint_light = null
+shader_parameter/tint_extra = null
+shader_parameter/use_vertex_color = null
+shader_parameter/vertex_ao_in_alpha = null
+shader_parameter/alpha_cutoff = null
+shader_parameter/cutout = null
+
+[sub_resource type="QuadMesh" id="QuadMesh_epinl"]
+size = Vector2(8.5, 4.2)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_7ok2p"]
+render_priority = 0
+shader = ExtResource("2_nnd5c")
+shader_parameter/shine_strength = null
+shader_parameter/shine_tint = null
+shader_parameter/shine_mode = null
+shader_parameter/hilite_strength = 0.0
+shader_parameter/hilite_size = null
+shader_parameter/hilite_color = null
+shader_parameter/albedo_texture = ExtResource("4_lxqea")
+shader_parameter/has_texture = true
+shader_parameter/albedo_color = Color(0.55, 0.5, 0.52, 1)
+shader_parameter/uv_scale = Vector2(3.5, 1.5)
+shader_parameter/uv_scroll = null
+shader_parameter/flip = null
+shader_parameter/anti_tiling = null
+shader_parameter/tint_mode = null
+shader_parameter/tint_dark = null
+shader_parameter/tint_light = null
+shader_parameter/tint_extra = null
+shader_parameter/use_vertex_color = null
+shader_parameter/vertex_ao_in_alpha = null
+shader_parameter/alpha_cutoff = null
+shader_parameter/cutout = null
+
+[sub_resource type="QuadMesh" id="QuadMesh_ffwyy"]
+size = Vector2(7, 3)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_a5pys"]
+render_priority = 0
+shader = ExtResource("2_nnd5c")
+shader_parameter/shine_strength = null
+shader_parameter/shine_tint = null
+shader_parameter/shine_mode = null
+shader_parameter/hilite_strength = 0.0
+shader_parameter/hilite_size = null
+shader_parameter/hilite_color = null
+shader_parameter/albedo_texture = ExtResource("4_lxqea")
+shader_parameter/has_texture = true
+shader_parameter/albedo_color = Color(0.55, 0.5, 0.52, 1)
+shader_parameter/uv_scale = Vector2(5, 2)
+shader_parameter/uv_scroll = null
+shader_parameter/flip = null
+shader_parameter/anti_tiling = null
+shader_parameter/tint_mode = null
+shader_parameter/tint_dark = null
+shader_parameter/tint_light = null
+shader_parameter/tint_extra = null
+shader_parameter/use_vertex_color = null
+shader_parameter/vertex_ao_in_alpha = null
+shader_parameter/alpha_cutoff = null
+shader_parameter/cutout = null
+
+[sub_resource type="QuadMesh" id="QuadMesh_ukd7q"]
+size = Vector2(10, 4)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_hm6mg"]
+render_priority = 0
+shader = ExtResource("2_nnd5c")
+shader_parameter/shine_strength = null
+shader_parameter/shine_tint = null
+shader_parameter/shine_mode = null
+shader_parameter/hilite_strength = 0.0
+shader_parameter/hilite_size = null
+shader_parameter/hilite_color = null
+shader_parameter/albedo_texture = ExtResource("4_lxqea")
+shader_parameter/has_texture = true
+shader_parameter/albedo_color = Color(0.55, 0.5, 0.52, 1)
+shader_parameter/uv_scale = Vector2(2.5, 1.1)
+shader_parameter/uv_scroll = null
+shader_parameter/flip = null
+shader_parameter/anti_tiling = null
+shader_parameter/tint_mode = null
+shader_parameter/tint_dark = null
+shader_parameter/tint_light = null
+shader_parameter/tint_extra = null
+shader_parameter/use_vertex_color = null
+shader_parameter/vertex_ao_in_alpha = null
+shader_parameter/alpha_cutoff = null
+shader_parameter/cutout = null
+
+[sub_resource type="QuadMesh" id="QuadMesh_6ec23"]
+size = Vector2(5, 2.2)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_v078v"]
+render_priority = 0
+shader = ExtResource("2_nnd5c")
+shader_parameter/shine_strength = null
+shader_parameter/shine_tint = null
+shader_parameter/shine_mode = null
+shader_parameter/hilite_strength = 0.0
+shader_parameter/hilite_size = null
+shader_parameter/hilite_color = null
+shader_parameter/albedo_texture = ExtResource("5_bkncq")
+shader_parameter/has_texture = true
+shader_parameter/albedo_color = Color(1, 1, 1, 1)
+shader_parameter/uv_scale = Vector2(1, 1)
+shader_parameter/uv_scroll = null
+shader_parameter/flip = null
+shader_parameter/anti_tiling = null
+shader_parameter/tint_mode = null
+shader_parameter/tint_dark = null
+shader_parameter/tint_light = null
+shader_parameter/tint_extra = null
+shader_parameter/use_vertex_color = null
+shader_parameter/vertex_ao_in_alpha = null
+shader_parameter/alpha_cutoff = null
+shader_parameter/cutout = null
+
+[sub_resource type="QuadMesh" id="QuadMesh_3b50t"]
+size = Vector2(1.2, 2.2)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_t61lg"]
+render_priority = 0
+shader = ExtResource("2_nnd5c")
+shader_parameter/shine_strength = null
+shader_parameter/shine_tint = null
+shader_parameter/shine_mode = null
+shader_parameter/hilite_strength = 0.0
+shader_parameter/hilite_size = null
+shader_parameter/hilite_color = null
+shader_parameter/albedo_texture = ExtResource("6_7pxcr")
+shader_parameter/has_texture = true
+shader_parameter/albedo_color = Color(0.7, 0.7, 0.7, 1)
+shader_parameter/uv_scale = Vector2(1, 1)
+shader_parameter/uv_scroll = null
+shader_parameter/flip = null
+shader_parameter/anti_tiling = null
+shader_parameter/tint_mode = null
+shader_parameter/tint_dark = null
+shader_parameter/tint_light = null
+shader_parameter/tint_extra = null
+shader_parameter/use_vertex_color = null
+shader_parameter/vertex_ao_in_alpha = null
+shader_parameter/alpha_cutoff = null
+shader_parameter/cutout = null
+
+[sub_resource type="QuadMesh" id="QuadMesh_yic2d"]
+size = Vector2(1.1, 2.1)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_yur73"]
+size = Vector3(0.4, 6, 36)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_tngca"]
+size = Vector3(7, 6, 0.4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_cciaq"]
+size = Vector3(0.4, 6, 36)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_fsup2"]
+size = Vector3(7, 6, 0.4)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_82kyk"]
+render_priority = 0
+shader = ExtResource("2_nnd5c")
+shader_parameter/shine_strength = null
+shader_parameter/shine_tint = null
+shader_parameter/shine_mode = null
+shader_parameter/hilite_strength = 0.0
+shader_parameter/hilite_size = null
+shader_parameter/hilite_color = null
+shader_parameter/has_texture = false
+shader_parameter/albedo_color = Color(0.12, 0.12, 0.14, 1)
+shader_parameter/uv_scale = null
+shader_parameter/uv_scroll = null
+shader_parameter/flip = null
+shader_parameter/anti_tiling = null
+shader_parameter/tint_mode = null
+shader_parameter/tint_dark = null
+shader_parameter/tint_light = null
+shader_parameter/tint_extra = null
+shader_parameter/use_vertex_color = null
+shader_parameter/vertex_ao_in_alpha = null
+shader_parameter/alpha_cutoff = null
+shader_parameter/cutout = null
+
+[sub_resource type="BoxMesh" id="BoxMesh_8k8h5"]
+size = Vector3(0.12, 3, 0.12)
+
+[sub_resource type="BoxMesh" id="BoxMesh_t8qrq"]
+size = Vector3(0.12, 3, 0.12)
+
+[sub_resource type="BoxMesh" id="BoxMesh_640dg"]
+size = Vector3(0.12, 3, 0.12)
+
+[sub_resource type="BoxMesh" id="BoxMesh_3qxkv"]
+size = Vector3(0.12, 3, 0.12)
+
+[node name="Nowhere" type="Node3D" unique_id=1025460085]
+script = ExtResource("1_sdtby")
+zone_id = &"nowhere"
+shadow_strength = 0.6
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=900244016]
+environment = SubResource("Environment_4fpfn")
+
+[node name="Alley" type="Node3D" parent="." unique_id=386891363]
+
+[node name="Floor" type="MeshInstance3D" parent="Alley" unique_id=1430047664]
+material_override = SubResource("ShaderMaterial_wgcgt")
+mesh = SubResource("PlaneMesh_jdgs4")
+
+[node name="FloorBody" type="StaticBody3D" parent="Alley" unique_id=2111985556]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+
+[node name="Shape" type="CollisionShape3D" parent="Alley/FloorBody" unique_id=208762528]
+shape = SubResource("BoxShape3D_xxtfk")
+
+[node name="Wall0" type="MeshInstance3D" parent="Alley" unique_id=2091074040]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -3, 1.8, -12)
+material_override = SubResource("ShaderMaterial_5ofrq")
+mesh = SubResource("QuadMesh_yrd86")
+
+[node name="Wall1" type="MeshInstance3D" parent="Alley" unique_id=1627454646]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -3, 1.3, 1)
+material_override = SubResource("ShaderMaterial_hsvhf")
+mesh = SubResource("QuadMesh_o4hkh")
+
+[node name="Wall2" type="MeshInstance3D" parent="Alley" unique_id=228732837]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -3, 2.1, 12.75)
+material_override = SubResource("ShaderMaterial_hdkrk")
+mesh = SubResource("QuadMesh_epinl")
+
+[node name="Wall3" type="MeshInstance3D" parent="Alley" unique_id=497843737]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 3, 1.5, -13.5)
+material_override = SubResource("ShaderMaterial_7ok2p")
+mesh = SubResource("QuadMesh_ffwyy")
+
+[node name="Wall4" type="MeshInstance3D" parent="Alley" unique_id=1817968533]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 3, 2, -1.5)
+material_override = SubResource("ShaderMaterial_a5pys")
+mesh = SubResource("QuadMesh_ukd7q")
+
+[node name="Wall5" type="MeshInstance3D" parent="Alley" unique_id=1365830263]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 3, 1.1, 9.5)
+material_override = SubResource("ShaderMaterial_hm6mg")
+mesh = SubResource("QuadMesh_6ec23")
+
+[node name="DoorL" type="MeshInstance3D" parent="Alley" unique_id=1109678961]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -2.98, 1.1, 1)
+material_override = SubResource("ShaderMaterial_v078v")
+mesh = SubResource("QuadMesh_3b50t")
+
+[node name="DoorR" type="MeshInstance3D" parent="Alley" unique_id=1947535108]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 2.98, 1.05, -5)
+material_override = SubResource("ShaderMaterial_t61lg")
+mesh = SubResource("QuadMesh_yic2d")
+
+[node name="EdgeL" type="StaticBody3D" parent="Alley" unique_id=1586504703]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.2, 3, 0)
+
+[node name="Shape" type="CollisionShape3D" parent="Alley/EdgeL" unique_id=1626141477]
+shape = SubResource("BoxShape3D_yur73")
+
+[node name="EndN" type="StaticBody3D" parent="Alley" unique_id=1801521976]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, -17.2)
+
+[node name="Shape" type="CollisionShape3D" parent="Alley/EndN" unique_id=1062518966]
+shape = SubResource("BoxShape3D_tngca")
+
+[node name="EdgeR" type="StaticBody3D" parent="Alley" unique_id=247455388]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.2, 3, 0)
+
+[node name="Shape" type="CollisionShape3D" parent="Alley/EdgeR" unique_id=1260939474]
+shape = SubResource("BoxShape3D_cciaq")
+
+[node name="EndS" type="StaticBody3D" parent="Alley" unique_id=1266338036]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 17.2)
+
+[node name="Shape" type="CollisionShape3D" parent="Alley/EndS" unique_id=492782404]
+shape = SubResource("BoxShape3D_fsup2")
+
+[node name="Lamps" type="Node3D" parent="." unique_id=1871114176]
+
+[node name="Lamp0" type="Node3D" parent="Lamps" unique_id=405568679]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.6, 0, -10)
+
+[node name="Post" type="MeshInstance3D" parent="Lamps/Lamp0" unique_id=883090032]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
+material_override = SubResource("ShaderMaterial_82kyk")
+mesh = SubResource("BoxMesh_8k8h5")
+
+[node name="Lantern" type="Node3D" parent="Lamps/Lamp0" unique_id=1909878121 instance=ExtResource("7_vfuhv")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.25, 0)
+
+[node name="Light" type="OmniLight3D" parent="Lamps/Lamp0" unique_id=977543246]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 0)
+light_color = Color(1, 0.74, 0.45, 1)
+light_energy = 2.0
+omni_range = 7.0
+
+[node name="Lamp1" type="Node3D" parent="Lamps" unique_id=1466250102]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.6, 0, -3)
+
+[node name="Post" type="MeshInstance3D" parent="Lamps/Lamp1" unique_id=2128541942]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
+material_override = SubResource("ShaderMaterial_82kyk")
+mesh = SubResource("BoxMesh_t8qrq")
+
+[node name="Lantern" type="Node3D" parent="Lamps/Lamp1" unique_id=1970159399 instance=ExtResource("7_vfuhv")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.25, 0)
+
+[node name="Light" type="OmniLight3D" parent="Lamps/Lamp1" unique_id=1078017084]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 0)
+light_color = Color(1, 0.74, 0.45, 1)
+light_energy = 2.0
+omni_range = 7.0
+
+[node name="Lamp2" type="Node3D" parent="Lamps" unique_id=2131256282]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.6, 0, 4)
+
+[node name="Post" type="MeshInstance3D" parent="Lamps/Lamp2" unique_id=228253171]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
+material_override = SubResource("ShaderMaterial_82kyk")
+mesh = SubResource("BoxMesh_640dg")
+
+[node name="Lantern" type="Node3D" parent="Lamps/Lamp2" unique_id=777196857 instance=ExtResource("7_vfuhv")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.25, 0)
+
+[node name="Light" type="OmniLight3D" parent="Lamps/Lamp2" unique_id=1606919894]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 0)
+light_color = Color(1, 0.74, 0.45, 1)
+light_energy = 2.0
+omni_range = 7.0
+
+[node name="Lamp3" type="Node3D" parent="Lamps" unique_id=2099038102]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.6, 0, 11)
+
+[node name="Post" type="MeshInstance3D" parent="Lamps/Lamp3" unique_id=1404839721]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
+material_override = SubResource("ShaderMaterial_82kyk")
+mesh = SubResource("BoxMesh_3qxkv")
+
+[node name="Lantern" type="Node3D" parent="Lamps/Lamp3" unique_id=1456018313 instance=ExtResource("7_vfuhv")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.25, 0)
+
+[node name="Light" type="OmniLight3D" parent="Lamps/Lamp3" unique_id=991706123]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 0)
+light_color = Color(1, 0.74, 0.45, 1)
+light_energy = 2.0
+omni_range = 7.0
+
+[node name="Spawn_default" type="Marker3D" parent="." unique_id=1791211904]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 13)
+script = ExtResource("8_4ohjb")
+
+[node name="Exit_Back" type="Area3D" parent="." unique_id=1688607258]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -16.2)
+script = ExtResource("9_2n4ba")
+back = true
+size = Vector3(6, 4, 1)
+
+[node name="Exit_Town" type="Area3D" parent="." unique_id=1902563903]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 16.2)
+script = ExtResource("9_2n4ba")
+target_zone = "res://zones/town1/town_1_market_square.tscn"
+size = Vector3(6, 4, 1)
+
+[node name="Offstage" type="Node3D" parent="." unique_id=1426112918]
+
+[node name="offstage_rice_merchant" type="Marker3D" parent="Offstage" unique_id=377102625]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 1.9, 0, -12)
+script = ExtResource("10_bfv6w")
+spot_id = &"offstage_rice_merchant"
+
+[node name="offstage_tea_keeper" type="Marker3D" parent="Offstage" unique_id=2033714501]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 1.9, 0, -10.2)
+script = ExtResource("10_bfv6w")
+spot_id = &"offstage_tea_keeper"
+
+[node name="offstage_dumpling_seller" type="Marker3D" parent="Offstage" unique_id=1711294846]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 1.9, 0, -8.4)
+script = ExtResource("10_bfv6w")
+spot_id = &"offstage_dumpling_seller"
+
+[node name="offstage_fishmonger" type="Marker3D" parent="Offstage" unique_id=1992549059]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 1.9, 0, -6.6)
+script = ExtResource("10_bfv6w")
+spot_id = &"offstage_fishmonger"
+
+[node name="offstage_umbrella_maker" type="Marker3D" parent="Offstage" unique_id=320219075]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 1.9, 0, -4.8)
+script = ExtResource("10_bfv6w")
+spot_id = &"offstage_umbrella_maker"
+
+[node name="offstage_bath_keeper" type="Marker3D" parent="Offstage" unique_id=139223632]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 1.9, 0, -3)
+script = ExtResource("10_bfv6w")
+spot_id = &"offstage_bath_keeper"
+
+[node name="offstage_councillor" type="Marker3D" parent="Offstage" unique_id=1536064932]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 1.9, 0, -1.2)
+script = ExtResource("10_bfv6w")
+spot_id = &"offstage_councillor"
+
+[node name="offstage_sweets_child" type="Marker3D" parent="Offstage" unique_id=354643796]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 1.9, 0, 0.6)
+script = ExtResource("10_bfv6w")
+spot_id = &"offstage_sweets_child"
+
+[node name="offstage_collector_1" type="Marker3D" parent="Offstage" unique_id=1392925965]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 1.9, 0, 2.4)
+script = ExtResource("10_bfv6w")
+spot_id = &"offstage_collector_1"
+
+[node name="offstage_collector_2" type="Marker3D" parent="Offstage" unique_id=1887642745]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 1.9, 0, 4.2)
+script = ExtResource("10_bfv6w")
+spot_id = &"offstage_collector_2"
+
+[node name="offstage_collector_3" type="Marker3D" parent="Offstage" unique_id=176767147]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 1.9, 0, 6)
+script = ExtResource("10_bfv6w")
+spot_id = &"offstage_collector_3"
+
+[node name="offstage_lamplighter" type="Marker3D" parent="Offstage" unique_id=1937984643]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 1.9, 0, 7.8)
+script = ExtResource("10_bfv6w")
+spot_id = &"offstage_lamplighter"
+
+[node name="offstage_night_watch" type="Marker3D" parent="Offstage" unique_id=189574337]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 1.9, 0, 9.6)
+script = ExtResource("10_bfv6w")
+spot_id = &"offstage_night_watch"

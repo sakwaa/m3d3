@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="Dialogue" format=3]
+
+[ext_resource type="Script" path="res://game/story/dialogue/dialogue_node.gd" id="1_7thb4"]
+[ext_resource type="Script" path="res://game/story/dialogue/dialogue_line.gd" id="2_ponr8"]
+[ext_resource type="Script" path="res://game/story/dialogue/dialogue.gd" id="3_yim2e"]
+
+[sub_resource type="Resource" id="Resource_qvko2"]
+script = ExtResource("2_ponr8")
+speaker = &"councillor"
+text = "Council business. Come back on metal day for the announcement."
+id = "hello"
+
+[resource]
+script = ExtResource("3_yim2e")
+id = &"councillor_placeholder"
+start = "hello"
+nodes = Array[ExtResource("1_7thb4")]([SubResource("Resource_qvko2")])
+notes = "Placeholder for the scheduling trial."

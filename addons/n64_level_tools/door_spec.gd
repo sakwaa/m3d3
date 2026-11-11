@@ -39,6 +39,7 @@ const NODE_PROPERTIES := [&"mode", &"style", &"target_zone", &"target_spawn", &"
 @export_file("*.tscn") var target_zone := "":
 	set(v):
 		target_zone = v
+		notify_property_list_changed()  # (target_spawn's choices)
 		emit_changed()
 @export var target_spawn: StringName = &"default":
 	set(v):
@@ -185,6 +186,7 @@ func _validate_property(property: Dictionary) -> void:
 	var zone_only := [&"target_zone", &"target_spawn", &"spawn_id", &"arrival_room", &"dark_behind"]
 	if (mode == Door.Mode.ZONE and property.name in room_only) or (mode == Door.Mode.ROOM and property.name in zone_only):
 		property.usage &= ~PROPERTY_USAGE_EDITOR
+	ZoneArrivals.hint(property, target_zone)
 
 
 ## The opening is the wall's front face (+Z side of the door).

@@ -51,6 +51,9 @@ static func default_for(h: RopeHang) -> Texture2D:
 			if not h.text.strip_edges().is_empty():
 				alphabet = h.text_alphabet()
 				look = [h.cloth_color, h.trim_color, h.ink_color, h.text, alphabet.resource_path if alphabet else ""]
+				var symbols := h.symbols_used()
+				if not symbols.is_empty():
+					look.append(symbols)
 				key = alphabet.content_key() if alphabet else 0
 			path = DIR + "banner_%x.res" % hash(look)
 		_: return null
@@ -67,7 +70,7 @@ static func default_for(h: RopeHang) -> Texture2D:
 	if alphabet == null:
 		return FenceTextureGenerator._save(_banner(h.cloth_color, h.trim_color, h.crest), path)
 	# Words: checked both ways, then on the smallest banner they fit on.
-	var enc := GlyphText.checked(h.text)
+	var enc := GlyphText.checked(h.text, h.symbols_used())
 	for e in enc.errors:
 		push_warning("Rope banner: " + e)
 	var img := text_banner(h.cloth_color, h.trim_color, h.ink_color, alphabet, enc.items)

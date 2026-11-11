@@ -1,0 +1,410 @@
+{
+ "name": "house_outside_town",
+ "source": "screenshots/house_outside_town.png (Dales lane: dry stone walls, field barn with lean-to, sycamore opposite)",
+ "snap": 0.25,
+ "notes": "x right, z towards the entrance (the photo's camera end); the lane runs -Z away from town. Wall points are centre lines.",
+ "entrance": {
+  "pos": [
+   0,
+   0,
+   31
+  ],
+  "out": [
+   0,
+   0,
+   1
+  ],
+  "width": 3.5
+ },
+ "lane": {
+  "track": [
+   [
+    0,
+    31
+   ],
+   [
+    0,
+    21
+   ],
+   [
+    -0.25,
+    10
+   ],
+   [
+    0,
+    0
+   ],
+   [
+    0,
+    -12
+   ]
+  ],
+  "track_width": 1.0
+ },
+ "walls": {
+  "height": 1.25,
+  "thickness": 0.5,
+  "lane_left": [
+   [
+    -2.0,
+    31
+   ],
+   [
+    -2.0,
+    21.75
+   ]
+  ],
+  "lane_left2": [
+   [
+    -2.0,
+    8.5
+   ],
+   [
+    -1.75,
+    0
+   ],
+   [
+    -1.5,
+    -12
+   ]
+  ],
+  "lane_right": [
+   [
+    2.0,
+    31
+   ],
+   [
+    2.0,
+    22
+   ],
+   [
+    2.75,
+    16
+   ],
+   [
+    2.75,
+    10
+   ],
+   [
+    2.0,
+    4
+   ],
+   [
+    1.75,
+    -12
+   ]
+  ],
+  "field_left": [
+   [
+    -1.5,
+    -12
+   ],
+   [
+    -12,
+    -12
+   ],
+   [
+    -12,
+    -30
+   ],
+   [
+    0,
+    -30
+   ]
+  ],
+  "field_right": [
+   [
+    1.75,
+    -12
+   ],
+   [
+    12,
+    -12
+   ],
+   [
+    12,
+    -30
+   ],
+   [
+    0,
+    -30
+   ]
+  ],
+  "pasture_left": [
+   [
+    -2.0,
+    31
+   ],
+   [
+    -12,
+    31
+   ],
+   [
+    -12,
+    -12
+   ]
+  ],
+  "pasture_right": [
+   [
+    2.0,
+    31
+   ],
+   [
+    12,
+    31
+   ],
+   [
+    12,
+    -12
+   ]
+  ]
+ },
+ "gate": {
+  "from": [
+   -2.0,
+   11
+  ],
+  "to": [
+   -2.0,
+   8.5
+  ],
+  "note": "wooden field gate into the left pasture, beside the barn"
+ },
+ "barn": {
+  "centre": [
+   -5.5,
+   15
+  ],
+  "along_lane": 8,
+  "across": 6,
+  "storey_height": 3.35,
+  "foundation": 0.3,
+  "roof": "gable, ridge along the lane",
+  "lane_window": true
+ },
+ "lean_to": {
+  "from_z": 19,
+  "to_z": 21.75,
+  "x": [
+   -8.5,
+   -2.5
+  ],
+  "wall_height": 1.75,
+  "roof_top": 3.25
+ },
+ "tree": {
+  "pos": [
+   7.5,
+   9
+  ],
+  "height": 14,
+  "canopy": 13,
+  "trunk": 0.9
+ },
+ "boundary": {
+  "x": [
+   -12,
+   12
+  ],
+  "z": [
+   -30,
+   31
+  ],
+  "invisible_height": 3.0
+ },
+ "edge_trees": {
+  "note": "Dales mix round the zone's edge. [x, z, species, seed, size]. inside: by the outer walls, full 3D + collision (walked round); near: just outside the walls (seen up close), 3D, no collision; far: 20-40 m out, cards only (2 tris, variants by seed).",
+  "inside": [
+   [
+    -10.0,
+    29.0,
+    "oak",
+    11,
+    0.7
+   ],
+   [
+    -10.5,
+    -5.0,
+    "sycamore",
+    23,
+    0.85
+   ],
+   [
+    10.0,
+    23.5,
+    "crabapple",
+    5,
+    1.0
+   ],
+   [
+    10.5,
+    -7.0,
+    "oak",
+    37,
+    0.8
+   ],
+   [
+    -9.5,
+    -27.0,
+    "sycamore",
+    41,
+    0.9
+   ],
+   [
+    9.0,
+    -27.5,
+    "london_plane",
+    3,
+    0.8
+   ]
+  ],
+  "near": [
+   [
+    -16.0,
+    27.0,
+    "sycamore",
+    52,
+    1.0
+   ],
+   [
+    -17.0,
+    10.0,
+    "london_plane",
+    8,
+    1.0
+   ],
+   [
+    16.5,
+    26.0,
+    "oak",
+    71,
+    1.0
+   ],
+   [
+    17.0,
+    -3.0,
+    "american_elm",
+    9,
+    0.9
+   ],
+   [
+    -6.0,
+    -34.5,
+    "oak",
+    93,
+    1.0
+   ]
+  ],
+  "far": [
+   [
+    -34.0,
+    28.0,
+    "sycamore",
+    101,
+    1.0
+   ],
+   [
+    -40.0,
+    12.0,
+    "oak",
+    102,
+    1.1
+   ],
+   [
+    -30.0,
+    -2.0,
+    "london_plane",
+    103,
+    1.0
+   ],
+   [
+    -38.0,
+    -18.0,
+    "sycamore",
+    104,
+    1.05
+   ],
+   [
+    -33.0,
+    -36.0,
+    "oak",
+    105,
+    1.0
+   ],
+   [
+    34.0,
+    30.0,
+    "oak",
+    106,
+    1.0
+   ],
+   [
+    42.0,
+    14.0,
+    "sycamore",
+    107,
+    1.1
+   ],
+   [
+    31.0,
+    0.0,
+    "american_elm",
+    108,
+    1.0
+   ],
+   [
+    39.0,
+    -16.0,
+    "oak",
+    109,
+    0.95
+   ],
+   [
+    33.0,
+    -34.0,
+    "sycamore",
+    110,
+    1.0
+   ],
+   [
+    -18.0,
+    -55.0,
+    "oak",
+    111,
+    1.1
+   ],
+   [
+    0.0,
+    -60.0,
+    "sycamore",
+    112,
+    1.0
+   ],
+   [
+    16.0,
+    -54.0,
+    "london_plane",
+    113,
+    1.0
+   ],
+   [
+    -30.0,
+    -52.0,
+    "sycamore",
+    114,
+    0.9
+   ]
+  ]
+ },
+ "fog": {
+  "start": 45.0,
+  "end": 130.0
+ },
+ "grass": {
+  "note": "Auto grass mat + tufts over the grass-textured ground inside the zone (GrassSettings).",
+  "height": 0.45,
+  "height_var": 0.06,
+  "tufts": 0.12,
+  "edge_tufts": 3.0
+ }
+}

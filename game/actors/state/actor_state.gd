@@ -40,6 +40,8 @@ enum Exit {
 @export var speed := -1.0
 ## Multiplies the actor's movement while active (0 = rooted).
 @export var move_scale := 1.0
+## Multiplies gravity while active (snappy jumps: strong on the way up, less coming down).
+@export var gravity_scale := 1.0
 ## Whether the actor may turn to face its movement while active.
 @export var can_turn := true
 ## Free-form labels for other systems ("guarding", "airborne", "stunned"...).
@@ -115,6 +117,12 @@ func exit(_next: ActorState) -> void:
 
 func update(_delta: float) -> void:
 	pass
+
+
+## Moves the actor itself this frame (climbing): return true and the Actor skips gravity,
+## input movement and turning (it still turns the body to `facing`).
+func move_actor(_delta: float) -> bool:
+	return false
 
 
 ## Shortcut for states: ask this state's machine to switch.

@@ -1,9 +1,9 @@
 @tool
 class_name RopeHang
 extends Resource
-## Something hung along a rope brush (LevelBrush.rope_hangs): a scene (lanterns, bells) or a
+## Something hung along a rope brush (LevelBrush.rope_hangs): a scene (lanterns, bells), a
 ## cutout card built into the rope's geometry (shimenawa straw tassels, shide paper
-## streamers, cloth banners, or any texture). Several on one rope mix (tassels with shide
+## streamers, cloth banners, or any texture), or string lights (glowing bulbs, StringLights). Several on one rope mix (tassels with shide
 ## between them: same spacing, offset 0.5). Shareable; editing it regenerates the ropes.
 
 const GlyphText := preload("res://addons/n64_level_tools/glyphs/glyph_text.gd")
@@ -14,6 +14,7 @@ enum Kind {
 	SHIDE,   ## Zigzag paper streamer, flat along the rope.
 	BANNER,  ## Cloth banner, flat along the rope (colours below, or a texture).
 	CARD,    ## Your own cutout texture, flat along the rope.
+	LIGHTS,  ## String lights: a bulb at each spot, glowing at dusk and night (StringLights).
 }
 enum Placement {
 	SPACED,          ## Every `spacing` metres along each section (evened out).
@@ -68,6 +69,27 @@ enum Placement {
 		drop = maxf(v, 0.0)
 		emit_changed()
 
+@export_group("Lights")
+## Bulb colour when lit (warm white by default).
+@export var light_color := Color(1.0, 0.75, 0.4):
+	set(v):
+		light_color = v
+		emit_changed()
+## Bulb diameter and the soft glow round it (metres).
+@export_range(0.02, 0.5, 0.01, "suffix:m") var bulb_size := 0.09:
+	set(v):
+		bulb_size = v
+		emit_changed()
+@export_range(0.0, 2.0, 0.01, "suffix:m") var glow_size := 0.5:
+	set(v):
+		glow_size = v
+		emit_changed()
+## Bulbs flicker a little, each on its own.
+@export var flicker := false:
+	set(v):
+		flicker = v
+		emit_changed()
+
 @export_group("Banner")
 @export var cloth_color := Color(0.85, 0.85, 0.8):
 	set(v):
@@ -93,10 +115,10 @@ enum Placement {
 		notify_property_list_changed()
 		emit_changed()
 ## How the text is written: each word's sounds per block (start | vowel | end), spelling
-## marks, and anything that can't be written or wouldn't read back the same ("!").
+## marks, word symbols, and anything that can't be written or wouldn't read back the same ("!").
 @export_custom(PROPERTY_HINT_MULTILINE_TEXT, "", PROPERTY_USAGE_EDITOR | PROPERTY_USAGE_READ_ONLY) var text_sounds: String:
 	get:
-		return GlyphText.breakdown(text) if not text.strip_edges().is_empty() else ""
+		return GlyphText.breakdown(text, symbols_used()) if not text.strip_edges().is_empty() else ""
 	set(_v):
 		pass
 ## Script the text is written in: a SyllabaryAlphabet (hand-drawn), a StrokeAlphabet
@@ -114,18 +136,69 @@ enum Placement {
 	set(v):
 		ink_color = v
 		emit_changed()
+## Words with a word symbol (SyllabaryAlphabet, drawn in the Script Builder) spelled out on
+## this banner instead; every other such word is written with its symbol. Set in the
+## inspector's Word symbols group, a tick box per word of the text that has one.
+@export_storage var spelled_out := PackedStringArray():
+	set(v):
+		spelled_out = v
+		emit_changed()
 
 
 func _validate_property(property: Dictionary) -> void:
 	var hide := false
 	match property.name:
 		"scene": hide = kind != Kind.SCENE
-		"texture", "size": hide = kind == Kind.SCENE
-		"crossed": hide = kind == Kind.SCENE
+		"texture", "size": hide = kind == Kind.SCENE or kind == Kind.LIGHTS
+		"crossed": hide = kind == Kind.SCENE or kind == Kind.LIGHTS
+		"light_color", "bulb_size", "glow_size", "flicker": hide = kind != Kind.LIGHTS
 		"spacing", "offset": hide = placement != Placement.SPACED
 		"cloth_color", "trim_color", "crest", "text", "alphabet", "ink_color", "text_sounds": hide = kind != Kind.BANNER
 	if hide:
 		property.usage &= ~PROPERTY_USAGE_EDITOR
+
+
+## The banner's words written with their symbol (the rest of the text's symbol words are
+## spelled out).
+func symbols_used() -> PackedStringArray:
+	var out := PackedStringArray()
+	for w in GlyphText.symbol_words_in(text, text_alphabet()):
+		if not w in spelled_out:
+			out.append(w)
+	return out
+
+
+func _get_property_list() -> Array[Dictionary]:
+	if kind != Kind.BANNER or not Engine.is_editor_hint():
+		return []
+	var words := GlyphText.symbol_words_in(text, text_alphabet())
+	if words.is_empty():
+		return []
+	var out: Array[Dictionary] = [{name = "Word symbols", type = TYPE_NIL, usage = PROPERTY_USAGE_GROUP, hint_string = "symbol_"}]
+	for w in words:
+		out.append({name = "symbol_" + w, type = TYPE_BOOL, usage = PROPERTY_USAGE_EDITOR})
+	return out
+
+
+func _get(property: StringName) -> Variant:
+	var p := String(property)
+	if p.begins_with("symbol_"):
+		return not p.trim_prefix("symbol_") in spelled_out
+	return null
+
+
+func _set(property: StringName, value: Variant) -> bool:
+	var p := String(property)
+	if not p.begins_with("symbol_"):
+		return false
+	var w := p.trim_prefix("symbol_")
+	var s := spelled_out.duplicate()
+	if value:
+		s.erase(w)
+	elif not w in s:
+		s.append(w)
+	spelled_out = s
+	return true
 
 
 ## Defaults that suit a kind (the inspector's starting point for a new hang).
@@ -151,6 +224,9 @@ static func preset(k: Kind) -> RopeHang:
 		Kind.CARD:
 			h.size = Vector2(0.3, 0.3)
 			h.crossed = false
+		Kind.LIGHTS:
+			h.spacing = 0.6
+			h.drop = 0.04
 	return h
 
 

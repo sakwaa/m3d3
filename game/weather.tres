@@ -22,8 +22,8 @@ stars = 0.1
 
 [sub_resource type="Resource" id="Resource_80mrr"]
 script = ExtResource("2_wi7t7")
-zenith = Color(0.18, 0.42, 0.88, 1)
-horizon = Color(0.62, 0.78, 0.95, 1)
+zenith = Color(0.2, 0.28, 0.78, 1)
+horizon = Color(0.55, 0.62, 0.95, 1)
 cloud_dark = Color(0.66, 0.72, 0.84, 1)
 
 [sub_resource type="Resource" id="Resource_f6eem"]
@@ -39,6 +39,7 @@ script = ExtResource("1_i1um7")
 keys = Array[ExtResource("2_wi7t7")]([SubResource("Resource_1lt5u"), SubResource("Resource_yfghn"), SubResource("Resource_80mrr"), SubResource("Resource_f6eem")])
 cloud_softness = 0.3
 cloud_speed = 0.006
+world_tint = Color(1, 0.98, 0.94, 1)
 fog_end = 180.0
 fog_amount = 0.5
 
@@ -86,6 +87,51 @@ fog_begin = 30.0
 fog_end = 130.0
 fog_amount = 0.65
 
+[sub_resource type="Resource" id="Resource_rainy0"]
+script = ExtResource("2_wi7t7")
+zenith = Color(0.034, 0.0382, 0.058, 1)
+horizon = Color(0.078, 0.086, 0.116, 1)
+cloud_light = Color(0.136, 0.144, 0.174, 1)
+cloud_dark = Color(0.056, 0.0598, 0.08, 1)
+stars = 0.18
+
+[sub_resource type="Resource" id="Resource_rainy1"]
+script = ExtResource("2_wi7t7")
+zenith = Color(0.316, 0.344, 0.42, 1)
+horizon = Color(0.62, 0.54, 0.508, 1)
+cloud_light = Color(0.678, 0.632, 0.616, 1)
+cloud_dark = Color(0.342, 0.342, 0.396, 1)
+
+[sub_resource type="Resource" id="Resource_rainy2"]
+script = ExtResource("2_wi7t7")
+zenith = Color(0.382, 0.45, 0.556, 1)
+horizon = Color(0.612, 0.65, 0.692, 1)
+cloud_light = Color(0.752, 0.766, 0.794, 1)
+cloud_dark = Color(0.418, 0.44, 0.492, 1)
+
+[sub_resource type="Resource" id="Resource_rainy3"]
+script = ExtResource("2_wi7t7")
+zenith = Color(0.252, 0.248, 0.336, 1)
+horizon = Color(0.594, 0.45, 0.408, 1)
+cloud_light = Color(0.632, 0.522, 0.496, 1)
+cloud_dark = Color(0.288, 0.25, 0.304, 1)
+stars = 0.03
+
+[sub_resource type="Resource" id="Resource_rainy"]
+script = ExtResource("1_i1um7")
+id = &"rainy"
+display_name = "Rainy"
+keys = Array[ExtResource("2_wi7t7")]([SubResource("Resource_rainy0"), SubResource("Resource_rainy1"), SubResource("Resource_rainy2"), SubResource("Resource_rainy3")])
+cloud_cover = 0.82
+cloud_softness = 0.45
+cloud_speed = 0.016
+world_tint = Color(0.74, 0.76, 0.82, 1)
+sun_strength = 0.45
+fog_begin = 22.0
+fog_end = 110.0
+fog_amount = 0.7
+rain = 0.45
+
 [sub_resource type="Resource" id="Resource_exvwu"]
 script = ExtResource("2_wi7t7")
 zenith = Color(0.025, 0.028, 0.04, 1)
@@ -132,4 +178,4 @@ rain = 0.8
 
 [resource]
 script = ExtResource("3_xw1r1")
-presets = Array[ExtResource("1_i1um7")]([SubResource("Resource_o5bx5"), SubResource("Resource_x6gkc"), SubResource("Resource_lsg6s")])
+presets = Array[ExtResource("1_i1um7")]([SubResource("Resource_o5bx5"), SubResource("Resource_x6gkc"), SubResource("Resource_rainy"), SubResource("Resource_lsg6s")])

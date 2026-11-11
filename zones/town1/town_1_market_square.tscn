@@ -7,7 +7,7 @@
 [ext_resource type="Script" uid="uid://bcvc33m1lfa5c" path="res://game/sky/dynamic_sky.gd" id="4_g7afi"]
 [ext_resource type="Script" uid="uid://rmol5sj7jl8o" path="res://game/world/day_night_sun.gd" id="5_kwrea"]
 [ext_resource type="Script" uid="uid://dbof576xv25u5" path="res://addons/n64_level_tools/level_root.gd" id="6_nrb72"]
-[ext_resource type="Resource" uid="uid://dclhhskkqbyy5" path="res://zones/town1/town_1_market_square_level.tres" id="7_quiwk"]
+[ext_resource type="Resource" uid="uid://4rqc6objfm23" path="res://zones/town1/town_1_market_square_level.res" id="7_quiwk"]
 [ext_resource type="Script" uid="uid://0pm0hwpaajhf" path="res://game/world/spawn_point.gd" id="8_sqndc"]
 [ext_resource type="Texture2D" uid="uid://bl1455r88l5l3" path="res://maps/town1/01-market-square-20ppm.png" id="9_u6usy"]
 
@@ -19,14 +19,14 @@ metadata/_custom_type_script = "uid://d3axvhxk7pjyl"
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_fknv1"]
 shader = ExtResource("2_68k5h")
-shader_parameter/zenith = Color(0.18, 0.42, 0.88, 1)
-shader_parameter/horizon = Color(0.62, 0.78, 0.95, 1)
+shader_parameter/zenith = Color(0.2, 0.28, 0.78, 1)
+shader_parameter/horizon = Color(0.55, 0.62, 0.95, 1)
 shader_parameter/cloud_light = Color(1, 1, 1, 1)
 shader_parameter/cloud_dark = Color(0.66, 0.72, 0.84, 1)
 shader_parameter/stars = 0.0
 shader_parameter/cloud_cover = 0.3
 shader_parameter/cloud_softness = 0.3
-shader_parameter/cloud_offset = Vector2(0.9797204, 0.79279083)
+shader_parameter/cloud_offset = Vector2(0.19434062, 0.06801865)
 shader_parameter/cloud_scale = 0.25
 shader_parameter/cloud_tex = ExtResource("3_kxs3f")
 shader_parameter/star_angle = 3.141592653589793
@@ -50,7 +50,7 @@ radiance_size = 0
 background_mode = 2
 sky = SubResource("Sky_d7se1")
 ambient_light_source = 2
-ambient_light_color = Color(0.4, 0.59999996, 0.91499996, 1)
+ambient_light_color = Color(0.375, 0.45, 0.865, 1)
 ambient_light_energy = 0.6
 reflected_light_source = 1
 

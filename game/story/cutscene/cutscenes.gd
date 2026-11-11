@@ -8,7 +8,8 @@ extends Node
 ## by the shots, black bars show. Dialogue lines can hold the timeline; so can "wait for a
 ## button". Holding Skip (Enter / Start) skips it when the cutscene allows (by default only
 ## once it's been seen): remaining Story events still apply and actors land where it
-## leaves them. Finishing (or skipping) sets its "seen" flag.
+## leaves them. Finishing (or skipping) sets its "seen" flag. A TITLE event shows a title
+## card: big white N64 lettering in the middle of the screen, fading in and out.
 
 signal started(cutscene: Cutscene)
 signal finished(cutscene: Cutscene, skipped: bool)
@@ -17,6 +18,12 @@ const SKIP_ACTION := &"skip_cutscene"
 const SKIP_HOLD := 0.8
 const BAR_HEIGHT := 0.11  # of the screen
 const ARRIVED := 0.12
+## Title card: letter height (share of the screen's height, in whole font pixels) and fade
+## times (seconds).
+const TITLE_HEIGHT := 0.09
+const TITLE_FADE_IN := 0.7
+const TITLE_FADE_OUT := 0.9
+const TEXT_SHADER := preload("res://addons/n64_runtime/shaders/n64_text.gdshader")
 
 var playing: Cutscene
 var time := 0.0
@@ -41,6 +48,9 @@ var _fade_to := Color(0, 0, 0, 0)
 var _fade_t := 1.0
 var _fade_len := 0.0
 var _skip_label: Label
+var _title: Label
+var _title_t := 0.0
+var _title_len := 0.0
 
 
 func _ready() -> void:
@@ -75,6 +85,21 @@ func _ready() -> void:
 	_skip_label.add_theme_constant_override(&"outline_size", 4)
 	_skip_label.visible = false
 	_layer.add_child(_skip_label)
+	_title = Label.new()
+	_title.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_title.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	var tm := ShaderMaterial.new()
+	tm.shader = TEXT_SHADER
+	_title.material = tm
+	_title.add_theme_font_override(&"font", DialogueBox.pixel_font())
+	_title.add_theme_color_override(&"font_color", Color.WHITE)
+	_title.add_theme_color_override(&"font_outline_color", Color(0, 0, 0, 0.85))
+	_title.add_theme_color_override(&"font_shadow_color", Color(0, 0, 0, 0.6))
+	_title.visible = false
+	_layer.add_child(_title)
 	_play_editor_preview.call_deferred()
 
 
@@ -150,6 +175,7 @@ func _take(a: Node) -> void:
 
 func _process(delta: float) -> void:
 	_update_fade(delta)
+	_update_title(delta)
 	_bar_amount = move_toward(_bar_amount, 1.0 if playing and playing.letterbox else 0.0, delta * 3.0)
 	var h := get_viewport().get_visible_rect().size.y * BAR_HEIGHT * smoothstep(0.0, 1.0, _bar_amount)
 	_bars[0].offset_bottom = h
@@ -248,6 +274,36 @@ func _fire_event(c: CutsceneCue) -> void:
 			_waiting_input = true
 		CutsceneCue.Event.SET_TIME:
 			GameState.set_time(c.hour)
+		CutsceneCue.Event.TITLE:
+			var zone := get_tree().current_scene as Zone
+			show_title(c.title if c.title != "" else (zone.display_name if zone else ""), c.duration)
+
+
+## The title card: `text` fading in, held, fading out, `length` seconds in all.
+func show_title(text: String, length: float) -> void:
+	_title.text = text.to_upper()
+	_title_len = maxf(length, TITLE_FADE_IN + TITLE_FADE_OUT)
+	_title_t = 0.0
+	_title.visible = true
+
+
+func _update_title(delta: float) -> void:
+	if not _title.visible:
+		return
+	_title_t += delta
+	if _title_t >= _title_len:
+		_title.visible = false
+		return
+	# Whole font pixels (the pixel font scales by integers only), outline and shadow to match.
+	var px := DialogueBox.PIXEL_SIZE
+	var size := maxi(roundi(get_viewport().get_visible_rect().size.y * TITLE_HEIGHT / px), 1) * px
+	var dot := maxi(size / px, 1)
+	_title.add_theme_font_size_override(&"font_size", size)
+	_title.add_theme_constant_override(&"outline_size", dot * 2)
+	_title.add_theme_constant_override(&"shadow_offset_x", dot)
+	_title.add_theme_constant_override(&"shadow_offset_y", dot)
+	var a := minf(_title_t / TITLE_FADE_IN, (_title_len - _title_t) / TITLE_FADE_OUT)
+	_title.modulate.a = smoothstep(0.0, 1.0, clampf(a, 0.0, 1.0))
 
 
 func _drive_actors(delta: float) -> void:
@@ -356,6 +412,9 @@ func _skip() -> void:
 					CutsceneCue.Action.HIDE:
 						a.visible = false
 	_next = _cues.size()
+	# A title card showing goes now.
+	if _title.visible:
+		_title_len = minf(_title_len, _title_t + TITLE_FADE_OUT * 0.5)
 	_finish(true)
 
 

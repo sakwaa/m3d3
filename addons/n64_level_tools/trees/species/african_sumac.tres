@@ -1,0 +1,55 @@
+[gd_resource type="Resource" script_class="TreeSpecies" format=3]
+
+[ext_resource type="Texture2D" path="res://textures/wood/tree_bark.res" id="1_eqk54"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_african_sumac_t0.res" id="2_pp25x"]
+[ext_resource type="Texture2D" path="res://textures/plants/leaves_african_sumac.res" id="3_yaitb"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_african_sumac_t1.res" id="3_yliex"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_african_sumac_t2.res" id="4_0e31n"]
+[ext_resource type="Script" path="res://addons/n64_level_tools/trees/tree_level.gd" id="4_pp25x"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_african_sumac_t3.res" id="5_ww3v7"]
+[ext_resource type="Script" path="res://addons/n64_level_tools/trees/tree_species.gd" id="5_yliex"]
+
+[sub_resource type="Resource" id="Resource_0e31n"]
+script = ExtResource("4_pp25x")
+count = 7
+angle = 65.0
+angle_var = 12.0
+length = 0.567924377431694
+curve = 25.0
+curve_power = 1.5
+wander = 10.0
+radius = 0.6
+
+[sub_resource type="Resource" id="Resource_ww3v7"]
+script = ExtResource("4_pp25x")
+count = 4
+angle = 50.0
+angle_var = 15.0
+curve = -10.0
+wander = 15.0
+bark = false
+segments = 1
+
+[resource]
+script = ExtResource("5_yliex")
+display_name = "African Sumac"
+latin = "Rhus lancea"
+reference = "Imported from 4RHULAN0.BMP (Rhus lancea, archetype spreading, real height ~7 m): crown 1.26x the height, bare trunk 25%, widest at 22% of the crown."
+height = 4.2
+trunk_radius = 0.12642
+trunk_top = 0.45
+wander = 8.0
+clear = 0.207
+crown = 4
+crown_profile = PackedFloat32Array(0.5464, 0.5898, 0.6277, 0.6289, 0.6205, 0.6024, 0.6084, 0.6018, 0.6139, 0.6096, 0.6127, 0.6096, 0.5934, 0.5175, 0.4867, 0.3181)
+levels = Array[ExtResource("4_pp25x")]([SubResource("Resource_0e31n"), SubResource("Resource_ww3v7")])
+leaf_texture = ExtResource("3_yaitb")
+bark_texture = ExtResource("1_eqk54")
+card_textures = Array[Texture2D]([ExtResource("2_pp25x"), ExtResource("3_yliex"), ExtResource("4_0e31n"), ExtResource("5_ww3v7")])
+card_aspects = PackedFloat32Array(1.331)
+card_tiles = Vector2i(2, 2)
+card_aspect = 1.331
+card_size = 1.2
+inner_clumps = 2
+leaf_start = 0.3
+bark_color = Color(0.08548387, 0.08548387, 0, 1)

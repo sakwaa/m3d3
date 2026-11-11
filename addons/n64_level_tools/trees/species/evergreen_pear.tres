@@ -1,0 +1,56 @@
+[gd_resource type="Resource" script_class="TreeSpecies" format=3]
+
+[ext_resource type="Texture2D" path="res://textures/wood/tree_bark.res" id="1_dy2w1"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_evergreen_pear_t0.res" id="2_suxml"]
+[ext_resource type="Texture2D" path="res://textures/plants/leaves_evergreen_pear.res" id="3_li2rs"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_evergreen_pear_t1.res" id="3_yxbv7"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_evergreen_pear_t2.res" id="4_mlqww"]
+[ext_resource type="Script" path="res://addons/n64_level_tools/trees/tree_level.gd" id="4_suxml"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_evergreen_pear_t3.res" id="5_u3icx"]
+[ext_resource type="Script" path="res://addons/n64_level_tools/trees/tree_species.gd" id="5_yxbv7"]
+
+[sub_resource type="Resource" id="Resource_mlqww"]
+script = ExtResource("4_suxml")
+count = 9
+angle = 58.0
+angle_var = 12.0
+length = 0.27003185436992005
+curve = 20.0
+wander = 7.0
+radius = 0.55
+segments = 2
+
+[sub_resource type="Resource" id="Resource_u3icx"]
+script = ExtResource("4_suxml")
+count = 3
+angle = 50.0
+angle_var = 15.0
+length = 0.55
+curve = -5.0
+wander = 10.0
+bark = false
+segments = 1
+
+[resource]
+script = ExtResource("5_yxbv7")
+display_name = "Evergreen Pear"
+latin = "Pyrus kawakamii"
+reference = "Imported from 4PYRKAW0.BMP (Pyrus kawakamii, archetype broadleaf, real height ~8 m): crown 0.66x the height, bare trunk 30%, widest at 22% of the crown."
+height = 4.8
+trunk_radius = 0.08
+trunk_top = 0.65
+clear = 0.258
+crown = 4
+crown_profile = PackedFloat32Array(0.2292, 0.3004, 0.3238, 0.3291, 0.3043, 0.2964, 0.2968, 0.2862, 0.2902, 0.2849, 0.2769, 0.2562, 0.2407, 0.2076, 0.1674, 0.1126)
+levels = Array[ExtResource("4_suxml")]([SubResource("Resource_mlqww"), SubResource("Resource_u3icx")])
+leaf_texture = ExtResource("3_li2rs")
+bark_texture = ExtResource("1_dy2w1")
+card_textures = Array[Texture2D]([ExtResource("2_suxml"), ExtResource("3_yxbv7"), ExtResource("4_mlqww"), ExtResource("5_u3icx")])
+card_aspects = PackedFloat32Array(0.658)
+card_tiles = Vector2i(2, 2)
+card_aspect = 0.658
+card_size = 1.2
+clumps = 2
+inner_clumps = 2
+leaf_start = 0.3
+bark_color = Color(0.7403226, 0.61129034, 0.46290323, 1)

@@ -1,0 +1,55 @@
+[gd_resource type="Resource" script_class="TreeSpecies" format=3]
+
+[ext_resource type="Texture2D" path="res://textures/wood/tree_bark.res" id="1_j07ph"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_russian_olive_t0.res" id="2_bccsm"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_russian_olive_t1.res" id="3_o53v6"]
+[ext_resource type="Texture2D" path="res://textures/plants/leaves_russian_olive.res" id="3_ocd76"]
+[ext_resource type="Script" path="res://addons/n64_level_tools/trees/tree_level.gd" id="4_bccsm"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_russian_olive_t2.res" id="4_sbqcj"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_russian_olive_t3.res" id="5_heu0n"]
+[ext_resource type="Script" path="res://addons/n64_level_tools/trees/tree_species.gd" id="5_o53v6"]
+
+[sub_resource type="Resource" id="Resource_sbqcj"]
+script = ExtResource("4_bccsm")
+count = 7
+angle = 65.0
+angle_var = 12.0
+length = 0.4051761343847264
+curve = 25.0
+curve_power = 1.5
+wander = 10.0
+radius = 0.6
+
+[sub_resource type="Resource" id="Resource_heu0n"]
+script = ExtResource("4_bccsm")
+count = 4
+angle = 50.0
+angle_var = 15.0
+curve = -10.0
+wander = 15.0
+bark = false
+segments = 1
+
+[resource]
+script = ExtResource("5_o53v6")
+display_name = "Russian Olive"
+latin = "Elaeagnus angustifolia"
+reference = "Imported from 4ELAANG0.BMP (Elaeagnus angustifolia, archetype spreading, real height ~7 m): crown 0.96x the height, bare trunk 16%, widest at 34% of the crown."
+height = 4.2
+trunk_radius = 0.13713
+trunk_top = 0.45
+wander = 8.0
+clear = 0.119
+crown = 4
+crown_profile = PackedFloat32Array(0.4705, 0.4653, 0.4746, 0.471, 0.4699, 0.4813, 0.4741, 0.4409, 0.4088, 0.4301, 0.4259, 0.4166, 0.3601, 0.3487, 0.3228, 0.2554)
+levels = Array[ExtResource("4_bccsm")]([SubResource("Resource_sbqcj"), SubResource("Resource_heu0n")])
+leaf_texture = ExtResource("3_ocd76")
+bark_texture = ExtResource("1_j07ph")
+card_textures = Array[Texture2D]([ExtResource("2_bccsm"), ExtResource("3_o53v6"), ExtResource("4_sbqcj"), ExtResource("5_heu0n")])
+card_aspects = PackedFloat32Array(0.964)
+card_tiles = Vector2i(2, 2)
+card_aspect = 0.964
+card_size = 1.2
+inner_clumps = 2
+leaf_start = 0.3
+bark_color = Color(0.103225805, 0.10483871, 0.05645161, 1)

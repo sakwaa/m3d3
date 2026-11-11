@@ -16,11 +16,13 @@ const TOOLS_DIR := "res://addons/n64_level_tools/"
 const VERSION := 3
 const ExportBake := preload("res://addons/n64_level_tools/export/export_bake.gd")
 const ZoneLinks := preload("res://addons/n64_level_tools/zone_links.gd")
+const BuildReport := preload("res://addons/n64_level_tools/export/build_report.gd")
 
 ## Hosts each scene while it's baked (own 3D world, never drawn).
 var _holder: SubViewport
 var _baked := 0
 var _failed: Array[String] = []
+var _report_levels := []  # BuildReport.level() of every baked level (the full build report)
 
 
 func _get_name() -> String:
@@ -46,6 +48,7 @@ func _get_customization_configuration_hash() -> int:
 func _export_begin(_features: PackedStringArray, _is_debug: bool, _path: String, _flags: int) -> void:
 	_baked = 0
 	_failed.clear()
+	_report_levels.clear()
 	# Pre-build: zone links (exits, zone doors, passages) must all lead somewhere.
 	if ZoneLinks.enabled():
 		var errors := ZoneLinks.report()
@@ -71,6 +74,10 @@ func _export_end() -> void:
 		print("[N64 export] Final bake: %d level(s) re-baked." % _baked)
 	for f in _failed:
 		push_warning("N64 export: couldn't re-bake %s; shipping its last editor bake." % f)
+	if not _report_levels.is_empty():
+		var dir := BuildReport.write(_report_levels, "export", "export")
+		print("[N64 export] Build report: %s" % ProjectSettings.globalize_path(dir))
+		_report_levels.clear()
 
 
 func _export_file(path: String, _type: String, _features: PackedStringArray) -> void:
@@ -93,7 +100,9 @@ func _customize_scene(scene: Node, path: String) -> Node:
 		return scene if stripped else null
 	if _holder:
 		var t := Time.get_ticks_msec()
-		var result := ExportBake.bake_scene(scene, _holder, path)
+		var result := ExportBake.bake_scene(scene, _holder, path,
+			bool(ProjectSettings.get_setting(BuildReport.REPORT_ON_EXPORT, true)))
+		_report_levels.append_array(result.levels)
 		_baked += result.baked
 		_failed.append_array(result.failed)
 		print("[N64 export] Baked %d level(s) in %s (%d ms)." % [result.baked, path, Time.get_ticks_msec() - t])
@@ -152,22 +161,39 @@ func _replace_level_root(root: LevelRoot, scene: Node, scene_path: String) -> No
 			mi.name = "Mesh" if meshes.size() == 1 else "Mesh%d" % i
 			mi.mesh = meshes[i].duplicate()
 			mi.layers = root.level_layers()
+			LevelRoot.apply_lod_range(mi, LevelRoot.lod_distance())
 			out.add_child(mi)
 	if data:
 		var c := data.baked_collision_set()
 		for body in Surface.build_bodies(c[0].map(func(shape): return shape.duplicate()), c[1]):
 			out.add_child(body)
+		var occ := LevelRoot.house_occluder(data)
+		if occ:
+			var oi := OccluderInstance3D.new()
+			oi.name = "Occluder"
+			oi.occluder = occ
+			out.add_child(oi)
+		var rain := RainCover.from_build(data.rain_cover_built(), data.rain_light_built())
+		if rain:
+			out.add_child(rain)
+		for n in Backdrop.build_nodes(data.backdrop_mesh, data.backdrop_ring, data.backdrop_ring_info):
+			out.add_child(n)
 	if data:
 		for i in data.scatter.size():
 			var nodes := data.scatter[i].build_nodes(root.level_layers()) if data.scatter[i] else ([] as Array[MultiMeshInstance3D])
 			for k in nodes.size():
 				nodes[k].name = "Scatter%d" % i if nodes.size() == 1 else "Scatter%d_%d" % [i, k]
 				out.add_child(nodes[k])
+		# Grass (mat tiles and tufts) as plain nodes.
+		for g in root.build_grass_for_export():
+			out.add_child(g)
 
 	# Passage brushes' gameplay nodes (exit, fade, spawn) ship as children of the bake.
 	root.make_passage_nodes_for_export(scene)
 	# Door brushes' Door nodes ship too (under the zone, outside any Room).
 	root.make_door_nodes_for_export(scene)
+	# Prop brushes' nodes (signs, stalls, drips, birds, NPC spots) ship as real nodes.
+	root.make_prop_nodes_for_export(scene)
 	# Scenes hung along ropes (lanterns) ship as children of the bake too.
 	root.make_rope_nodes_for_export(scene)
 	# Swap in place, keeping the level's own children (actors, markers) and their owners.

@@ -12,6 +12,9 @@ extends Node
 ## had before the cut (so the player doesn't suddenly turn); releasing it re-maps to the
 ## new view, like OoT.
 
+## Free orbit distance multiplier while the player climbs.
+const CLIMB_PULL_BACK := 1.4
+
 var player: Actor
 var yaw: Node3D
 var pitch: Node3D
@@ -93,7 +96,7 @@ func resume(blend := 0.6) -> void:
 func _process(delta: float) -> void:
 	if override:
 		return
-	if player.is_on_floor():
+	if player.is_on_floor() and not player.has_tag(&"climbing"):
 		_floor_id = Surface.camera_id(player.floor_surface)
 	var zone := _pick()
 	if zone != active:
@@ -109,6 +112,8 @@ func _process(delta: float) -> void:
 	var target: Transform3D
 	if active == null or active.mode == CameraZone.Mode.FOLLOW:
 		var want_len := active.distance if active else _base_length
+		if player.has_tag(&"climbing"):
+			want_len *= CLIMB_PULL_BACK  # see more of the wall
 		arm.spring_length = lerpf(arm.spring_length, want_len, k)
 		if active:
 			pitch.rotation.x = lerp_angle(pitch.rotation.x, -deg_to_rad(active.pitch), k)

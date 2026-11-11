@@ -1,0 +1,83 @@
+[gd_resource type="Resource" script_class="NpcSchedule" format=3]
+
+[ext_resource type="Resource" path="res://story/dialogue/sweets_child_placeholder.tres" id="1_okluf"]
+[ext_resource type="Script" path="res://game/story/schedule/schedule_entry.gd" id="2_6bm18"]
+[ext_resource type="Script" path="res://game/story/story_condition.gd" id="3_hxy71"]
+[ext_resource type="Script" path="res://game/story/story_effect.gd" id="4_w1w5p"]
+[ext_resource type="Script" path="res://game/story/schedule/npc_schedule.gd" id="5_op8eg"]
+
+[sub_resource type="Resource" id="Resource_g50qx"]
+script = ExtResource("2_6bm18")
+label = "Runs around the square"
+from_hour = 10.0
+to_hour = 11.0
+activity = 1
+zone = "res://zones/town1/town_1_market_square.tscn"
+place = &"child_loop"
+
+[sub_resource type="Resource" id="Resource_cms2w"]
+script = ExtResource("2_6bm18")
+label = "Catches their breath"
+from_hour = 11.0
+zone = "res://zones/town1/town_1_market_square.tscn"
+place = &"child_rest"
+
+[sub_resource type="Resource" id="Resource_2lqwf"]
+script = ExtResource("2_6bm18")
+label = "Runs around the square"
+from_hour = 12.0
+to_hour = 13.0
+activity = 1
+zone = "res://zones/town1/town_1_market_square.tscn"
+place = &"child_loop"
+
+[sub_resource type="Resource" id="Resource_3feoy"]
+script = ExtResource("2_6bm18")
+label = "Catches their breath"
+from_hour = 13.0
+to_hour = 14.0
+zone = "res://zones/town1/town_1_market_square.tscn"
+place = &"child_rest"
+
+[sub_resource type="Resource" id="Resource_ovbji"]
+script = ExtResource("2_6bm18")
+label = "Runs around the square"
+from_hour = 14.0
+to_hour = 15.0
+activity = 1
+zone = "res://zones/town1/town_1_market_square.tscn"
+place = &"child_loop"
+
+[sub_resource type="Resource" id="Resource_hvcr4"]
+script = ExtResource("2_6bm18")
+label = "Catches their breath"
+from_hour = 15.0
+to_hour = 16.0
+zone = "res://zones/town1/town_1_market_square.tscn"
+place = &"child_rest"
+
+[sub_resource type="Resource" id="Resource_q42n1"]
+script = ExtResource("2_6bm18")
+label = "Runs home"
+from_hour = 16.0
+to_hour = 16.5
+activity = 1
+zone = "res://zones/town1/town_1_market_square.tscn"
+place = &"child_home"
+vanish_at_end = true
+
+[sub_resource type="Resource" id="Resource_0cpsk"]
+script = ExtResource("2_6bm18")
+label = "Elsewhere"
+from_hour = 0.0
+to_hour = 0.0
+zone = "res://zones/nowhere/nowhere.tscn"
+place = &"offstage_sweets_child"
+
+[resource]
+script = ExtResource("5_op8eg")
+id = &"sweets_child"
+character = &"sweets_child"
+dialogue = ExtResource("1_okluf")
+entries = Array[ExtResource("2_6bm18")]([SubResource("Resource_g50qx"), SubResource("Resource_cms2w"), SubResource("Resource_2lqwf"), SubResource("Resource_3feoy"), SubResource("Resource_ovbji"), SubResource("Resource_hvcr4"), SubResource("Resource_q42n1"), SubResource("Resource_0cpsk")])
+notes = "Market square scheduling trial."

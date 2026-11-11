@@ -28,6 +28,10 @@ extends Resource
 @export var lightning := false
 ## Rain intensity 0..1, for the rain system (not rendered yet).
 @export_range(0.0, 1.0, 0.05) var rain := 0.0
+## Wind: multiplies the zone's wind (Zone.wind_strength; 1 = as the zone has it, 0 = still,
+## 2+ = a gale), and how gusty it is (0 steady .. 1 rolling gusts).
+@export_range(0.0, 4.0, 0.05) var wind := 1.0
+@export_range(0.0, 1.0, 0.05) var gusts := 0.5
 
 
 func get_key(index: int) -> SkyKey:

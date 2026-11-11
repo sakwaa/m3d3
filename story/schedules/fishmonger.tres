@@ -1,0 +1,51 @@
+[gd_resource type="Resource" script_class="NpcSchedule" format=3]
+
+[ext_resource type="Resource" path="res://story/dialogue/fishmonger_placeholder.tres" id="1_pr3jn"]
+[ext_resource type="Script" path="res://game/story/schedule/schedule_entry.gd" id="2_x2i7q"]
+[ext_resource type="Script" path="res://game/story/story_condition.gd" id="3_cbjrk"]
+[ext_resource type="Script" path="res://game/story/story_effect.gd" id="4_0c78d"]
+[ext_resource type="Script" path="res://game/story/schedule/npc_schedule.gd" id="5_tuh84"]
+
+[sub_resource type="Resource" id="Resource_0tudx"]
+script = ExtResource("2_x2i7q")
+label = "Brings the catch in from Riverside"
+from_hour = 4.75
+to_hour = 6.0
+activity = 1
+zone = "res://zones/town1/town_1_market_square.tscn"
+place = &"fish_in"
+
+[sub_resource type="Resource" id="Resource_iugxk"]
+script = ExtResource("2_x2i7q")
+label = "Sells fish"
+from_hour = 6.0
+to_hour = 13.0
+zone = "res://zones/town1/town_1_market_square.tscn"
+place = &"fish_stall"
+
+[sub_resource type="Resource" id="Resource_slfn3"]
+script = ExtResource("2_x2i7q")
+label = "Heads home to Riverside"
+from_hour = 13.0
+to_hour = 14.0
+activity = 1
+zone = "res://zones/town1/town_1_market_square.tscn"
+place = &"fish_in"
+reverse = true
+vanish_at_end = true
+
+[sub_resource type="Resource" id="Resource_hli88"]
+script = ExtResource("2_x2i7q")
+label = "Elsewhere"
+from_hour = 0.0
+to_hour = 0.0
+zone = "res://zones/nowhere/nowhere.tscn"
+place = &"offstage_fishmonger"
+
+[resource]
+script = ExtResource("5_tuh84")
+id = &"fishmonger"
+character = &"fishmonger"
+dialogue = ExtResource("1_pr3jn")
+entries = Array[ExtResource("2_x2i7q")]([SubResource("Resource_0tudx"), SubResource("Resource_iugxk"), SubResource("Resource_slfn3"), SubResource("Resource_hli88")])
+notes = "Market square scheduling trial."

@@ -21,6 +21,11 @@ func _enter_tree() -> void:
 	_update_preview()
 
 
+## Prop brush pick box (PropSpec): a person-sized block where they stand.
+func prop_bounds() -> AABB:
+	return AABB(Vector3(-0.3, 0.0, -0.3), Vector3(0.6, 1.7, 0.6))
+
+
 func _update_preview() -> void:
 	if not Engine.is_editor_hint() or not is_inside_tree():
 		return

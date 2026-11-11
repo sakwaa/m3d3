@@ -13,6 +13,8 @@ signal paint_changed
 signal materials_changed
 ## The scattered cut-outs (flowers, tufts) changed.
 signal scatter_changed
+## The grass (mat and tufts) settings changed.
+signal grass_changed
 
 const MAX_LAYERS := 4
 
@@ -190,6 +192,24 @@ const IDENTITY_BASIS := Vector4(1, 0, 0, 1)
 			if s and not s.changed.is_connected(_on_scatter_changed):
 				s.changed.connect(_on_scatter_changed)
 		scatter_changed.emit()
+## Grass: a lumpy mat over the grass-textured ground with tufts in it (GrassSettings;
+## empty or disabled = none). Rebuilt with the brushes.
+@export var grass: GrassSettings:
+	set(value):
+		if grass and grass.changed.is_connected(_on_grass_changed):
+			grass.changed.disconnect(_on_grass_changed)
+		grass = value
+		if grass and not grass.changed.is_connected(_on_grass_changed):
+			grass.changed.connect(_on_grass_changed)
+		grass_changed.emit()
+## Ground finish: soft edges where grass meets dirt, ground piled up a little at the foot of
+## buildings (GroundFinish). Taken off and put back with its buttons; never changes the
+## ground for good.
+@export var ground_finish: GroundFinish:
+	set(value):
+		ground_finish = value
+		if ground_finish:
+			ground_finish.level = weakref(self)
 ## Mask texels per metre for newly painted faces.
 @export_range(2.0, 64.0) var mask_density := 16.0
 @export_group("")
@@ -222,6 +242,14 @@ const IDENTITY_BASIS := Vector4(1, 0, 0, 1)
 @export_range(0.0, 1.0, 0.05) var light_contrast := 1.0:
 	set(value):
 		light_contrast = value
+		materials_changed.emit()
+## Baked modes: the darkest the baked lighting gets on screen, as a fraction of a surface's
+## fully lit look (its painted colour kept, tinted like the light). Lifts corners the AO
+## and shadows would otherwise turn black; 0.2 is about Majora's Mask's darkest scenes.
+## Editor preview is live; Bake Level to apply in game.
+@export_range(0.0, 0.5, 0.01) var light_floor := 0.2:
+	set(value):
+		light_floor = value
 		materials_changed.emit()
 ## Baked Vertex / Timed Dynamic: how much of the bake shows. 0 = none (plain Dynamic: the scene's own
 ## ambient / environment), 1 = full bake in place of the scene's ambient, above 1 brighter.
@@ -257,6 +285,25 @@ const IDENTITY_BASIS := Vector4(1, 0, 0, 1)
 		baked_collision_surfaces = value
 		bake_changed.emit()
 @export_storage var bake_hash := 0
+## The bake's rain cover (RainCover.build), kept until the bake changes (rain_cover_built()).
+@export_storage var rain_cover_image: Image
+@export_storage var rain_cover_area := Rect2()
+@export_storage var rain_cover_range := Vector2(0.0, 1.0)
+@export_storage var rain_cover_key := 0
+## The light rain catches around the lamps (LevelLighting.bake_rain_light): XZ layers
+## stacked by height (light / 2), the first point's level-local position, metres between
+## points, and lamp strength per lighting key (Baked Timed; else 1).
+## What's past the walls, from the zones next door (NeighbourBackdrop, baked with Bake):
+## the near zones' flat-coloured mesh (level space), the far ring's painted strip and its
+## layout (Backdrop.build_nodes).
+@export_storage var backdrop_mesh: ArrayMesh
+@export_storage var backdrop_ring: Texture2D
+@export_storage var backdrop_ring_info := Vector4.ZERO
+@export_storage var rain_light_image: Image
+@export_storage var rain_light_origin := Vector3.ZERO
+@export_storage var rain_light_cell := 1.0
+@export_storage var rain_light_layers := 1
+@export_storage var rain_light_keys := Vector4.ONE
 @export_storage var bake_summary := ""
 
 
@@ -289,7 +336,7 @@ func with_texture(texture: Texture2D) -> Array[Texture2D]:
 
 
 func paint_hash() -> int:
-	var parts := [textures, base_tile_size, base_tile_sizes, base_tints, base_variation, lighting_mode, light_contrast, light_bake_strength,
+	var parts := [textures, base_tile_size, base_tile_sizes, base_tints, base_variation, lighting_mode, light_contrast, light_floor, light_bake_strength,
 		vertex_color_range, overlay_offsets, overlay_angles, overlay_bases, overlay_stairs]
 	for s in layer_set_count():
 		parts.append(s)
@@ -338,6 +385,10 @@ func _on_set_layers_changed() -> void:
 
 func _on_scatter_changed() -> void:
 	scatter_changed.emit()
+
+
+func _on_grass_changed() -> void:
+	grass_changed.emit()
 
 
 ## What the shader multiplies vertex colour by (meshes store colour / this).
@@ -391,6 +442,37 @@ func set_baked_collision(result: Dictionary) -> void:
 	baked_collision = null
 	baked_collision_surfaces = result.collision_surfaces
 	baked_collision_parts = result.collision_parts
+
+
+## The rain cover of the current bake ({image, area, height_range}, empty without one): the
+## stored one, or made (and stored) when the bake has changed since.
+## The rain light grid for RainCover.from_build ({image, origin, cell, layers, keys}), or
+## empty when the level has none (no lamps, or not lit since it was added).
+func rain_light_built() -> Dictionary:
+	if rain_light_image == null:
+		return {}
+	return {image = rain_light_image, origin = rain_light_origin, cell = rain_light_cell,
+		layers = rain_light_layers, keys = rain_light_keys}
+
+
+func rain_cover_built() -> Dictionary:
+	var meshes := baked_meshes()
+	if meshes.is_empty():
+		return {}
+	var count := 0
+	for m in meshes:
+		for s in m.get_surface_count():
+			count += m.surface_get_array_len(s)
+	var key := hash([bake_hash, meshes.size(), count, RainCover.CELL])
+	if key != rain_cover_key or rain_cover_image == null:
+		var built := RainCover.build(meshes)
+		if built.is_empty():
+			return {}
+		rain_cover_image = built.image
+		rain_cover_area = built.area
+		rain_cover_range = built.height_range
+		rain_cover_key = key
+	return {image = rain_cover_image, area = rain_cover_area, height_range = rain_cover_range}
 
 
 ## The baked visual meshes: the chunks, or the single mesh.

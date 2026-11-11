@@ -5,9 +5,18 @@ extends WorldEnvironment
 ## editor, by the preview settings below). Also sets the `n64_weather_tint` shader
 ## global that darkens baked level lighting in bad weather; it is reset to white when
 ## this node leaves the tree, so indoor zones without a DynamicSky are unaffected.
+## Rain too: the weather's `rain` drives the Rain streaks and the `n64_rain` / `n64_wetness`
+## shader globals (surfaces soak in over WET_IN seconds and dry over WET_OUT), cleared again
+## when this node leaves (no rain or wet ground indoors).
 
 const SHADER := preload("res://game/sky/n64_sky.gdshader")
 const WEATHER_PARAM := &"n64_weather_tint"
+const WIND_PARAM := &"n64_wind"
+const RAIN_PARAM := &"n64_rain"
+const WET_PARAM := &"n64_wetness"
+## Seconds for the ground to soak through in a downpour, and to dry out after it.
+const WET_IN := 25.0
+const WET_OUT := 120.0
 
 @export var cloud_texture: Texture2D = preload("res://textures/sky/clouds.res")
 ## Cloud texture repeats per unit of the cloud plane (higher = smaller clouds).
@@ -21,6 +30,8 @@ const WEATHER_PARAM := &"n64_weather_tint"
 @export_range(0.0, 1.0, 0.05) var star_twinkle := 0.3
 ## RGBA16-style banding with an ordered dither, like N64 framebuffers.
 @export var dither := true
+## Wind slanting the rain (metres per second, world X / Z) at full rain; lighter rain gets less.
+@export var rain_wind := Vector2(1.5, 0.6)
 @export_group("Editor Preview")
 @export var preview_weather := &"sunny"
 @export_range(0.0, 24.0, 0.25) var preview_hour := 12.0
@@ -32,6 +43,9 @@ var _flicker := -1.0
 var _next_flash := 4.0
 var _table: WeatherTable
 var _schedule: LightingSchedule
+var _rain: Rain
+var _wetness := 0.0
+var _wet_started := false
 
 
 func _ready() -> void:
@@ -53,10 +67,14 @@ func _ready() -> void:
 	# Fog: the Zone drives it (N64 fog from the weather, see Zone.fog_target()).
 	_table = WeatherTable.load_project()
 	_schedule = LightingSchedule.load_project()
+	_rain = Rain.new()
+	add_child(_rain, false, INTERNAL_MODE_BACK)
 
 
 func _exit_tree() -> void:
 	RenderingServer.global_shader_parameter_set(WEATHER_PARAM, Color.WHITE)
+	RenderingServer.global_shader_parameter_set(RAIN_PARAM, Vector4.ZERO)
+	RenderingServer.global_shader_parameter_set(WET_PARAM, 0.0)
 
 
 func _process(delta: float) -> void:
@@ -113,6 +131,36 @@ func _process(delta: float) -> void:
 	# Preset tints are on-screen colours; the shader multiplies linear light.
 	var tint: Color = w.world_tint.srgb_to_linear()
 	RenderingServer.global_shader_parameter_set(WEATHER_PARAM, tint.lerp(Color(1.4, 1.4, 1.5), _flash * 0.5))
+	_update_rain(delta, float(w.get("rain", 0.0)))
+	_update_wind(float(w.get("wind", 1.0)), float(w.get("gusts", 0.5)))
+
+
+## The shared wind (n64_wind: direction x / z, strength, gustiness) from the zone's wind
+## scaled by the weather's; grass, trees and anything else swaying read it.
+func _update_wind(weather_wind: float, gusts: float) -> void:
+	var zone := get_parent()
+	var deg: float = zone.get(&"wind_direction") if zone and zone.get(&"wind_direction") != null else 30.0
+	var strength: float = zone.get(&"wind_strength") if zone and zone.get(&"wind_strength") != null else 0.35
+	var a := deg_to_rad(deg)
+	RenderingServer.global_shader_parameter_set(WIND_PARAM, Vector4(cos(a), -sin(a), strength * weather_wind, gusts))
+
+
+## Rain amount and wind for the streaks; the wetness follows the rain (at once in the editor).
+func _update_rain(delta: float, rain: float) -> void:
+	var wind := rain_wind * rain
+	RenderingServer.global_shader_parameter_set(RAIN_PARAM, Vector4(rain, wind.x, wind.y, 0.0))
+	var target := clampf(rain * 1.5, 0.0, 1.0)
+	if Engine.is_editor_hint() or not _wet_started:
+		# Arriving in rain: already wet.
+		_wetness = target
+		_wet_started = true
+	elif target > _wetness:
+		_wetness = minf(_wetness + delta / WET_IN, target)
+	else:
+		_wetness = maxf(_wetness - delta / WET_OUT, target)
+	RenderingServer.global_shader_parameter_set(WET_PARAM, _wetness)
+	if _rain:
+		_rain.visible = rain > 0.0
 
 
 ## Storm flashes: a bright strike, a short flicker after it, then a random wait.

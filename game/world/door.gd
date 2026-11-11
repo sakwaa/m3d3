@@ -38,7 +38,10 @@ const SWING_ANGLE := 1.75  # ~100°
 @export var room_b: Room
 
 @export_group("Zone")
-@export_file("*.tscn") var target_zone := ""
+@export_file("*.tscn") var target_zone := "":
+	set(v):
+		target_zone = v
+		notify_property_list_changed()  # (target_spawn's choices)
 @export var target_spawn: StringName = &"default"
 ## Id other zones use to arrive through this door.
 @export var spawn_id: StringName = &"door"
@@ -158,6 +161,7 @@ func _validate_property(property: Dictionary) -> void:
 		property.usage = PROPERTY_USAGE_STORAGE
 	elif property.name == &"panel_material" and panel_material == null:
 		property.usage = PROPERTY_USAGE_STORAGE
+	ZoneArrivals.hint(property, target_zone)
 
 
 func _ready() -> void:
@@ -225,9 +229,10 @@ func interact() -> void:
 	var zone := _zone()
 	var from_room: Room = room_b if side > 0.0 else room_a
 	var to_room: Room = room_a if side > 0.0 else room_b
-	# A zone door without a loadable target (e.g. just placed, room behind still being
-	# built) works as a plain walk-through door instead of fading out for good.
-	var travels := mode == Mode.ZONE and not target_zone.is_empty() and ResourceLoader.exists(target_zone)
+	# A zone door with no target set works as a plain walk-through door. One whose target
+	# doesn't exist yet (a house's interior still to build) travels anyway: ZoneManager
+	# sends the player to the nowhere room.
+	var travels := mode == Mode.ZONE and not target_zone.is_empty()
 	if mode == Mode.ZONE and not travels:
 		push_warning("Door '%s': no target zone set (%s); walking through instead." % [name, target_zone if target_zone else "empty"])
 	if mode == Mode.ROOM and zone:
@@ -236,6 +241,9 @@ func interact() -> void:
 		if to_room:
 			zone.hold_room(to_room)
 
+	if travels:
+		# Load the other side while the door opens and the player walks through.
+		get_node(^"/root/ZoneManager").preload_zone(target_zone)
 	player.face(global_basis * Vector3(0, 0, -side))
 	await _tween_player(player, to_global(Vector3(0, 0, side * 0.9)), 0.2)
 	if travels:

@@ -1,0 +1,41 @@
+[gd_resource type="Resource" script_class="NpcSchedule" format=3]
+
+[ext_resource type="Resource" path="res://story/dialogue/dumpling_seller_placeholder.tres" id="1_q2y56"]
+[ext_resource type="Script" path="res://game/story/schedule/schedule_entry.gd" id="2_k8etm"]
+[ext_resource type="Script" path="res://game/story/story_condition.gd" id="3_lu0by"]
+[ext_resource type="Script" path="res://game/story/story_effect.gd" id="4_7nkbk"]
+[ext_resource type="Script" path="res://game/story/schedule/npc_schedule.gd" id="5_spmcy"]
+
+[sub_resource type="Resource" id="Resource_nvk33"]
+script = ExtResource("2_k8etm")
+label = "Lunch rush"
+days = 29
+from_hour = 10.0
+to_hour = 14.0
+zone = "res://zones/town1/town_1_market_square.tscn"
+place = &"dumpling_stall"
+
+[sub_resource type="Resource" id="Resource_2mkfi"]
+script = ExtResource("2_k8etm")
+label = "Supper rush"
+days = 29
+from_hour = 17.0
+to_hour = 21.0
+zone = "res://zones/town1/town_1_market_square.tscn"
+place = &"dumpling_stall"
+
+[sub_resource type="Resource" id="Resource_wnovd"]
+script = ExtResource("2_k8etm")
+label = "Elsewhere"
+from_hour = 0.0
+to_hour = 0.0
+zone = "res://zones/nowhere/nowhere.tscn"
+place = &"offstage_dumpling_seller"
+
+[resource]
+script = ExtResource("5_spmcy")
+id = &"dumpling_seller"
+character = &"dumpling_seller"
+dialogue = ExtResource("1_q2y56")
+entries = Array[ExtResource("2_k8etm")]([SubResource("Resource_nvk33"), SubResource("Resource_2mkfi"), SubResource("Resource_wnovd")])
+notes = "Market square scheduling trial."

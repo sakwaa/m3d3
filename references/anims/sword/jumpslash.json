@@ -1,0 +1,101 @@
+{
+ "name": "JumpSlash",
+ "fps": 30,
+ "length": 12,
+ "loop": false,
+ "root": "auto",
+ "source": "OoT remake front view 64WRm0sZn0E (60 fps) + MM3D Swordsman's School AXzZe1vsjxk, read by eye",
+ "measured": true,
+ "windows": {},
+ "keys": [
+  {
+   "upper_arm_L": [
+    5,
+    25
+   ],
+   "forearm_L": [
+    40,
+    15
+   ],
+   "thigh_L": 45,
+   "shin_L": -40,
+   "thigh_R": 30,
+   "shin_R": -55,
+   "upper_arm_R": [
+    -40,
+    25
+   ],
+   "forearm_R": [
+    15,
+    15
+   ],
+   "lean": 22,
+   "blade_R": [
+    60,
+    10
+   ],
+   "frame": 0,
+   "ease": "ease_in"
+  },
+  {
+   "upper_arm_L": [
+    5,
+    25
+   ],
+   "forearm_L": [
+    40,
+    15
+   ],
+   "thigh_L": 75,
+   "shin_L": -45,
+   "thigh_R": 60,
+   "shin_R": -60,
+   "upper_arm_R": [
+    150,
+    30
+   ],
+   "forearm_R": [
+    200,
+    20
+   ],
+   "lean": 8,
+   "air": true,
+   "blade_R": [
+    200,
+    15
+   ],
+   "frame": 4,
+   "ease": "smooth"
+  },
+  {
+   "upper_arm_L": [
+    5,
+    25
+   ],
+   "forearm_L": [
+    40,
+    15
+   ],
+   "thigh_L": 75,
+   "shin_L": -45,
+   "thigh_R": 60,
+   "shin_R": -60,
+   "upper_arm_R": [
+    175,
+    20
+   ],
+   "forearm_R": [
+    225,
+    15
+   ],
+   "lean": 0,
+   "air": true,
+   "blade_R": [
+    215,
+    10
+   ],
+   "frame": 11,
+   "ease": "ease_in"
+  }
+ ]
+}

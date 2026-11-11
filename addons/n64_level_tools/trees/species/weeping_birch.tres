@@ -1,0 +1,60 @@
+[gd_resource type="Resource" script_class="TreeSpecies" format=3]
+
+[ext_resource type="Texture2D" path="res://textures/wood/tree_bark.res" id="1_q18ax"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_weeping_birch_t0.res" id="2_2dtrg"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_weeping_birch_t1.res" id="3_kjbn5"]
+[ext_resource type="Texture2D" path="res://textures/plants/leaves_weeping_birch.res" id="3_qt6sk"]
+[ext_resource type="Script" path="res://addons/n64_level_tools/trees/tree_level.gd" id="4_2dtrg"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_weeping_birch_t2.res" id="4_k4ktk"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_weeping_birch_t3.res" id="5_acxkc"]
+[ext_resource type="Script" path="res://addons/n64_level_tools/trees/tree_species.gd" id="5_kjbn5"]
+
+[sub_resource type="Resource" id="Resource_k4ktk"]
+script = ExtResource("4_2dtrg")
+count = 7
+angle = 22.0
+angle_var = 12.0
+length = 0.5798679296616915
+curve = -115.0
+curve_power = 3.5
+radius = 0.6
+segments = 4
+
+[sub_resource type="Resource" id="Resource_acxkc"]
+script = ExtResource("4_2dtrg")
+count = 3
+start = 0.4
+angle = 40.0
+angle_var = 15.0
+length = 0.4
+curve = -40.0
+curve_power = 2.0
+radius = 0.45
+bark = false
+segments = 2
+
+[resource]
+script = ExtResource("5_kjbn5")
+display_name = "Weeping Birch"
+latin = "Betula pendula (weeping form)"
+reference = "Imported from 4BETPEN1.BMP (Betula pendula (weeping form), archetype weeping, real height ~9 m): crown 1.14x the height, bare trunk 24%, widest at 53% of the crown."
+height = 5.3999999999999995
+trunk_radius = 0.16119
+trunk_top = 0.4
+clear = 0.205
+crown = 4
+crown_profile = PackedFloat32Array(0.3832, 0.4367, 0.4527, 0.4624, 0.4815, 0.5669, 0.5638, 0.5705, 0.571, 0.5592, 0.536, 0.5216, 0.5031, 0.4964, 0.2886, 0.2279)
+levels = Array[ExtResource("4_2dtrg")]([SubResource("Resource_k4ktk"), SubResource("Resource_acxkc")])
+cards = 2
+leaf_texture = ExtResource("3_qt6sk")
+bark_texture = ExtResource("1_q18ax")
+card_textures = Array[Texture2D]([ExtResource("2_2dtrg"), ExtResource("3_kjbn5"), ExtResource("4_k4ktk"), ExtResource("5_acxkc")])
+card_aspects = PackedFloat32Array(1.151)
+card_tiles = Vector2i(2, 2)
+card_aspect = 1.151
+card_size = 1.0
+inner_clumps = 3
+leaf_start = 0.3
+hang_length = 4.05
+bark_color = Color(0.6451613, 0.5322581, 0.4516129, 1)
+crown_ao = 0.35

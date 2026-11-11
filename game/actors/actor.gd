@@ -39,6 +39,9 @@ static var show_debug := OS.is_debug_build()
 @export var footsteps := false
 ## Metres between footsteps at walking speed (grows a little with speed).
 @export var stride := 0.7
+## Falls ending this far (m) below the highest point hurt (a heart, more every 4 m
+## further); 0 = never.
+@export var fall_damage_height := 0.0
 
 var health := 8
 ## While set (and the states allow turning), face this instead of the movement (lock-on,
@@ -61,6 +64,17 @@ var floor_surface := 0
 var scripted := false
 ## A cutscene's animation clip playing instead of the states' ("" = none).
 var cue_animation := &""
+## Climbing stamina (a Grip child); null = unlimited.
+var grip: Grip
+## When the actor last let go of a wall or ledge (ClimbState: no grabbing straight back).
+var let_go_time := -1000.0
+## That let-go was the player's own (let go, drop, jump off): no catching anything they
+## don't push towards on the way down.
+var let_go_deliberate := false
+## How far the last landing fell (m): states tell a hard landing from a soft one.
+var last_drop := 0.0
+var _dip_depth := 0.0
+var _dip_t := 1.0  # seconds into the landing dip (LAND_DIP_TIME = done)
 
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 var _safe_position := Vector3.ZERO
@@ -68,6 +82,11 @@ var _has_safe := false
 var _hazard_wait := 0.0
 var _step_left := 0.0
 var _was_on_floor := true
+var _air_top := 0.0  # highest point since leaving the ground (fall damage)
+var _lean := 0.0  # body lean (radians) and where it pivots, eased (_pose_body)
+var _lean_pivot := 0.8
+var _lean_shift := Vector3.ZERO
+var _lean_roll := 0.0
 var _anim: AnimationPlayer
 var _label: Label3D
 
@@ -76,6 +95,11 @@ var _label: Label3D
 ## strength) and button presses, which stay available briefly until a state takes them.
 class Intent:
 	var move := Vector3.ZERO
+	## The raw stick (x right, y up), for screen-relative controls like climbing; zero
+	## when the driver has no stick (AI): states fall back to `move`.
+	var stick := Vector2.ZERO
+	## The view's right (world, flat), which way the stick's x points on screen.
+	var view_right := Vector3.RIGHT
 	var _presses := {}  # action -> seconds left
 	var _held := {}
 
@@ -91,6 +115,7 @@ class Intent:
 
 	func clear() -> void:
 		move = Vector3.ZERO
+		stick = Vector2.ZERO
 		_presses.clear()
 		_held.clear()
 
@@ -187,6 +212,7 @@ func _physics_process(delta: float) -> void:
 		Combat.update_attacks(self)
 	_move(delta)
 	intent.tick(delta)
+	_dip_t += delta
 	counter_left = maxf(counter_left - delta, 0.0)
 	_update_label()
 
@@ -258,9 +284,17 @@ static func add_reaction_states(action: StateMachine, ready_state: StringName) -
 
 
 func _move(delta: float) -> void:
+	for m in machines:
+		if m.current and m.current.move_actor(delta):
+			_pose_body(delta, m.current.body_lean() if m.current.has_method(&"body_lean") else [0.0, _lean_pivot, Vector3.ZERO])
+			floor_surface = 0
+			_was_on_floor = false
+			_air_top = global_position.y  # holding on: falls count from here
+			return
 	var speed := -1.0
 	var scale := 1.0
 	var turn := true
+	var grav := 1.0
 	for m in machines:
 		var s := m.current
 		if s == null:
@@ -268,8 +302,9 @@ func _move(delta: float) -> void:
 		speed = maxf(speed, s.speed)
 		scale *= s.move_scale
 		turn = turn and s.can_turn
+		grav *= s.gravity_scale
 	if not is_on_floor():
-		velocity.y -= _gravity * delta
+		velocity.y -= _gravity * grav * delta
 	# Direction from the input; the state sets the speed (analog strength only picks the
 	# state), so movement always matches the state's animation.
 	var dir := Vector3(intent.move.x, 0.0, intent.move.z).limit_length(1.0)
@@ -290,9 +325,13 @@ func _move(delta: float) -> void:
 		look.y = 0.0
 	if turn and look.length() > 0.1:
 		var target := look.normalized()
-		facing = facing.slerp(target, clampf(turn_speed * delta, 0.0, 1.0)).normalized() if facing.dot(target) > -0.99 else target
-	if body:
-		body.rotation.y = atan2(-facing.x, -facing.z)
+		# Turned by heading angle (Vector3.slerp trips over near-opposite directions).
+		if facing.dot(target) > -0.99:
+			var yaw := lerp_angle(atan2(facing.x, facing.z), atan2(target.x, target.z), clampf(turn_speed * delta, 0.0, 1.0))
+			facing = Vector3(sin(yaw), 0.0, cos(yaw))
+		else:
+			facing = target
+	_pose_body(delta, [0.0, _lean_pivot, Vector3.ZERO])
 	velocity.x += impulse.x
 	velocity.z += impulse.z
 	move_and_slide()
@@ -302,12 +341,43 @@ func _move(delta: float) -> void:
 	_update_ground(delta)
 
 
+## Turns the body to `facing` and eases it into a lean ([tilt, pivot height, shift, roll],
+## see ClimbState.body_lean): climbing slanted walls lies the body along them, and the
+## weight shifts side to side (roll: + lifts the right shoulder).
+func _pose_body(delta: float, lean: Array) -> void:
+	if body == null:
+		return
+	var k := clampf(10.0 * delta, 0.0, 1.0)
+	_lean = lerpf(_lean, lean[0], k)
+	_lean_shift = _lean_shift.lerp(lean[2], k)
+	_lean_roll = lerpf(_lean_roll, lean[3] if lean.size() > 3 else 0.0, k)
+	if absf(lean[0]) > 0.001:
+		_lean_pivot = lean[1]
+	var r := Basis.from_euler(Vector3(_lean, atan2(-facing.x, -facing.z), _lean_roll))
+	body.basis = r
+	var pivot := Vector3.UP * _lean_pivot
+	body.position = pivot - r * pivot + _lean_shift
+
+
+## How far the hips are dipping from a soft landing right now (m; LandDip applies it):
+## quickly down, then eased back up.
+func land_dip() -> float:
+	if _dip_t >= LAND_DIP_TIME:
+		return 0.0
+	var down := 0.06
+	if _dip_t < down:
+		return _dip_depth * sin(_dip_t / down * PI * 0.5)
+	return _dip_depth * (1.0 - smoothstep(down, LAND_DIP_TIME, _dip_t))
+
+
 # --- Ground -------------------------------------------------------------------------------
 
 const DUST_EFFECT := preload("res://game/effects/dust_puff.tres")
 const SPLASH_EFFECT := preload("res://game/effects/water_splash.tres")
 const RIPPLE_EFFECT := preload("res://game/effects/splash_ring.tres")
 
+## Seconds a soft landing's dip lasts.
+const LAND_DIP_TIME := 0.26
 ## m/s² of speed change on slippery floors.
 const SLIP_ACCEL := 5.0
 ## Seconds between damage-floor hits (the hop carries the actor off meanwhile).
@@ -331,6 +401,11 @@ func _update_ground(delta: float) -> void:
 				found = true
 	if not on_floor:
 		floor_surface = 0
+		_air_top = maxf(_air_top, global_position.y)
+	elif not _was_on_floor:
+		_land_from(_air_top - global_position.y)
+	if on_floor:
+		_air_top = global_position.y
 	# On the floor without a contact this frame (snapped): keep the last floor's surface.
 	if on_floor and floor_surface & Surface.VOID:
 		_void_out()
@@ -345,6 +420,16 @@ func _update_ground(delta: float) -> void:
 	if footsteps:
 		_update_footsteps(on_floor, delta)
 	_was_on_floor = on_floor
+
+
+func _land_from(drop: float) -> void:
+	last_drop = drop
+	if drop > 0.15 and not (fall_damage_height > 0.0 and drop >= fall_damage_height):
+		# A soft landing: the knees give a little (LandDip), more the further it fell.
+		_dip_depth = clampf(0.025 + drop * 0.012, 0.025, 0.07)
+		_dip_t = 0.0
+	if fall_damage_height > 0.0 and drop > fall_damage_height:
+		hurt(1 + int((drop - fall_damage_height) / 4.0))
 
 
 ## Dust kicked up on soft ground, ripples (a splash on landing) in water.

@@ -5,7 +5,7 @@ class_name ActorSockets
 ## exports (both have a Skeleton3D under the character).
 ##
 ##   var sword := ActorSockets.attach(model, &"prop_R", SWORD_SCENE.instantiate())
-##   ActorSockets.detach(model, &"prop_R")  # e.g. when sheathing
+##   ActorSockets.move(model, sword, &"chest", BACK)  # sheathing
 
 
 ## Attaches `item` to `bone` (replacing what was held there) and returns it.
@@ -19,6 +19,17 @@ static func attach(character: Node, bone: StringName, item: Node3D) -> Node3D:
 		c.queue_free()
 	socket.add_child(item)
 	return item
+
+
+## Moves `item` (already attached somewhere) onto `bone`, placed by `offset` in the bone's
+## space (its own scale kept): sheathing a sword onto the back and drawing it again.
+static func move(character: Node, item: Node3D, bone: StringName, offset := Transform3D.IDENTITY) -> void:
+	var socket := _socket(character, bone, true)
+	if socket == null or item == null:
+		return
+	if item.get_parent() != socket:
+		item.reparent(socket, false)
+	item.transform = offset.scaled_local(item.scale)  # keeps the item's own size
 
 
 static func detach(character: Node, bone: StringName) -> void:

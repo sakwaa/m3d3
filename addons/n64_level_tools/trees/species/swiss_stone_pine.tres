@@ -1,0 +1,50 @@
+[gd_resource type="Resource" script_class="TreeSpecies" format=3]
+
+[ext_resource type="Texture2D" path="res://textures/wood/tree_bark.res" id="1_rqmte"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_swiss_stone_pine_t0.res" id="2_d6b4r"]
+[ext_resource type="Texture2D" path="res://textures/plants/leaves_swiss_stone_pine.res" id="3_4u3t5"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_swiss_stone_pine_t1.res" id="3_agc4c"]
+[ext_resource type="Script" path="res://addons/n64_level_tools/trees/tree_level.gd" id="4_d6b4r"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_swiss_stone_pine_t2.res" id="4_svhg0"]
+[ext_resource type="Script" path="res://addons/n64_level_tools/trees/tree_species.gd" id="5_agc4c"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_swiss_stone_pine_t3.res" id="5_lxolq"]
+
+[sub_resource type="Resource" id="Resource_svhg0"]
+script = ExtResource("4_d6b4r")
+count = 4
+whorls = 9
+end = 0.97
+angle = 78.0
+angle_var = 8.0
+length = 0.4048468755665516
+length_var = 0.2
+curve = -12.0
+radius = 0.35
+bark = false
+segments = 2
+
+[resource]
+script = ExtResource("5_agc4c")
+display_name = "Swiss Stone Pine"
+latin = "Pinus cembra"
+reference = "Imported from 5PINCEM0.BMP (Pinus cembra, archetype conifer, real height ~12 m): crown 0.98x the height, bare trunk 7%, widest at 22% of the crown."
+height = 7.199999999999999
+trunk_radius = 0.54576
+trunk_taper = 0.1
+trunk_top = 1.0
+lean = 1.0
+wander = 1.5
+clear = 0.027
+crown = 4
+crown_profile = PackedFloat32Array(0.3846, 0.4734, 0.4768, 0.4918, 0.4884, 0.474, 0.4242, 0.401, 0.3873, 0.3695, 0.3224, 0.2739, 0.2131, 0.2029, 0.1298, 0.0908)
+levels = Array[ExtResource("4_d6b4r")]([SubResource("Resource_svhg0")])
+leaf_texture = ExtResource("3_4u3t5")
+bark_texture = ExtResource("1_rqmte")
+card_textures = Array[Texture2D]([ExtResource("2_d6b4r"), ExtResource("3_agc4c"), ExtResource("4_svhg0"), ExtResource("5_lxolq")])
+card_aspects = PackedFloat32Array(0.99)
+card_tiles = Vector2i(2, 2)
+card_aspect = 0.99
+card_size = 1.7279999999999998
+leaf_start = 0.15
+bark_color = Color(0.117741935, 0.13548388, 0.07258064, 1)
+crown_ao = 0.4

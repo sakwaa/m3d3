@@ -7,6 +7,10 @@ extends RefCounted
 
 ## Project setting: run the final bake on export (off = ship the last editor bake).
 const SETTING := "n64/export/bake_on_export"
+## Project setting: metres between the build's lighting vertices (the private Clean Up the
+## build runs before lighting; 0 = keep the editor's geometry).
+const LIGHT_GRID := "n64/build/light_grid"
+const BuildReport := preload("res://addons/n64_level_tools/export/build_report.gd")
 
 
 static func enabled() -> bool:
@@ -15,18 +19,26 @@ static func enabled() -> bool:
 
 ## Bakes the LevelRoots in `scene` (an instance being exported, outside the tree).
 ## `holder`: a node in the editor's tree to host the scene while baking (lights, levels
-## and doors need real world transforms). Returns {baked: int, failed: Array[String]}.
-static func bake_scene(scene: Node, holder: Node, scene_path: String) -> Dictionary:
+## and doors need real world transforms). `report`: also measure each built level
+## (BuildReport.level) into `levels`. Returns {baked: int, failed: Array[String], levels}.
+static func bake_scene(scene: Node, holder: Node, scene_path: String, report := false) -> Dictionary:
 	var roots: Array = scene.find_children("*", "Node3D", true, false).filter(func(n): return n is LevelRoot)
 	if scene is LevelRoot:
 		roots.push_front(scene)
-	var out := {baked = 0, failed = []}
+	var out := {baked = 0, failed = [], levels = []}
+	var edited := {}  # root -> the level as edited (for the report)
 	if roots.is_empty():
 		return out
-	# Private copies: the editor's open levels and the files on disk stay as they are.
+	# Private copies: the editor's open levels and the files on disk stay as they are (brushes
+	# saved as their own files too: the build reshapes them).
 	for root: LevelRoot in roots:
 		if root.data:
+			edited[root] = root.data
 			root.data = root.data.duplicate_deep(Resource.DEEP_DUPLICATE_INTERNAL)
+			var own: Array[LevelBrush] = []
+			for b: LevelBrush in root.data.brushes:
+				own.append(b.duplicate() if b and b.resource_path.get_extension() != "" and not b.resource_path.contains("::") else b)
+			root.data.brushes = own
 	holder.add_child(scene)
 	# Door / passage trim is built by the nodes themselves; make sure it's current.
 	for node in scene.find_children("*", "Node3D", true, false):
@@ -42,19 +54,43 @@ static func bake_scene(scene: Node, holder: Node, scene_path: String) -> Diction
 		if not not_ready.is_empty():
 			out.failed.append("%s in %s (%s)" % [root.name, scene_path, not_ready])
 			continue
-		_bake_level(root, occluders, lights)
+		var t := Time.get_ticks_msec()
+		var stats := _bake_level(root, occluders, lights)
 		out.baked += 1
+		if report:
+			out.levels.append(BuildReport.level(root, scene, scene_path, edited[root], stats, Time.get_ticks_msec() - t))
 	_bake_dressing_ao(scene, roots, occluders)
 	holder.remove_child(scene)
 	return out
 
 
-static func _bake_level(root: LevelRoot, occluders: Array, lights: Array) -> void:
+## Returns the bake's stats.
+static func _bake_level(root: LevelRoot, occluders: Array, lights: Array) -> Dictionary:
 	var data := root.data
 	var mode := data.lighting_mode
 	for brush in data.brushes:
 		if brush:
 			brush.set_block_signals(true)
+	# Hidden faces out first (ground under buildings, walls against a neighbour).
+	var culled := BuildCull.cull(data)
+	# Blender's limited dissolve (BlenderDissolve), before lighting: the merged faces get lit.
+	# It replaces the lighting grid below (which would cut them up again).
+	var dissolved := {}
+	if BlenderDissolve.enabled():
+		dissolved = BlenderDissolve.dissolve(data)
+		if dissolved.has("error"):
+			push_warning("[Build] %s: %s (built without it)" % [root.name, dissolved.error])
+	# The build's own Clean Up (before lighting: the new vertices get lit), on the copy.
+	var grid := float(ProjectSettings.get_setting(LIGHT_GRID, 4.0))
+	if grid > 0.0 and not dissolved.has("after"):
+		for brush in data.brushes:
+			if brush and brush.blend_file == "":
+				# Far stand-ins are seen from afar only: no lighting grid for them.
+				var all: Array[int] = []
+				for f in brush.get_face_count():
+					if not brush.get_face_lod(f) in [LevelBrush.LOD_FAR, LevelBrush.LOD_DETAIL_FAR]:
+						all.append(f)
+				BrushCleanup.clean_up(brush, all, grid, data.mask_density, false)
 	# Vertex AO, if the level uses it (Bake AO).
 	if data.brushes.any(func(b): return b and not b.vertex_ao.is_empty()):
 		var ao := LevelLighting.bake_vertex_ao(root, occluders, data.light_ao_strength, data.light_ao_radius,
@@ -77,6 +113,7 @@ static func _bake_level(root: LevelRoot, occluders: Array, lights: Array) -> voi
 		var lit := LevelLighting.bake(root, occluders, baked_lights)
 		for brush in lit:
 			brush.corner_lighting = lit[brush]
+	LevelLighting.bake_rain_light(root, occluders, lights)
 	for brush in data.brushes:
 		if brush:
 			brush.set_block_signals(false)
@@ -89,6 +126,11 @@ static func _bake_level(root: LevelRoot, occluders: Array, lights: Array) -> voi
 	data.set_baked_collision(result)
 	data.bake_hash = root.compute_hash()
 	data.set_block_signals(false)
+	result.stats.dissolve_from = dissolved.get("before", 0)
+	result.stats.dissolve_to = dissolved.get("after", 0)
+	result.stats.hidden_ground_faces = culled.ground
+	result.stats.hidden_wall_faces = culled.walls
+	return result.stats
 
 
 ## Door / passage trim AO, where it was baked before (same as Bake AO in the editor).

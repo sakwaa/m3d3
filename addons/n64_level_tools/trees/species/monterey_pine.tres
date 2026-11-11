@@ -1,0 +1,49 @@
+[gd_resource type="Resource" script_class="TreeSpecies" format=3]
+
+[ext_resource type="Texture2D" path="res://textures/wood/tree_bark.res" id="1_8lqpn"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_monterey_pine_t0.res" id="2_heb7d"]
+[ext_resource type="Texture2D" path="res://textures/plants/leaves_monterey_pine.res" id="3_l2gp5"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_monterey_pine_t1.res" id="3_y1p3n"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_monterey_pine_t2.res" id="4_cotuj"]
+[ext_resource type="Script" path="res://addons/n64_level_tools/trees/tree_level.gd" id="4_heb7d"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_monterey_pine_t3.res" id="5_qnupu"]
+[ext_resource type="Script" path="res://addons/n64_level_tools/trees/tree_species.gd" id="5_y1p3n"]
+
+[sub_resource type="Resource" id="Resource_cotuj"]
+script = ExtResource("4_heb7d")
+count = 4
+whorls = 9
+end = 0.97
+angle = 78.0
+angle_var = 8.0
+length = 0.41813730329979704
+length_var = 0.2
+curve = -12.0
+radius = 0.35
+bark = false
+segments = 2
+
+[resource]
+script = ExtResource("5_y1p3n")
+display_name = "Monterey Pine"
+latin = "Pinus radiata"
+reference = "Imported from 4PINRAD0.BMP (Pinus radiata, archetype conifer, real height ~20 m): crown 1.01x the height, bare trunk 13%, widest at 9% of the crown."
+trunk_radius = 0.339
+trunk_taper = 0.1
+trunk_top = 1.0
+lean = 1.0
+wander = 1.5
+clear = 0.091
+crown = 4
+crown_profile = PackedFloat32Array(0.4578, 0.5052, 0.5048, 0.4928, 0.4773, 0.4984, 0.4924, 0.4821, 0.4315, 0.4232, 0.3463, 0.3045, 0.2739, 0.2082, 0.1218, 0.1075)
+levels = Array[ExtResource("4_heb7d")]([SubResource("Resource_cotuj")])
+leaf_texture = ExtResource("3_l2gp5")
+bark_texture = ExtResource("1_8lqpn")
+card_textures = Array[Texture2D]([ExtResource("2_heb7d"), ExtResource("3_y1p3n"), ExtResource("4_cotuj"), ExtResource("5_qnupu")])
+card_aspects = PackedFloat32Array(1.021)
+card_tiles = Vector2i(2, 2)
+card_aspect = 1.021
+card_size = 2.88
+leaf_start = 0.15
+bark_color = Color(0.106451616, 0.1, 0.032258064, 1)
+crown_ao = 0.4

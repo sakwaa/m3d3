@@ -54,6 +54,8 @@ static func sample(preset: WeatherPreset, schedule: LightingSchedule, hour: floa
 		fog_amount = preset.fog_amount,
 		lightning = 1.0 if preset.lightning else 0.0,
 		rain = preset.rain,
+		wind = preset.wind,
+		gusts = preset.gusts,
 	}
 
 

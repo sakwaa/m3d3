@@ -1,0 +1,89 @@
+[gd_resource type="Resource" script_class="ActorAnimation" format=3]
+
+[ext_resource type="Script" path="res://addons/n64_actor_tools/actor_animation.gd" id="1_ibkit"]
+
+[resource]
+script = ExtResource("1_ibkit")
+name = "JumpSlashLand"
+fps = 30
+keys = [{
+&"ease": 4,
+&"frame": 0,
+&"pose": {
+&"chest": Quaternion(0, 0, 0, 1),
+&"forearm_L": Quaternion(0.29441813, 1.1452702e-08, -0.008578754, 0.9556383),
+&"forearm_R": Quaternion(0.037112094, -2.7354048e-08, 0.022920549, 0.99904823),
+&"hand_R": Quaternion(-0.6889897, 0.051209547, 3.3026133e-08, 0.7229598),
+&"head": Quaternion(0.06279049, 0, 0, 0.9980267),
+&"neck": Quaternion(0.09410834, 0, 0, 0.9955621),
+&"shin_L": Quaternion(0.85773104, -1.4901159e-08, 0.10314948, -0.5036442),
+&"shin_R": Quaternion(0.85972404, 3.7252899e-09, -0.08873395, -0.50299186),
+&"spine": Quaternion(-0.15643448, 0, 0, 0.9876884),
+&"thigh_L": Quaternion(-0.6090121, -1.1175871e-08, 0.014586121, -0.7930268),
+&"thigh_R": Quaternion(0.50033396, -5.5879354e-09, 0.025820274, 0.86544746),
+&"upper_arm_L": Quaternion(0.18052335, 0, 0.07347563, 0.98082244),
+&"upper_arm_R": Quaternion(0.790669, 5.9604645e-08, -0.40913928, 0.45546424)
+},
+&"root": Vector3(0, 0, 0)
+}, {
+&"ease": 3,
+&"frame": 4,
+&"pose": {
+&"chest": Quaternion(0, 0, 0, 1),
+&"forearm_L": Quaternion(0.29359296, 1.460771e-08, 0.02363855, 0.95563823),
+&"forearm_R": Quaternion(-0.06569181, -2.2867559e-08, 0.06215626, 0.99590224),
+&"hand_R": Quaternion(-0.71624047, -0.0839408, 3.0006074e-08, 0.6927869),
+&"head": Quaternion(0.11840395, 0, 0, 0.9929655),
+&"neck": Quaternion(0.1770848, 0, 0, 0.9841956),
+&"shin_L": Quaternion(0.8767452, -1.4901161e-08, 0.10897291, -0.4684472),
+&"shin_R": Quaternion(-0.8627245, -1.1175873e-08, 0.0465361, 0.5035286),
+&"spine": Quaternion(-0.29237175, 0, 0, 0.95630485),
+&"thigh_L": Quaternion(-0.56636024, -2.0489098e-08, -0.06594051, -0.82151574),
+&"thigh_R": Quaternion(0.33850506, -4.6566133e-09, -0.03765647, 0.9402109),
+&"upper_arm_L": Quaternion(0.3005669, -1.4901161e-08, 0.0971133, 0.9488038),
+&"upper_arm_R": Quaternion(0.70658183, 0, -0.109942175, 0.6990386)
+},
+&"root": Vector3(0, -0.41388658, 0)
+}, {
+&"ease": 0,
+&"frame": 11,
+&"pose": {
+&"chest": Quaternion(0, 0, 0, 1),
+&"forearm_L": Quaternion(0.29414105, 1.8270462e-08, 0.015385252, 0.9556382),
+&"forearm_R": Quaternion(-0.04312848, 2.2926644e-08, 0.05001764, 0.99781674),
+&"hand_R": Quaternion(-0.72605175, -0.095885895, 3.362107e-08, 0.68092203),
+&"head": Quaternion(0.10452847, 0, 0, 0.9945219),
+&"neck": Quaternion(0.1564345, 0, 0, 0.9876884),
+&"shin_L": Quaternion(0.8767452, -1.4901161e-08, 0.10897291, -0.4684472),
+&"shin_R": Quaternion(-0.8627245, -1.1175873e-08, 0.0465361, 0.5035286),
+&"spine": Quaternion(-0.25881907, 0, 0, 0.96592593),
+&"thigh_L": Quaternion(-0.56636024, -2.0489098e-08, -0.06594051, -0.82151574),
+&"thigh_R": Quaternion(0.33850506, -4.6566133e-09, -0.03765647, 0.9402109),
+&"upper_arm_L": Quaternion(0.27122968, 7.4505806e-08, 0.0900131, 0.9582965),
+&"upper_arm_R": Quaternion(0.696278, -2.9802322e-08, -0.10063644, 0.7106823)
+},
+&"root": Vector3(0, -0.41388658, 0)
+}, {
+&"ease": 0,
+&"frame": 20,
+&"pose": {
+&"chest": Quaternion(0, 0, 0, 1),
+&"forearm_L": Quaternion(0.29284036, 3.3891063e-09, -0.03162574, 0.9556382),
+&"forearm_R": Quaternion(0.48704723, -1.4730514e-08, -0.041656997, 0.8723816),
+&"head": Quaternion(0.020942416, 0, 0, 0.9997807),
+&"neck": Quaternion(0.031410754, 0, 0, 0.9995066),
+&"shin_L": Quaternion(-0.20806167, -2.7939682e-09, 0.03883498, 0.9773446),
+&"shin_R": Quaternion(-0.06982423, -2.3283064e-10, -0.04517589, 0.9965359),
+&"spine": Quaternion(-0.05233595, 0, 0, 0.9986295),
+&"thigh_L": Quaternion(0.15658729, 4.1909516e-09, -0.04307666, 0.9867243),
+&"thigh_R": Quaternion(-0.12198964, -4.656613e-10, 0.043733414, 0.99156743),
+&"upper_arm_L": Quaternion(0.08697371, -1.4901161e-08, 0.06388044, 0.9941604),
+&"upper_arm_R": Quaternion(0.1306631, -5.9604645e-08, -0.023280159, 0.99115354)
+},
+&"root": Vector3(0, -0.021301132, 0)
+}]
+windows = {
+"active": Vector2i(0, 7),
+"cancel": Vector2i(12, 20),
+"opening": Vector2i(8, 20)
+}

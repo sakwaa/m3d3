@@ -1,0 +1,43 @@
+[gd_resource type="Resource" script_class="NpcSchedule" format=3]
+
+[ext_resource type="Resource" path="res://story/dialogue/umbrella_maker_placeholder.tres" id="1_fe8js"]
+[ext_resource type="Script" path="res://game/story/schedule/schedule_entry.gd" id="2_kwutx"]
+[ext_resource type="Script" path="res://game/story/story_condition.gd" id="3_eyuyi"]
+[ext_resource type="Script" path="res://game/story/story_effect.gd" id="4_fjoea"]
+[ext_resource type="Script" path="res://game/story/schedule/npc_schedule.gd" id="5_1dhhj"]
+
+[sub_resource type="Resource" id="Resource_n13w2"]
+script = ExtResource("3_eyuyi")
+kind = 5
+weather = &"stormy"
+
+[sub_resource type="Resource" id="Resource_xo4a0"]
+script = ExtResource("2_kwutx")
+label = "Sells umbrellas in the rain"
+to_hour = 18.0
+conditions = Array[ExtResource("3_eyuyi")]([SubResource("Resource_n13w2")])
+zone = "res://zones/town1/town_1_market_square.tscn"
+place = &"umbrella_rain"
+
+[sub_resource type="Resource" id="Resource_67kdw"]
+script = ExtResource("2_kwutx")
+label = "Works in the drying yard"
+to_hour = 18.0
+zone = "res://zones/town1/town_1_market_square.tscn"
+place = &"umbrella_yard"
+
+[sub_resource type="Resource" id="Resource_fnck7"]
+script = ExtResource("2_kwutx")
+label = "Elsewhere"
+from_hour = 0.0
+to_hour = 0.0
+zone = "res://zones/nowhere/nowhere.tscn"
+place = &"offstage_umbrella_maker"
+
+[resource]
+script = ExtResource("5_1dhhj")
+id = &"umbrella_maker"
+character = &"umbrella_maker"
+dialogue = ExtResource("1_fe8js")
+entries = Array[ExtResource("2_kwutx")]([SubResource("Resource_xo4a0"), SubResource("Resource_67kdw"), SubResource("Resource_fnck7")])
+notes = "Market square scheduling trial."

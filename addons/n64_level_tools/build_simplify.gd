@@ -7,7 +7,7 @@ extends RefCounted
 ## (painted colour, AO, baked lighting, every lighting key) lies on one linear blend across
 ## the merged face, within `tolerance`: the merged face shades the same as its parts did, so
 ## shadow edges and colour changes keep their vertices and flat stretches lose theirs.
-## Merges stay inside the baker's chunk cells (LevelBaker.CHUNK_SIZE, by face centre, on the
+## Merges stay inside the baker's chunk cells (LevelBaker.chunk_size(), by face centre, on the
 ## same grid), so chunks stay compact for culling. Painted masks move onto the merged faces
 ## at full density. The level being edited is never changed.
 
@@ -76,10 +76,10 @@ static func simplify(b: LevelBrush, origin: Vector3, density: float) -> void:
 		for p in pts:
 			centre += b.transform * p
 		centre /= pts.size()
-		var cell := Vector2i(floori((centre.x - origin.x) / LevelBaker.CHUNK_SIZE),
-			floori((centre.z - origin.z) / LevelBaker.CHUNK_SIZE))
+		var cell := Vector2i(floori((centre.x - origin.x) / LevelBaker.chunk_size()),
+			floori((centre.z - origin.z) / LevelBaker.chunk_size()))
 		compat.append([b.get_surface_key(f), b.get_face_texture(f), b.get_face_uv(f), b.get_face_surface(f),
-			b.get_face_layer_set(f), b.face_bake[f] if f < b.face_bake.size() else 0, cell,
+			b.get_face_layer_set(f), b.face_bake[f] if f < b.face_bake.size() else 0, cell, b.get_face_lod(f),
 			BrushOps._plane_key(verts, polys[f])])
 		var list := []
 		var start := b.get_face_start(f)

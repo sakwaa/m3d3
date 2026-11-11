@@ -1,0 +1,46 @@
+[gd_resource type="Resource" script_class="TreeSpecies" format=3]
+
+[ext_resource type="Texture2D" path="res://textures/wood/tree_bark.res" id="1_g3tqo"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_columnar_hornbeam_t0.res" id="2_sn7v1"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_columnar_hornbeam_t1.res" id="3_q0why"]
+[ext_resource type="Texture2D" path="res://textures/plants/leaves_columnar_hornbeam.res" id="3_y3rg0"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_columnar_hornbeam_t2.res" id="4_3su83"]
+[ext_resource type="Script" path="res://addons/n64_level_tools/trees/tree_level.gd" id="4_sn7v1"]
+[ext_resource type="Script" path="res://addons/n64_level_tools/trees/tree_species.gd" id="5_q0why"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_columnar_hornbeam_t3.res" id="5_s4oif"]
+
+[sub_resource type="Resource" id="Resource_3su83"]
+script = ExtResource("4_sn7v1")
+count = 14
+angle = 22.0
+angle_var = 8.0
+length = 0.5085334944665397
+curve = 5.0
+wander = 5.0
+radius = 0.4
+bark = false
+segments = 1
+
+[resource]
+script = ExtResource("5_q0why")
+display_name = "Columnar Hornbeam"
+latin = "Carpinus betulus 'Fastigiata'"
+reference = "Imported from 4CARBEF0.BMP (Carpinus betulus 'Fastigiata', archetype columnar, real height ~12 m): crown 0.43x the height, bare trunk 11%, widest at 34% of the crown."
+height = 7.199999999999999
+trunk_radius = 0.08
+trunk_top = 1.0
+lean = 1.0
+clear = 0.066
+crown = 4
+crown_profile = PackedFloat32Array(0.0736, 0.1205, 0.1506, 0.1842, 0.2083, 0.2143, 0.2083, 0.2018, 0.1859, 0.176, 0.1648, 0.151, 0.1175, 0.0977, 0.0775, 0.0482)
+levels = Array[ExtResource("4_sn7v1")]([SubResource("Resource_3su83")])
+leaf_texture = ExtResource("3_y3rg0")
+bark_texture = ExtResource("1_g3tqo")
+card_textures = Array[Texture2D]([ExtResource("2_sn7v1"), ExtResource("3_q0why"), ExtResource("4_3su83"), ExtResource("5_s4oif")])
+card_aspects = PackedFloat32Array(0.433)
+card_tiles = Vector2i(2, 2)
+card_aspect = 0.433
+card_size = 2.47104
+clumps = 2
+leaf_start = 0.1
+bark_color = Color(0.68225807, 0.57903224, 0.57258064, 1)

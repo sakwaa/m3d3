@@ -1,0 +1,60 @@
+[gd_resource type="Resource" script_class="TreeSpecies" format=3]
+
+[ext_resource type="Texture2D" path="res://textures/wood/tree_bark.res" id="1_mavg7"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_weeping_willow_photo_t0.res" id="2_663r0"]
+[ext_resource type="Texture2D" path="res://textures/plants/leaves_weeping_willow_photo.res" id="3_cbxlv"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_weeping_willow_photo_t1.res" id="3_cqkij"]
+[ext_resource type="Script" path="res://addons/n64_level_tools/trees/tree_level.gd" id="4_663r0"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_weeping_willow_photo_t2.res" id="4_y81jk"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_weeping_willow_photo_t3.res" id="5_6hx37"]
+[ext_resource type="Script" path="res://addons/n64_level_tools/trees/tree_species.gd" id="5_cqkij"]
+
+[sub_resource type="Resource" id="Resource_y81jk"]
+script = ExtResource("4_663r0")
+count = 7
+angle = 22.0
+angle_var = 12.0
+length = 0.5493485649426553
+curve = -115.0
+curve_power = 3.5
+radius = 0.6
+segments = 4
+
+[sub_resource type="Resource" id="Resource_6hx37"]
+script = ExtResource("4_663r0")
+count = 3
+start = 0.4
+angle = 40.0
+angle_var = 15.0
+length = 0.4
+curve = -40.0
+curve_power = 2.0
+radius = 0.45
+bark = false
+segments = 2
+
+[resource]
+script = ExtResource("5_cqkij")
+display_name = "Weeping Willow Photo"
+latin = "Salix babylonica"
+reference = "Imported from 4SALBAB0.BMP (Salix babylonica, archetype weeping, real height ~12 m): crown 1.09x the height, bare trunk 19%, widest at 22% of the crown."
+height = 7.199999999999999
+trunk_radius = 0.17351999999999998
+trunk_top = 0.4
+clear = 0.153
+crown = 4
+crown_profile = PackedFloat32Array(0.5207, 0.5408, 0.5399, 0.5458, 0.5448, 0.5384, 0.5413, 0.5379, 0.5261, 0.5138, 0.4862, 0.4592, 0.4311, 0.3292, 0.2953, 0.0699)
+levels = Array[ExtResource("4_663r0")]([SubResource("Resource_y81jk"), SubResource("Resource_6hx37")])
+cards = 2
+leaf_texture = ExtResource("3_cbxlv")
+bark_texture = ExtResource("1_mavg7")
+card_textures = Array[Texture2D]([ExtResource("2_663r0"), ExtResource("3_cqkij"), ExtResource("4_y81jk"), ExtResource("5_6hx37")])
+card_aspects = PackedFloat32Array(1.104)
+card_tiles = Vector2i(2, 2)
+card_aspect = 1.104
+card_size = 1.008
+inner_clumps = 3
+leaf_start = 0.3
+hang_length = 5.3999999999999995
+bark_color = Color(0.13387097, 0.18870968, 0.13225806, 1)
+crown_ao = 0.35

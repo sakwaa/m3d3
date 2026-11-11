@@ -6,7 +6,7 @@
 [ext_resource type="Texture2D" uid="uid://cocicdg4an5we" path="res://textures/sky/clouds.res" id="3_8cwth"]
 [ext_resource type="Script" uid="uid://rmol5sj7jl8o" path="res://game/world/day_night_sun.gd" id="3_ag55k"]
 [ext_resource type="Script" uid="uid://dbof576xv25u5" path="res://addons/n64_level_tools/level_root.gd" id="4_8cwth"]
-[ext_resource type="Resource" uid="uid://cbxdkdylc50ie" path="res://zones/town1/town1_level.tres" id="5_fknv1"]
+[ext_resource type="Resource" uid="uid://cbxdkdylc50ie" path="res://zones/town1/town1_level.res" id="5_fknv1"]
 [ext_resource type="Script" uid="uid://0pm0hwpaajhf" path="res://game/world/spawn_point.gd" id="6_d7se1"]
 [ext_resource type="Texture2D" uid="uid://cvpasknkdji24" path="res://screenshots/town-grid-20ppm.png" id="9_8cwth"]
 

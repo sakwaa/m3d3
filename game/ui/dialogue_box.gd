@@ -24,17 +24,22 @@ const BOX_SIZE := Vector2(1100, 240)
 ## Text inset inside the box (left, top, right, bottom); three lines fit.
 const BOX_MARGIN := Vector4(56, 34, 56, 30)
 const FONT_SIZE := 36
+## Signs (DialogueLine.Style.SIGN): smaller text, two bitmap pixels per font pixel.
+const SIGN_FONT_SIZE := 24
 ## The bitmap look: glyphs drawn at this size, scaled up by whole pixels.
 const PIXEL_SIZE := 12
 const PUNCTUATION_PAUSE := {".": 0.22, "!": 0.22, "?": 0.22, ",": 0.1, "…": 0.3}
 const BOX_COLOR := Color(0.07, 0.05, 0.04, 0.9)
 const TEXT_COLOR := Color(1.0, 0.98, 0.92)
+## Text drawn with the N64's 3-point filter (soft-edged pixels, like the console's text).
+const TEXT_SHADER := preload("res://addons/n64_runtime/shaders/n64_text.gdshader")
 
 ## The game state text is read against (GameState unless set).
 var gs: Node
 ## Font for all dialogue text (a bitmap font goes here); null = the built-in font drawn
 ## pixelated.
 var font: Font
+var _text_material: ShaderMaterial
 
 var is_open := false
 var _event := {}
@@ -75,6 +80,8 @@ func _init() -> void:
 	layer = 60
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	font = pixel_font()
+	_text_material = ShaderMaterial.new()
+	_text_material.shader = TEXT_SHADER
 	_root = Control.new()
 	_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_root)
@@ -135,6 +142,7 @@ func _init() -> void:
 	_tag_label.add_theme_font_size_override(&"font_size", FONT_SIZE)
 	_tag_label.add_theme_color_override(&"font_color", Color(0.12, 0.08, 0.05))
 	_tag_label.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_tag_label.material = _text_material
 	_tag.add_child(_tag_label)
 	_frame.add_child(_tag)
 	_tag.resized.connect(func(): _tag.position = Vector2(34, -_tag.size.y * 0.62))
@@ -217,6 +225,7 @@ func _rich(color: Color) -> RichTextLabel:
 	r.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	r.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	r.material = _text_material
 	r.add_theme_font_override(&"normal_font", font)
 	r.add_theme_font_size_override(&"normal_font_size", FONT_SIZE)
 	r.add_theme_color_override(&"default_color", color)
@@ -228,6 +237,7 @@ func _label(text: String, color: Color) -> Label:
 	var l := Label.new()
 	l.text = text
 	l.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	l.material = _text_material
 	l.add_theme_font_override(&"font", font)
 	l.add_theme_font_size_override(&"font_size", FONT_SIZE)
 	l.add_theme_color_override(&"font_color", color)
@@ -265,6 +275,8 @@ func show_line(event: Dictionary) -> void:
 		_tag_style.bg_color = event.color
 		_icon.texture = event.icon
 		_icon.visible = event.icon != null
+		var is_sign: bool = event.style == DialogueLine.Style.SIGN
+		_text.add_theme_font_size_override(&"normal_font_size", SIGN_FONT_SIZE if is_sign else FONT_SIZE)
 	is_open = true
 	_pages = DialogueText.pages(event.text, gs)
 	_page = 0
@@ -361,6 +373,8 @@ func _start_page() -> void:
 	_speed = 1.0
 	_apply_marks()
 	_next.visible = false
+	if _event.get("style") == DialogueLine.Style.SIGN:
+		_finish_page()  # signs don't type out
 
 
 func is_typing() -> bool:

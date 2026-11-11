@@ -16,6 +16,8 @@ extends ActorState
 @export_range(0.0, 1.0) var slower_below := 0.6
 @export var jump_state: StringName = &"Jump"
 @export var fall_state: StringName = &"Fall"
+## Walking into a climbable wall grabs it (a LocoClimb state; empty = can't climb).
+@export var climb_state: StringName
 ## Seconds off the floor before falling (walking off ledges; small bumps don't count).
 @export var coyote_time := 0.12
 
@@ -34,6 +36,10 @@ func update(delta: float) -> void:
 			return
 	else:
 		_air = 0.0
+	if climb_state != &"" and actor.intent.move.length() > 0.3:
+		var climb := machine.states.get(climb_state) as LocoClimb
+		if climb and climb.try_grab(actor.intent.move):
+			return
 	if jump_state != &"" and actor.intent.take(&"jump"):
 		go(jump_state)
 		return

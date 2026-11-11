@@ -27,9 +27,11 @@ const ONSETS := ["P L", "P R", "B L", "B R", "K L", "K R", "K W", "G L", "G R", 
 const SLOTS := 3
 
 
-## {items: [{word, blocks: [{onset, vowel, coda}], spell} or {punct} or {line: true}],
-## errors: [String]} for `text`. Unknown words are reported and left out.
-static func encode(text: String) -> Dictionary:
+## {items: [{word, blocks: [{onset, vowel, coda}], spell} or {symbol} or {punct} or
+## {line: true}], errors: [String]} for `text`. Words in `symbols` (lower case) become a
+## {symbol: word} item: written with the alphabet's word symbol instead of spelled out (they
+## needn't be in the word list). Other unknown words are reported and left out.
+static func encode(text: String, symbols := PackedStringArray()) -> Dictionary:
 	var items := []
 	var errors := []
 	var word := ""
@@ -41,7 +43,7 @@ static func encode(text: String) -> Dictionary:
 			word += c
 			continue
 		if not word.is_empty():
-			_add_word(word, items, errors)
+			_add_word(word, items, errors, symbols)
 			word = ""
 		if c == "\n":
 			items.append({line = true})
@@ -57,8 +59,11 @@ static func encode(text: String) -> Dictionary:
 	return {items = items, errors = errors}
 
 
-static func _add_word(raw: String, items: Array, errors: Array) -> void:
+static func _add_word(raw: String, items: Array, errors: Array, symbols := PackedStringArray()) -> void:
 	var w := raw.to_lower().strip_edges().trim_prefix("'").trim_suffix("'")
+	if w in symbols:
+		items.append({symbol = w})
+		return
 	var sounds := Pronunciation.sounds_of(w)
 	if sounds.is_empty():
 		errors.append("'%s' isn't in the word list or CMUdict (add it to %s)" % [w, Pronunciation.WORDS])
@@ -137,6 +142,9 @@ static func decode(items: Array) -> Dictionary:
 		elif it.has("punct"):
 			out += it.punct
 			joined = it.punct == "-"
+		elif it.has("symbol"):
+			out += ("" if joined else " ") + it.symbol
+			joined = false
 		else:
 			var sounds := PackedStringArray()
 			for b in it.blocks:
@@ -175,8 +183,8 @@ static func normalised(text: String) -> String:
 
 
 ## Encodes, decodes and compares: {items, errors (encoding, decoding, mismatch)}.
-static func checked(text: String) -> Dictionary:
-	var enc := encode(text)
+static func checked(text: String, symbols := PackedStringArray()) -> Dictionary:
+	var enc := encode(text, symbols)
 	var errors: Array = enc.errors.duplicate()
 	if errors.is_empty():
 		var dec := decode(enc.items)
@@ -186,11 +194,56 @@ static func checked(text: String) -> Dictionary:
 	return {items = enc.items, errors = errors}
 
 
+## Where word symbols come from: they're drawn once, in a SyllabaryAlphabet (the Script
+## Builder), and every script writes with them: `alphabet` itself when it's a syllabary,
+## else the project's (SYMBOL_SOURCE). Null without one.
+const SYMBOL_SOURCE := "res://glyphs/syllabary/alphabet.tres"
+
+
+static func symbol_source(alphabet: Resource) -> SyllabaryAlphabet:
+	if alphabet is SyllabaryAlphabet:
+		return alphabet
+	return load(SYMBOL_SOURCE) as SyllabaryAlphabet if ResourceLoader.exists(SYMBOL_SOURCE) else null
+
+
+## The symbol for `word` (white ink on clear) as `alphabet` writes it, `side` pixels square
+## (whole multiples of its 16 pixels stay crisp), or null when it isn't drawn.
+static func symbol_image(alphabet: Resource, word: String, side: int) -> Image:
+	var src := symbol_source(alphabet)
+	var cell: Image = src.cell(SyllabaryAlphabet.symbol_token(word)) if src else null
+	if cell == null:
+		return null
+	var img := cell.duplicate()
+	if side != img.get_width():
+		img.resize(side, side, Image.INTERPOLATE_NEAREST if side % img.get_width() == 0 else Image.INTERPOLATE_BILINEAR)
+	return img
+
+
+## The words of `text` with a word symbol drawn (symbol_source(`alphabet`)), lower case, each
+## once, in order: the words an inspector lets you write as symbols.
+static func symbol_words_in(text: String, alphabet: Resource) -> PackedStringArray:
+	var out := PackedStringArray()
+	var src := symbol_source(alphabet)
+	if src == null:
+		return out
+	var drawn: PackedStringArray = src.drawn_symbols()
+	if drawn.is_empty():
+		return out
+	var re := RegEx.create_from_string("[A-Za-z']+")
+	for m in re.search_all(text):
+		var w := m.get_string().to_lower().trim_prefix("'").trim_suffix("'")
+		if w in drawn and not w in out:
+			out.append(w)
+	return out
+
+
 ## One line per word for the inspector: "shop  SH | AA | P", "write  R | AY | T  (spelling 3)".
-static func breakdown(text: String) -> String:
-	var enc := checked(text)
+static func breakdown(text: String, symbols := PackedStringArray()) -> String:
+	var enc := checked(text, symbols)
 	var lines := []
 	for it in enc.items:
+		if it.has("symbol"):
+			lines.append("%s   (word symbol)" % it.symbol)
 		if not it.has("word"):
 			continue
 		var parts := []
@@ -252,6 +305,12 @@ static func layout(alphabet: GlyphAlphabet, items: Array, area: Rect2i, scale :=
 			cols[-1].append({image = grow.call(alphabet.cell(it.punct)), height = cs.y, word = false})
 			if alphabet.cell(it.punct) == null:
 				missing.append(it.punct)
+		elif it.has("symbol"):
+			# A word symbol fills a block's square.
+			var s := symbol_image(alphabet, it.symbol, mini(cs.x * 3, block_h))
+			if s == null:
+				missing.append("symbol " + it.symbol)
+			cols[-1].append({image = s, height = block_h, word = true})
 		else:
 			var first := true
 			for b in it.blocks:

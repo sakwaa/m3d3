@@ -1,0 +1,39 @@
+[gd_resource type="Resource" script_class="NpcSchedule" format=3]
+
+[ext_resource type="Resource" path="res://story/dialogue/bath_keeper_placeholder.tres" id="1_183iw"]
+[ext_resource type="Script" path="res://game/story/schedule/schedule_entry.gd" id="2_4d3kg"]
+[ext_resource type="Script" path="res://game/story/story_condition.gd" id="3_dra0x"]
+[ext_resource type="Script" path="res://game/story/story_effect.gd" id="4_d20g0"]
+[ext_resource type="Script" path="res://game/story/schedule/npc_schedule.gd" id="5_5qgob"]
+
+[sub_resource type="Resource" id="Resource_sks5n"]
+script = ExtResource("2_4d3kg")
+label = "Sweeps the bathhouse steps"
+from_hour = 12.0
+to_hour = 15.0
+zone = "res://zones/town1/town_1_market_square.tscn"
+place = &"bath_steps"
+
+[sub_resource type="Resource" id="Resource_mae6l"]
+script = ExtResource("2_4d3kg")
+label = "Minds the bathhouse door"
+from_hour = 15.0
+to_hour = 24.0
+zone = "res://zones/town1/town_1_market_square.tscn"
+place = &"bath_door"
+
+[sub_resource type="Resource" id="Resource_a5sac"]
+script = ExtResource("2_4d3kg")
+label = "Elsewhere"
+from_hour = 0.0
+to_hour = 0.0
+zone = "res://zones/nowhere/nowhere.tscn"
+place = &"offstage_bath_keeper"
+
+[resource]
+script = ExtResource("5_5qgob")
+id = &"bath_keeper"
+character = &"bath_keeper"
+dialogue = ExtResource("1_183iw")
+entries = Array[ExtResource("2_4d3kg")]([SubResource("Resource_sks5n"), SubResource("Resource_mae6l"), SubResource("Resource_a5sac")])
+notes = "Market square scheduling trial."

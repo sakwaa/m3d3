@@ -73,11 +73,25 @@ static func carve_brush(brush: LevelBrush, bxf: Transform3D, xf: Transform3D, wi
 	for i in verts.size():
 		sources.append(PackedInt32Array([i]))
 	for pl in planes:
-		# World plane n.p = d in brush-local space.
+		# World plane n.p = d in brush-local space, cutting only the wall being opened (its
+		# faces facing along `inward`, within `depth`): a house's roof, plinth and other walls
+		# stay whole instead of being sliced along every line of the opening.
 		var nl: Vector3 = bxf.basis.transposed() * pl[0]
 		var dl: float = pl[1] - pl[0].dot(bxf.origin)
 		var len := nl.length()
-		var cut := BrushOps.cut_plane(verts, faces, nl / len, dl / len)
+		var only := {}
+		for f in faces.size():
+			var pts := PackedVector3Array()
+			for v in faces[f]:
+				pts.append(bxf * verts[v])
+			if absf(PolyUtil.newell_normal(pts).normalized().dot(inward)) < 0.99:
+				continue
+			var behind := -inward.dot(pts[0] - c)
+			if behind >= -EPS and behind <= depth:
+				only[f] = true
+		if only.is_empty():
+			continue
+		var cut := BrushOps.cut_plane(verts, faces, nl / len, dl / len, only)
 		verts = cut.verts
 		faces = cut.faces
 		for pair in cut.new_vertices:

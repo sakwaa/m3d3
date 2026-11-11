@@ -1,0 +1,56 @@
+[gd_resource type="Resource" script_class="TreeSpecies" format=3]
+
+[ext_resource type="Texture2D" path="res://textures/wood/tree_bark.res" id="1_ijil8"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_red_maple_t0.res" id="2_7fh6x"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_red_maple_t1.res" id="3_ibrba"]
+[ext_resource type="Texture2D" path="res://textures/plants/leaves_red_maple.res" id="3_tm5kj"]
+[ext_resource type="Script" path="res://addons/n64_level_tools/trees/tree_level.gd" id="4_7fh6x"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_red_maple_t2.res" id="4_jmubh"]
+[ext_resource type="Script" path="res://addons/n64_level_tools/trees/tree_species.gd" id="5_ibrba"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_red_maple_t3.res" id="5_nmcu4"]
+
+[sub_resource type="Resource" id="Resource_jmubh"]
+script = ExtResource("4_7fh6x")
+count = 9
+angle = 58.0
+angle_var = 12.0
+length = 0.4433710796641481
+curve = 20.0
+wander = 7.0
+radius = 0.55
+segments = 2
+
+[sub_resource type="Resource" id="Resource_nmcu4"]
+script = ExtResource("4_7fh6x")
+count = 3
+angle = 50.0
+angle_var = 15.0
+length = 0.55
+curve = -5.0
+wander = 10.0
+bark = false
+segments = 1
+
+[resource]
+script = ExtResource("5_ibrba")
+display_name = "Red Maple"
+latin = "Acer rubrum"
+reference = "Imported from 4ACERUB0.BMP (Acer rubrum, archetype broadleaf, real height ~18 m): crown 0.94x the height, bare trunk 23%, widest at 41% of the crown."
+height = 10.8
+trunk_radius = 0.22733999999999996
+trunk_top = 0.65
+clear = 0.189
+crown = 4
+crown_profile = PackedFloat32Array(0.3635, 0.3857, 0.4272, 0.4374, 0.4414, 0.4465, 0.4721, 0.4528, 0.4369, 0.4187, 0.4067, 0.3675, 0.2617, 0.2156, 0.2019, 0.153)
+levels = Array[ExtResource("4_7fh6x")]([SubResource("Resource_jmubh"), SubResource("Resource_nmcu4")])
+leaf_texture = ExtResource("3_tm5kj")
+bark_texture = ExtResource("1_ijil8")
+card_textures = Array[Texture2D]([ExtResource("2_7fh6x"), ExtResource("3_ibrba"), ExtResource("4_jmubh"), ExtResource("5_nmcu4")])
+card_aspects = PackedFloat32Array(0.951)
+card_tiles = Vector2i(2, 2)
+card_aspect = 0.951
+card_size = 2.5919999999999996
+clumps = 2
+inner_clumps = 2
+leaf_start = 0.3
+bark_color = Color(0.27903226, 0.2612903, 0.18548387, 1)

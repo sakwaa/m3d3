@@ -23,7 +23,7 @@ const SHADER := preload("res://addons/n64_runtime/shaders/projected_shadow.gdsha
 ## actor's shadow matches.
 @export_range(-1.0, 1.0, 0.05) var strength := -1.0
 ## Silhouette resolution (texels across the caster box): lower = chunkier.
-@export var resolution := 128
+@export var resolution := 64
 ## Fade out by this height above the ground (jumping, falling).
 @export var fade_height := 3.0
 ## How far the shadow may reach along the light (long dusk shadows).
@@ -46,6 +46,8 @@ func _ready() -> void:
 	var box := AABB()
 	var first := true
 	for mi in caster.find_children("*", "MeshInstance3D", true, false):
+		if not _of_body(mi):
+			continue
 		mi.layers = ACTOR_LAYER | CASTER_LAYER
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		_mark_stencil(mi)
@@ -159,6 +161,10 @@ func _aim(slot: Dictionary, center: Vector3, dir: Vector3, weight: float) -> voi
 	var mat: ShaderMaterial = slot.material
 	mat.set_shader_parameter(&"to_light", y)
 	mat.set_shader_parameter(&"strength", _strength() * weight)
+	# Where the feet are along the box (blur grows from there), and its size for the blur.
+	mat.set_shader_parameter(&"feet_y", 0.5 - (_half_height * 0.5 + _half_height * absf(y.y)) / reach)
+	mat.set_shader_parameter(&"reach_m", reach)
+	mat.set_shader_parameter(&"size_m", _size)
 	# Silhouettes refresh at half rate, staggered between lights (one small render per
 	# frame per two lights); the projection itself follows every frame.
 	var vp: SubViewport = slot.viewport
@@ -184,6 +190,17 @@ func _height_above_ground(from: Vector3) -> float:
 		q.exclude = [(caster as CollisionObject3D).get_rid()]
 	var hit := space.intersect_ray(q)
 	return maxf((from - hit.position).length() - _half_height, 0.0) if hit else fade_height
+
+
+## Whether `mi` is part of the caster's body: not under a top_level node (world-space
+## effects the actor carries, e.g. its GrassWake: they cast no shadow).
+func _of_body(mi: Node) -> bool:
+	var n := mi
+	while n and n != caster:
+		if n is Node3D and (n as Node3D).top_level:
+			return false
+		n = n.get_parent()
+	return true
 
 
 ## Caster materials (copies) write stencil STENCIL_REF so the projection leaves it lit.

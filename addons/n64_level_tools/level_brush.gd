@@ -147,6 +147,37 @@ var passage_dirty := false
 		if door:
 			door.changed.connect(_on_passage_changed)
 		_on_passage_changed()
+## Window brush (set): its opening is cut like a door's; the LevelRoot builds its reveal,
+## frame, sill and pane from this. Origin = bottom centre of the opening, wall centre line.
+@export var window: WindowSpec:
+	set(value):
+		if window and window.changed.is_connected(_on_passage_changed):
+			window.changed.disconnect(_on_passage_changed)
+		window = value
+		if window:
+			window.changed.connect(_on_passage_changed)
+		_on_passage_changed()
+## House brush (set): the LevelRoot builds its walls, roof and trim from this (HouseBuilder)
+## and cuts the doors' and windows' openings in them again after each rebuild.
+@export var house: HouseSpec:
+	set(value):
+		if house and house.changed.is_connected(_on_passage_changed):
+			house.changed.disconnect(_on_passage_changed)
+		house = value
+		if house:
+			house.changed.connect(_on_passage_changed)
+		_on_passage_changed()
+## Prop brush (set): a sign, stall, rain drip, bird flock or NPC spot (PropSpec); the
+## LevelRoot builds its node at the brush and a pick box to select it by. Origin = the
+## prop's own (a sign's foot, a drip's edge...).
+@export var prop: PropSpec:
+	set(value):
+		if prop and prop.changed.is_connected(_on_passage_changed):
+			prop.changed.disconnect(_on_passage_changed)
+		prop = value
+		if prop:
+			prop.changed.connect(_on_passage_changed)
+		_on_passage_changed()
 ## Double-sided, and the base texture's alpha cuts holes (fences, grilles, hanging cloth).
 @export var cutout := false:
 	set(value):
@@ -155,6 +186,12 @@ var passage_dirty := false
 @export var bake_mode := BakeMode.VISUAL_AND_COLLISION:
 	set(value):
 		bake_mode = value
+		emit_changed()
+## Its upward faces count as ground: past the ground LOD distance the bake draws a
+## flattened stand-in instead (GroundLOD). Off for floors that must stay detailed far away.
+@export var ground_lod := true:
+	set(value):
+		ground_lod = value
 		emit_changed()
 ## Stairs only: bake collision as a smooth ramp so characters can walk up the steps.
 @export var stairs_collision_ramp := true:
@@ -226,12 +263,21 @@ var passage_dirty := false
 @export_storage var face_bake := PackedByteArray():
 	set(value):
 		face_bake = value
+		_vertex_normals.clear()  # they skip collision-only / far faces
 		emit_changed()
 ## Per-face overlay set (LevelData.layers_of; 0 = the level's default layers). Missing
 ## entries are 0.
 @export_storage var face_layer_sets := PackedInt32Array():
 	set(value):
 		face_layer_sets = value
+		emit_changed()
+## Per face: which distance it's drawn at (LOD_ALWAYS, LOD_NEAR: only close up, LOD_FAR:
+## only far away, the stand-in for the near faces). Empty / past the end = always. The bake
+## puts near and far faces in their own chunk meshes with visibility ranges (LevelRoot).
+@export_storage var face_lod := PackedByteArray():
+	set(value):
+		face_lod = value
+		_vertex_normals.clear()  # they skip collision-only / far faces
 		emit_changed()
 ## Pieces of one face cut by the Border tool's corners share an id here (0 = not cut), so
 ## erasing the border can merge them back (merge_faces). Missing entries are 0.
@@ -282,6 +328,16 @@ var passage_dirty := false
 	set(value):
 		vertex_ao = value
 		emit_changed()
+
+## Ground finish (GroundFinish), kept so it can be taken off again. Ground piling: how far
+## each vertex was raised (aligned with vertices; the ground as built is vertices minus
+## these) and where they stood before (exact, for taking it off). Edge blending: the paint masks a blend changed, as they were before it
+## ({Vector2i(face, slot): Image, or null for none}), and a hash of what the blend wrote
+## ({key: int}: a mask painted over since is left alone when the blend comes off).
+@export_storage var pile_offsets := PackedFloat32Array()
+@export_storage var pile_base := PackedVector3Array()  # (the piled vertices as they were)
+@export_storage var blend_base := {}
+@export_storage var blend_written := {}
 
 ## Baked lighting per face corner (aligned with face_indices), from LevelLighting.
 ## Multiplies vertex_colors; stale sizes (after topology edits) count as white.
@@ -343,8 +399,14 @@ func _validate_property(property: Dictionary) -> void:
 		hide = not is_passage()
 	elif name == &"door":
 		hide = not is_door()
+	elif name == &"window":
+		hide = not is_window()
+	elif name == &"house":
+		hide = not is_house()
+	elif name == &"prop":
+		hide = not is_prop()
 	elif name in SHAPE_PROPERTIES:
-		hide = is_fence() or is_rope() or is_passage() or is_door() or (name == &"stairs_collision_ramp" and shape != BrushShapes.Shape.STAIRS)
+		hide = is_fence() or is_rope() or is_passage() or is_door() or is_window() or is_house() or is_prop() or (name == &"stairs_collision_ramp" and shape != BrushShapes.Shape.STAIRS)
 	if hide:
 		property.usage &= ~PROPERTY_USAGE_EDITOR
 
@@ -376,13 +438,44 @@ func set_faces(faces: Array[PackedInt32Array]) -> void:
 	face_counts = packed[1]
 
 
+## Drops vertices no face uses, with their vertex colour / AO. Faces and corners keep
+## their order, so per-corner data (paint, lighting) still lines up. Returns how many went.
+func drop_unused_vertices() -> int:
+	var remap := PackedInt32Array()
+	remap.resize(vertices.size())
+	remap.fill(-1)
+	var verts := PackedVector3Array()
+	var vc := PackedColorArray()
+	var ao := PackedFloat32Array()
+	var ids := face_indices.duplicate()
+	for c in ids.size():
+		var v := ids[c]
+		if remap[v] < 0:
+			remap[v] = verts.size()
+			verts.append(vertices[v])
+			if not vertex_colors.is_empty():
+				vc.append(vertex_colors[v] if v < vertex_colors.size() else Color.WHITE)
+			if not vertex_ao.is_empty():
+				ao.append(vertex_ao[v] if v < vertex_ao.size() else 1.0)
+		ids[c] = remap[v]
+	var dropped := vertices.size() - verts.size()
+	if dropped == 0:
+		return 0
+	vertices = verts
+	face_indices = ids
+	_corner_src = {}  # same corners in the same order: nothing to carry over
+	vertex_colors = vc
+	vertex_ao = ao
+	return dropped
+
+
 ## Geometry (and per-face paint) state for undo/redo.
 func snapshot() -> Dictionary:
 	return {vertices = vertices.duplicate(), face_indices = face_indices.duplicate(),
 		face_counts = face_counts.duplicate(), face_ids = face_ids.duplicate(), hand_edited = hand_edited,
 		face_textures = face_textures.duplicate(), face_uv = face_uv.duplicate(), face_masks = face_masks.duplicate(),
 		face_surfaces = face_surfaces.duplicate(), face_layer_sets = face_layer_sets.duplicate(),
-		face_pieces = face_pieces.duplicate(), face_bake = face_bake.duplicate(), corner_uvs = corner_uvs.duplicate(),
+		face_pieces = face_pieces.duplicate(), face_bake = face_bake.duplicate(), face_lod = face_lod.duplicate(), corner_uvs = corner_uvs.duplicate(),
 		fence_points = fence_points.duplicate(), fence_open = fence_open.duplicate(),
 		rope_points = rope_points.duplicate(), rope_open = rope_open.duplicate(), vertex_colors = vertex_colors.duplicate(), vertex_ao = vertex_ao.duplicate(), corner_lighting = corner_lighting.duplicate(),
 		corner_lighting_keys = corner_lighting_keys.duplicate(), corner_colors = _resolved_corners().duplicate()}
@@ -444,14 +537,17 @@ func get_triangle_positions() -> PackedVector3Array:
 	return out
 
 
-## Triangles that block light / AO (all but pick-only faces).
+## Triangles that block light / AO: the drawn, near faces.
 func get_occluder_triangle_positions() -> PackedVector3Array:
-	if not face_bake.has(3):
+	if face_bake.is_empty() and not (LOD_FAR in face_lod or LOD_DETAIL_FAR in face_lod):
 		return get_triangle_positions()
 	_ensure_cache()
 	var out := PackedVector3Array()
 	for t in _tri_faces.size():
-		if not face_pick_only(_tri_faces[t]):
+		var f := _tri_faces[t]
+		# Only what's drawn up close casts: not collision-only boxes or far stand-ins, which
+		# lie on the drawn faces and would shade them.
+		if face_visual(f) and not get_face_lod(f) in [LOD_FAR, LOD_DETAIL_FAR]:
 			for k in 3:
 				out.append(vertices[_tri_indices[t * 3 + k]])
 	return out
@@ -595,6 +691,14 @@ func _resolve_corners() -> void:
 		return
 	if src.face_indices == face_indices and src.face_counts == face_counts:
 		return  # vertices moved only: corners still line up
+	var old_total := 0
+	for n in src.face_counts:
+		old_total += n
+	if old_total != src.face_indices.size() or src.colors.size() != src.face_indices.size():
+		push_warning("LevelBrush '%s': corner colours held mid-edit (%d corners, %d indices, %d colours); using vertex colours." % [
+			tag, old_total, src.face_indices.size(), src.colors.size()])
+		corner_colors = PackedColorArray()
+		return
 	var cc := transfer_corner_colors(src.vertices, src.face_indices, src.face_counts, src.colors,
 		vertices, face_indices, face_counts, vertex_colors)
 	corner_colors = cc
@@ -824,7 +928,8 @@ func is_rope() -> bool:
 	return rope_style != null
 
 
-## A fence's or rope's points / open sections / whether it loops (the point editor's view).
+## A fence's, rope's or NPC path's points / open sections / whether it loops (the point
+## editor's view; an NPC path keeps its points as fence_points).
 func path_points() -> PackedVector3Array:
 	return rope_points if is_rope() else fence_points
 
@@ -850,9 +955,28 @@ func is_door() -> bool:
 	return door != null
 
 
-## The passage's or door's spec (the wall opening it cuts), or null.
+func is_window() -> bool:
+	return window != null
+
+
+func is_house() -> bool:
+	return house != null
+
+
+func is_prop() -> bool:
+	return prop != null
+
+
+## A prop brush that's an NPC route: its points (fence_points) are the route.
+func is_npc_path() -> bool:
+	return prop != null and prop.kind == PropSpec.Kind.NPC_PATH
+
+
+## The passage's, door's or window's spec (the wall opening it cuts), or null.
 func opening_spec() -> OpeningSpec:
-	return passage if passage else door
+	if passage:
+		return passage
+	return door if door else window
 
 
 func _on_passage_changed() -> void:
@@ -1013,6 +1137,22 @@ func merge_faces(faces: Array, density: float, pieces_only := false) -> PackedIn
 	return map
 
 
+const LOD_ALWAYS := 0
+const LOD_NEAR := 1
+const LOD_FAR := 2
+## Bake only (GroundLOD): the detailed ground, and its flattened far stand-in.
+const LOD_GROUND_NEAR := 3
+const LOD_GROUND_FAR := 4
+## Small detail (a shop's awning, curtain, counter, inside) and its flat stand-in, which
+## swap at the shorter detail distance.
+const LOD_DETAIL_NEAR := 5
+const LOD_DETAIL_FAR := 6
+
+
+func get_face_lod(face: int) -> int:
+	return face_lod[face] if face < face_lod.size() else LOD_ALWAYS
+
+
 func get_face_layer_set(face: int) -> int:
 	return face_layer_sets[face] if face < face_layer_sets.size() else 0
 
@@ -1109,6 +1249,10 @@ func get_vertex_normals() -> PackedVector3Array:
 		_vertex_normals.resize(vertices.size())
 		_vertex_normals.fill(Vector3.ZERO)
 		for f in face_counts.size():
+			# Drawn near faces only: a house's collision box and far panels share its wall
+			# corners and would bend them (AO / paint brushes follow these normals).
+			if not face_visual(f) or get_face_lod(f) in [LOD_FAR, LOD_DETAIL_FAR]:
+				continue
 			var ids := get_face_vertex_ids(f)
 			var pts := get_face_points(f)
 			# Unnormalised Newell normal ~ face area * normal.
@@ -1195,10 +1339,14 @@ func remap_faces(map: PackedInt32Array, masks_follow := true) -> void:
 	var surf := PackedInt32Array()
 	var sets := PackedInt32Array()
 	var pieces := PackedInt32Array()
+	var lods := PackedByteArray()
+	var bake := PackedByteArray()
 	var masks := {}
 	for i in map.size():
 		var old := map[i]
 		pieces.append(get_face_piece(old) if old >= 0 else 0)
+		lods.append(get_face_lod(old) if old >= 0 else LOD_ALWAYS)
+		bake.append(face_bake[old] if old >= 0 and old < face_bake.size() else 0)
 		tex.append(get_face_texture(old) if old >= 0 else -1)
 		surf.append(get_face_surface(old) if old >= 0 else 0)
 		sets.append(get_face_layer_set(old) if old >= 0 else 0)
@@ -1214,6 +1362,8 @@ func remap_faces(map: PackedInt32Array, masks_follow := true) -> void:
 	face_surfaces = surf if not face_surfaces.is_empty() else PackedInt32Array()
 	face_layer_sets = sets if not face_layer_sets.is_empty() else PackedInt32Array()
 	face_pieces = pieces if not face_pieces.is_empty() else PackedInt32Array()
+	face_lod = lods if not face_lod.is_empty() else PackedByteArray()
+	face_bake = bake if not face_bake.is_empty() else PackedByteArray()
 	corner_uvs = PackedVector2Array()  # exact UVs belong to the old faces
 	if not face_ids.is_empty():
 		var ids := PackedInt32Array()
@@ -1357,6 +1507,10 @@ func resize_box() -> AABB:
 	if door:
 		var d := maxf(door.wall_depth, door.thickness)
 		return AABB(Vector3(-door.width * 0.5, 0, door.wall_center_z - d * 0.5), Vector3(door.width, door.height, d))
+	if window:
+		return AABB(Vector3(-window.width * 0.5, 0, -window.wall_depth * 0.5), Vector3(window.width, window.height, window.wall_depth))
+	if house:
+		return AABB(Vector3(-house.width * 0.5, 0, -house.depth * 0.5), Vector3(house.width, house.wall_height(), house.depth))
 	if hand_edited:
 		return local_aabb()
 	return AABB(Vector3(-size.x * 0.5, 0, -size.z * 0.5), size)
@@ -1489,7 +1643,8 @@ func build_painted_mesh(atlas: Dictionary, brush_index: int, timed := false, bak
 	var key_count := {}
 	for t in range(t_from, t_to):
 		var f := _tri_faces[t]
-		if not face_bake.is_empty() and not face_visual(f):
+		# Hidden: not drawn, and far stand-ins (the editor shows the near version).
+		if (not face_bake.is_empty() and not face_visual(f)) or get_face_lod(f) in [LOD_FAR, LOD_DETAIL_FAR]:
 			tri_key[t] = HIDDEN_KEY
 			continue
 		var key: int = with_cutout(with_set(STAIR_KEY + stair.faces[f], get_face_layer_set(f)), cutout) if stair.faces.has(f) \
@@ -1607,6 +1762,8 @@ func raycast_local(from: Vector3, dir: Vector3, both_sides := false) -> Dictiona
 	var best := {}
 	var best_t := INF
 	for t in _tri_faces.size():
+		if get_face_lod(_tri_faces[t]) in [LOD_FAR, LOD_DETAIL_FAR]:
+			continue  # far stand-ins can't be picked
 		var a := vertices[_tri_indices[t * 3]]
 		var b := vertices[_tri_indices[t * 3 + 1]]
 		var c := vertices[_tri_indices[t * 3 + 2]]

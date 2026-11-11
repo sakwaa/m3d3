@@ -1,0 +1,55 @@
+[gd_resource type="Resource" script_class="TreeSpecies" format=3]
+
+[ext_resource type="Texture2D" path="res://textures/wood/tree_bark.res" id="1_qvbr5"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_moreton_bay_fig_t0.res" id="2_1kcki"]
+[ext_resource type="Texture2D" path="res://textures/plants/leaves_moreton_bay_fig.res" id="3_nsfyt"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_moreton_bay_fig_t1.res" id="3_t41u3"]
+[ext_resource type="Script" path="res://addons/n64_level_tools/trees/tree_level.gd" id="4_1kcki"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_moreton_bay_fig_t2.res" id="4_tu7dw"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_moreton_bay_fig_t3.res" id="5_j7dta"]
+[ext_resource type="Script" path="res://addons/n64_level_tools/trees/tree_species.gd" id="5_t41u3"]
+
+[sub_resource type="Resource" id="Resource_tu7dw"]
+script = ExtResource("4_1kcki")
+count = 7
+angle = 65.0
+angle_var = 12.0
+length = 0.9345610973612306
+curve = 25.0
+curve_power = 1.5
+wander = 10.0
+radius = 0.6
+
+[sub_resource type="Resource" id="Resource_j7dta"]
+script = ExtResource("4_1kcki")
+count = 4
+angle = 50.0
+angle_var = 15.0
+curve = -10.0
+wander = 15.0
+bark = false
+segments = 1
+
+[resource]
+script = ExtResource("5_t41u3")
+display_name = "Moreton Bay Fig"
+latin = "Ficus macrophylla"
+reference = "Imported from 4FICMAC0.BMP (Ficus macrophylla, archetype spreading, real height ~25 m): crown 1.89x the height, bare trunk 14%, widest at 22% of the crown."
+height = 15.0
+trunk_radius = 0.9
+trunk_top = 0.45
+wander = 8.0
+clear = 0.099
+crown = 4
+crown_profile = PackedFloat32Array(0.9291, 0.9206, 0.8792, 0.9431, 0.9305, 0.9129, 0.9143, 0.8497, 0.7282, 0.71, 0.6362, 0.6243, 0.6018, 0.4038, 0.3581, 0.2844)
+levels = Array[ExtResource("4_1kcki")]([SubResource("Resource_tu7dw"), SubResource("Resource_j7dta")])
+leaf_texture = ExtResource("3_nsfyt")
+bark_texture = ExtResource("1_qvbr5")
+card_textures = Array[Texture2D]([ExtResource("2_1kcki"), ExtResource("3_t41u3"), ExtResource("4_tu7dw"), ExtResource("5_j7dta")])
+card_aspects = PackedFloat32Array(1.899)
+card_tiles = Vector2i(2, 2)
+card_aspect = 1.899
+card_size = 3.5999999999999996
+inner_clumps = 2
+leaf_start = 0.3
+bark_color = Color(0.030645162, 0.024193548, 0.016129032, 1)

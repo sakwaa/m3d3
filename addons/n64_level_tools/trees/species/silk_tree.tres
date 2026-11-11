@@ -1,0 +1,55 @@
+[gd_resource type="Resource" script_class="TreeSpecies" format=3]
+
+[ext_resource type="Texture2D" path="res://textures/wood/tree_bark.res" id="1_eb82m"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_silk_tree_t0.res" id="2_1evec"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_silk_tree_t1.res" id="3_uaktt"]
+[ext_resource type="Texture2D" path="res://textures/plants/leaves_silk_tree.res" id="3_vnlg5"]
+[ext_resource type="Script" path="res://addons/n64_level_tools/trees/tree_level.gd" id="4_1evec"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_silk_tree_t2.res" id="4_y3aqi"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_silk_tree_t3.res" id="5_pjoqg"]
+[ext_resource type="Script" path="res://addons/n64_level_tools/trees/tree_species.gd" id="5_uaktt"]
+
+[sub_resource type="Resource" id="Resource_y3aqi"]
+script = ExtResource("4_1evec")
+count = 7
+angle = 65.0
+angle_var = 12.0
+length = 0.6609233734585326
+curve = 25.0
+curve_power = 1.5
+wander = 10.0
+radius = 0.6
+
+[sub_resource type="Resource" id="Resource_pjoqg"]
+script = ExtResource("4_1evec")
+count = 4
+angle = 50.0
+angle_var = 15.0
+curve = -10.0
+wander = 15.0
+bark = false
+segments = 1
+
+[resource]
+script = ExtResource("5_uaktt")
+display_name = "Silk Tree"
+latin = "Albizia julibrissin"
+reference = "Imported from 4ALBJUL0.BMP (Albizia julibrissin, archetype spreading, real height ~9 m): crown 1.39x the height, bare trunk 24%, widest at 34% of the crown."
+height = 5.3999999999999995
+trunk_radius = 0.08019
+trunk_top = 0.45
+wander = 8.0
+clear = 0.201
+crown = 4
+crown_profile = PackedFloat32Array(0.2862, 0.304, 0.5202, 0.5441, 0.6763, 0.6948, 0.6746, 0.6734, 0.6763, 0.6627, 0.6339, 0.5688, 0.5428, 0.4411, 0.3315, 0.1063)
+levels = Array[ExtResource("4_1evec")]([SubResource("Resource_y3aqi"), SubResource("Resource_pjoqg")])
+leaf_texture = ExtResource("3_vnlg5")
+bark_texture = ExtResource("1_eb82m")
+card_textures = Array[Texture2D]([ExtResource("2_1evec"), ExtResource("3_uaktt"), ExtResource("4_y3aqi"), ExtResource("5_pjoqg")])
+card_aspects = PackedFloat32Array(1.394)
+card_tiles = Vector2i(2, 2)
+card_aspect = 1.394
+card_size = 1.2959999999999998
+inner_clumps = 2
+leaf_start = 0.3
+bark_color = Color(0.5145161, 0.46935484, 0.3983871, 1)

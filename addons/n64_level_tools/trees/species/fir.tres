@@ -1,0 +1,62 @@
+[gd_resource type="Resource" script_class="TreeSpecies" format=3]
+
+[ext_resource type="Texture2D" path="res://textures/wood/tree_bark.res" id="1_illmb"]
+[ext_resource type="Texture2D" path="res://textures/plants/leaves_fir.res" id="2_5p2on"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_fir_1_t0.res" id="2_tagll"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_fir_1_t1.res" id="3_564m2"]
+[ext_resource type="Script" path="res://addons/n64_level_tools/trees/tree_level.gd" id="3_wfg3q"]
+[ext_resource type="Script" path="res://addons/n64_level_tools/trees/tree_species.gd" id="4_bxlbq"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_fir_1_t2.res" id="4_y5abu"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_fir_1_t3.res" id="5_8ois3"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_fir_2_t0.res" id="6_ovea2"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_fir_2_t1.res" id="7_4ld4h"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_fir_2_t2.res" id="8_arqw0"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_fir_2_t3.res" id="9_xjiut"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_fir_3_t0.res" id="10_vo01w"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_fir_3_t1.res" id="11_ocu3n"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_fir_3_t2.res" id="12_50ai6"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_fir_3_t3.res" id="13_ruot3"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_fir_4_t0.res" id="14_mtd7c"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_fir_4_t1.res" id="15_s6sd7"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_fir_4_t2.res" id="16_25h25"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_fir_4_t3.res" id="17_3mbec"]
+
+[sub_resource type="Resource" id="Resource_7tgf2"]
+script = ExtResource("3_wfg3q")
+count = 5
+whorls = 13
+end = 0.97
+angle = 80.0
+angle_var = 8.0
+length = 0.36
+length_var = 0.2
+curve = -14.0
+radius = 0.35
+bark = false
+segments = 2
+
+[resource]
+script = ExtResource("4_bxlbq")
+display_name = "Fir"
+reference = "Abies alba (silver fir) / spruce form: narrow cone ~0.35x the height, straight leader to the top, branches in whorls nearly horizontal (75-90 deg from vertical), drooping slightly, crown down to ~10% of the height. Game scale 15 m."
+height = 15.0
+trunk_radius = 0.3
+trunk_taper = 0.08
+root_flare = 0.15
+trunk_top = 1.0
+lean = 1.0
+wander = 1.5
+clear = 0.1
+crown = 0
+crown_profile = PackedFloat32Array()
+levels = Array[ExtResource("3_wfg3q")]([SubResource("Resource_7tgf2")])
+cards = 1
+leaf_texture = ExtResource("2_5p2on")
+bark_texture = ExtResource("1_illmb")
+card_textures = Array[Texture2D]([ExtResource("2_tagll"), ExtResource("3_564m2"), ExtResource("4_y5abu"), ExtResource("5_8ois3"), ExtResource("6_ovea2"), ExtResource("7_4ld4h"), ExtResource("8_arqw0"), ExtResource("9_xjiut"), ExtResource("10_vo01w"), ExtResource("11_ocu3n"), ExtResource("12_50ai6"), ExtResource("13_ruot3"), ExtResource("14_mtd7c"), ExtResource("15_s6sd7"), ExtResource("16_25h25"), ExtResource("17_3mbec")])
+card_aspects = PackedFloat32Array(0.7890625, 0.8828125, 0.76953125, 0.88671875)
+card_tiles = Vector2i(2, 2)
+card_size = 3.0
+leaf_start = 0.0
+bark_color = Color(0.48, 0.38, 0.32, 1)
+crown_ao = 0.4

@@ -40,7 +40,7 @@ extends ImageTexture
 	"Snow:8", "Carpet:9") var surface_sound := -1
 ## Gameplay flags the texture brings with it. Hazards (damage, void-out) and no-camera
 ## are painted per face with the Surface layer instead.
-@export_flags("Slippery", "Climbable", "Hookshot") var surface_flags := 0
+@export_flags("Slippery", "Climbable", "Hookshot", "No ledge grab") var surface_flags := 0
 ## Also flags from the name: "ice" is slippery.
 @export var surface_auto_flags := true
 @export_group("Animation")
@@ -148,6 +148,8 @@ func surface() -> int:
 		flags |= Surface.CLIMBABLE
 	if surface_flags & 4:
 		flags |= Surface.HOOKSHOT
+	if surface_flags & 8:
+		flags |= Surface.NO_LEDGE
 	return snd | flags
 
 

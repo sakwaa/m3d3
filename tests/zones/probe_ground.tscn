@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tests/zones/probe_ground.gd" id="1"]
+
+[node name="ProbeGround" type="Node"]
+script = ExtResource("1")

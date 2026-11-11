@@ -1,10 +1,130 @@
 [gd_resource type="Resource" script_class="StoryDatabase" format=3 uid="uid://bvx8hm7fo0m14"]
 
-[ext_resource type="Script" uid="uid://dqejplul73akb" path="res://game/story/character_def.gd" id="1_sed2a"]
-[ext_resource type="Script" uid="uid://brhbotcl5xqjm" path="res://game/story/flag_def.gd" id="2_ei84t"]
-[ext_resource type="Script" uid="uid://hejabi86rpry" path="res://game/story/item_def.gd" id="3_ontyy"]
-[ext_resource type="Script" uid="uid://cfy8pvuag3lp" path="res://game/story/schedule/npc_schedule.gd" id="4_glj78"]
-[ext_resource type="Script" uid="uid://kwjwluggdq02" path="res://game/story/story_database.gd" id="5_k0h8i"]
+[ext_resource type="Script" path="res://game/story/character_def.gd" id="1_sed2a"]
+[ext_resource type="Script" path="res://game/story/flag_def.gd" id="2_ei84t"]
+[ext_resource type="Script" path="res://game/story/item_def.gd" id="3_ontyy"]
+[ext_resource type="Script" path="res://game/story/schedule/npc_schedule.gd" id="4_glj78"]
+[ext_resource type="Resource" path="res://story/schedules/rice_merchant.tres" id="5_cu633"]
+[ext_resource type="Script" path="res://game/story/story_database.gd" id="5_k0h8i"]
+[ext_resource type="Resource" path="res://story/schedules/tea_keeper.tres" id="6_cjtin"]
+[ext_resource type="Resource" path="res://story/schedules/dumpling_seller.tres" id="7_ndbyw"]
+[ext_resource type="Resource" path="res://story/schedules/fishmonger.tres" id="8_ovw3p"]
+[ext_resource type="Resource" path="res://story/schedules/umbrella_maker.tres" id="9_nqhca"]
+[ext_resource type="Resource" path="res://story/schedules/bath_keeper.tres" id="10_5f2ey"]
+[ext_resource type="Resource" path="res://story/schedules/councillor.tres" id="11_8r2w1"]
+[ext_resource type="Resource" path="res://story/schedules/sweets_child.tres" id="12_du5ix"]
+[ext_resource type="Resource" path="res://story/schedules/collector_1.tres" id="13_iaukd"]
+[ext_resource type="Resource" path="res://story/schedules/collector_2.tres" id="14_auebg"]
+[ext_resource type="Resource" path="res://story/schedules/collector_3.tres" id="15_m6021"]
+[ext_resource type="Resource" path="res://story/schedules/lamplighter.tres" id="16_iwrck"]
+[ext_resource type="Resource" path="res://story/schedules/night_watch.tres" id="17_it8y2"]
+
+[sub_resource type="Resource" id="Resource_dnw4i"]
+script = ExtResource("1_sed2a")
+id = &"rice_merchant"
+display_name = "Rice merchant"
+name_color = Color(0.95, 0.85, 0.45, 1)
+walk_speed = 1.3
+voice_pitch = 180.0
+notes = "Market square scheduling trial (placeholder)."
+
+[sub_resource type="Resource" id="Resource_y60xp"]
+script = ExtResource("1_sed2a")
+id = &"tea_keeper"
+display_name = "Tea house owner"
+name_color = Color(0.45, 0.75, 0.45, 1)
+walk_speed = 1.2
+voice_pitch = 240.0
+notes = "Market square scheduling trial (placeholder)."
+
+[sub_resource type="Resource" id="Resource_jvtkn"]
+script = ExtResource("1_sed2a")
+id = &"dumpling_seller"
+display_name = "Dumpling seller"
+name_color = Color(0.95, 0.65, 0.4, 1)
+voice_pitch = 210.0
+voice_timbre = 1
+notes = "Market square scheduling trial (placeholder)."
+
+[sub_resource type="Resource" id="Resource_pyqjr"]
+script = ExtResource("1_sed2a")
+id = &"fishmonger"
+display_name = "Fishmonger"
+name_color = Color(0.4, 0.6, 0.85, 1)
+walk_speed = 1.5
+voice_pitch = 150.0
+voice_timbre = 2
+notes = "Market square scheduling trial (placeholder)."
+
+[sub_resource type="Resource" id="Resource_us2bq"]
+script = ExtResource("1_sed2a")
+id = &"umbrella_maker"
+display_name = "Umbrella maker"
+name_color = Color(0.85, 0.45, 0.55, 1)
+walk_speed = 1.3
+voice_pitch = 260.0
+voice_timbre = 1
+notes = "Market square scheduling trial (placeholder)."
+
+[sub_resource type="Resource" id="Resource_duhle"]
+script = ExtResource("1_sed2a")
+id = &"bath_keeper"
+display_name = "Bathhouse keeper"
+name_color = Color(0.6, 0.85, 0.85, 1)
+walk_speed = 1.2
+voice_pitch = 170.0
+notes = "Market square scheduling trial (placeholder)."
+
+[sub_resource type="Resource" id="Resource_6kfbj"]
+script = ExtResource("1_sed2a")
+id = &"councillor"
+display_name = "Councillor"
+name_color = Color(0.55, 0.45, 0.75, 1)
+walk_speed = 1.3
+voice_pitch = 140.0
+voice_timbre = 1
+notes = "Market square scheduling trial (placeholder)."
+
+[sub_resource type="Resource" id="Resource_ocpud"]
+script = ExtResource("1_sed2a")
+id = &"sweets_child"
+display_name = "Sweets-shop kid"
+name_color = Color(1, 0.6, 0.8, 1)
+walk_speed = 1.6
+voice_pitch = 420.0
+voice_timbre = 1
+notes = "Market square scheduling trial (placeholder)."
+
+[sub_resource type="Resource" id="Resource_32sgb"]
+script = ExtResource("1_sed2a")
+id = &"collector"
+display_name = "Collector"
+name_color = Color(0.55, 0.55, 0.6, 1)
+walk_speed = 1.2
+voice_pitch = 200.0
+voice_timbre = 2
+notes = "Market square scheduling trial (placeholder)."
+
+[sub_resource type="Resource" id="Resource_gpmxl"]
+script = ExtResource("1_sed2a")
+id = &"lamplighter"
+display_name = "Lamplighter"
+name_color = Color(1, 0.75, 0.35, 1)
+walk_speed = 2.0
+voice_pitch = 190.0
+notes = "Market square scheduling trial (placeholder)."
+
+[sub_resource type="Resource" id="Resource_7kf48"]
+script = ExtResource("1_sed2a")
+id = &"night_watch"
+display_name = "Night watch"
+name_color = Color(0.35, 0.4, 0.6, 1)
+walk_speed = 1.2
+voice_pitch = 130.0
+voice_timbre = 2
+notes = "Market square scheduling trial (placeholder)."
 
 [resource]
 script = ExtResource("5_k0h8i")
+characters = Array[ExtResource("1_sed2a")]([SubResource("Resource_dnw4i"), SubResource("Resource_y60xp"), SubResource("Resource_jvtkn"), SubResource("Resource_pyqjr"), SubResource("Resource_us2bq"), SubResource("Resource_duhle"), SubResource("Resource_6kfbj"), SubResource("Resource_ocpud"), SubResource("Resource_32sgb"), SubResource("Resource_gpmxl"), SubResource("Resource_7kf48")])
+schedules = Array[ExtResource("4_glj78")]([ExtResource("5_cu633"), ExtResource("6_cjtin"), ExtResource("7_ndbyw"), ExtResource("8_ovw3p"), ExtResource("9_nqhca"), ExtResource("10_5f2ey"), ExtResource("11_8r2w1"), ExtResource("12_du5ix"), ExtResource("13_iaukd"), ExtResource("14_auebg"), ExtResource("15_m6021"), ExtResource("16_iwrck"), ExtResource("17_it8y2")])

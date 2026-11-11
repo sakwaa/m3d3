@@ -1,0 +1,55 @@
+[gd_resource type="Resource" script_class="TreeSpecies" format=3]
+
+[ext_resource type="Texture2D" path="res://textures/wood/tree_bark.res" id="1_b8w7w"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_umbrella_red_pine_t0.res" id="2_3j8on"]
+[ext_resource type="Texture2D" path="res://textures/plants/leaves_umbrella_red_pine.res" id="3_3b8tg"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_umbrella_red_pine_t1.res" id="3_il24u"]
+[ext_resource type="Script" path="res://addons/n64_level_tools/trees/tree_level.gd" id="4_3j8on"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_umbrella_red_pine_t2.res" id="4_uckrx"]
+[ext_resource type="Script" path="res://addons/n64_level_tools/trees/tree_species.gd" id="5_il24u"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_umbrella_red_pine_t3.res" id="5_mso16"]
+
+[sub_resource type="Resource" id="Resource_uckrx"]
+script = ExtResource("4_3j8on")
+count = 7
+angle = 65.0
+angle_var = 12.0
+length = 0.4744525051538715
+curve = 25.0
+curve_power = 1.5
+wander = 10.0
+radius = 0.6
+
+[sub_resource type="Resource" id="Resource_mso16"]
+script = ExtResource("4_3j8on")
+count = 4
+angle = 50.0
+angle_var = 15.0
+curve = -10.0
+wander = 15.0
+bark = false
+segments = 1
+
+[resource]
+script = ExtResource("5_il24u")
+display_name = "Umbrella Red Pine"
+latin = "Pinus densiflora 'Umbraculifera'"
+reference = "Imported from 5PINDEU0.BMP (Pinus densiflora 'Umbraculifera', archetype spreading, real height ~4 m): crown 1.10x the height, bare trunk 18%, widest at 47% of the crown."
+height = 4.0
+trunk_radius = 0.1024
+trunk_top = 0.45
+wander = 8.0
+clear = 0.145
+crown = 4
+crown_profile = PackedFloat32Array(0.2539, 0.3853, 0.4621, 0.5056, 0.5256, 0.5334, 0.5468, 0.5501, 0.5356, 0.5067, 0.4855, 0.4432, 0.3018, 0.255, 0.1982, 0.1548)
+levels = Array[ExtResource("4_3j8on")]([SubResource("Resource_uckrx"), SubResource("Resource_mso16")])
+leaf_texture = ExtResource("3_3b8tg")
+bark_texture = ExtResource("1_b8w7w")
+card_textures = Array[Texture2D]([ExtResource("2_3j8on"), ExtResource("3_il24u"), ExtResource("4_uckrx"), ExtResource("5_mso16")])
+card_aspects = PackedFloat32Array(1.102)
+card_tiles = Vector2i(2, 2)
+card_aspect = 1.102
+card_size = 1.2
+inner_clumps = 2
+leaf_start = 0.3
+bark_color = Color(0.14838709, 0.15, 0.075806454, 1)

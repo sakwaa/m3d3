@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="Dialogue" format=3]
+
+[ext_resource type="Script" path="res://game/story/dialogue/dialogue_node.gd" id="1_w6d4w"]
+[ext_resource type="Script" path="res://game/story/dialogue/dialogue_line.gd" id="2_kb4ik"]
+[ext_resource type="Script" path="res://game/story/dialogue/dialogue.gd" id="3_ege2q"]
+
+[sub_resource type="Resource" id="Resource_vvtf7"]
+script = ExtResource("2_kb4ik")
+speaker = &"rice_merchant"
+text = "Rice, fresh from the harvest. Well, last harvest."
+id = "hello"
+
+[resource]
+script = ExtResource("3_ege2q")
+id = &"rice_merchant_placeholder"
+start = "hello"
+nodes = Array[ExtResource("1_w6d4w")]([SubResource("Resource_vvtf7")])
+notes = "Placeholder for the scheduling trial."

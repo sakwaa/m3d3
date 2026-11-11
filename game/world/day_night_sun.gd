@@ -30,6 +30,11 @@ func _process(_delta: float) -> void:
 		light_energy = night_energy
 		light_color = night_color
 		world = world_dusk.lerp(world_night, clampf(-height * 4.0, 0.0, 1.0))
+	# Never lower than the level's bake lifts it (LevelData.light_min_sun_elevation), so
+	# real-time shadows (actors) match the baked ones instead of stretching at dusk / night.
+	var lift := deg_to_rad(_min_elevation())
+	if lift > 0.0:
+		rotation.x = -clampf(fposmod(-rotation.x, TAU), lift, PI - lift)
 	if GameState.lighting_schedule:
 		var sun: Array = GameState.lighting_schedule.sun_at(GameState.time_of_day)
 		light_color = sun[0]
@@ -37,3 +42,14 @@ func _process(_delta: float) -> void:
 	# Weather (overcast, storm) dims the sun / moon.
 	light_energy *= GameState.weather_now.get("sun_strength", 1.0)
 	RenderingServer.global_shader_parameter_set(&"n64_world_tint", world)
+
+
+var _lift_root: Node
+
+
+func _min_elevation() -> float:
+	if not is_instance_valid(_lift_root) or not _lift_root.is_inside_tree():
+		_lift_root = get_tree().get_first_node_in_group(&"level_root")
+	var data: Resource = _lift_root.get(&"data") if _lift_root else null
+	var deg = data.get(&"light_min_sun_elevation") if data else null
+	return deg if deg != null else 0.0

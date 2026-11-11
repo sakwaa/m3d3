@@ -251,7 +251,8 @@ class SyllabaryTools extends VBoxContainer:
 			alphabet.template = load(path)
 
 	func _redraw() -> void:
-		var enc := GlyphText.checked(sample.text)
+		# Every word with a symbol drawn is written with it here.
+		var enc := GlyphText.checked(sample.text, alphabet.drawn_symbols() if alphabet is SyllabaryAlphabet else PackedStringArray())
 		var img := Image.create(240, 120, false, Image.FORMAT_RGBA8)
 		img.fill(Color(0.93, 0.91, 0.85))
 		var r: Dictionary = alphabet.draw(img, enc.items, Rect2i(4, 4, 232, 112), Color(0.12, 0.1, 0.1))

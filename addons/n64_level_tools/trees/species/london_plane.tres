@@ -1,0 +1,56 @@
+[gd_resource type="Resource" script_class="TreeSpecies" format=3 uid="uid://idmb1ush21ta"]
+
+[ext_resource type="Texture2D" path="res://textures/wood/tree_bark.res" id="1_bnc1r"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_london_plane_t0.res" id="2_e52id"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_london_plane_t1.res" id="3_aru10"]
+[ext_resource type="Texture2D" path="res://textures/plants/leaves_london_plane.res" id="3_ticki"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_london_plane_t2.res" id="4_61ldv"]
+[ext_resource type="Script" uid="uid://y0x3hn8qn10u" path="res://addons/n64_level_tools/trees/tree_level.gd" id="4_e52id"]
+[ext_resource type="Script" uid="uid://d26o5yijavm2h" path="res://addons/n64_level_tools/trees/tree_species.gd" id="5_aru10"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_london_plane_t3.res" id="5_oum8s"]
+
+[sub_resource type="Resource" id="Resource_61ldv"]
+script = ExtResource("4_e52id")
+count = 9
+angle = 58.0
+angle_var = 12.0
+length = 0.43393765243725146
+curve = 20.0
+wander = 7.0
+radius = 0.55
+segments = 2
+
+[sub_resource type="Resource" id="Resource_oum8s"]
+script = ExtResource("4_e52id")
+count = 3
+angle = 50.0
+angle_var = 15.0
+length = 0.55
+curve = -5.0
+wander = 10.0
+bark = false
+segments = 1
+
+[resource]
+script = ExtResource("5_aru10")
+display_name = "London Plane"
+latin = "Platanus x acerifolia"
+reference = "Imported from 4PLAACE0.BMP (Platanus x acerifolia, archetype broadleaf, real height ~25 m): crown 0.93x the height, bare trunk 14%, widest at 9% of the crown."
+height = 15.0
+trunk_radius = 0.225
+trunk_top = 0.65
+clear = 0.099
+crown = 4
+crown_profile = PackedFloat32Array(0.4496, 0.4642, 0.4546, 0.4438, 0.4442, 0.4392, 0.4275, 0.39, 0.3967, 0.3504, 0.3354, 0.3158, 0.3004, 0.2471, 0.2092, 0.0671)
+levels = Array[ExtResource("4_e52id")]([SubResource("Resource_61ldv"), SubResource("Resource_oum8s")])
+leaf_texture = ExtResource("3_ticki")
+bark_texture = ExtResource("1_bnc1r")
+card_textures = Array[Texture2D]([ExtResource("2_e52id"), ExtResource("3_aru10"), ExtResource("4_61ldv"), ExtResource("5_oum8s")])
+card_aspects = PackedFloat32Array(0.93)
+card_tiles = Vector2i(2, 2)
+card_aspect = 0.93
+card_size = 3.5999999999999996
+clumps = 2
+inner_clumps = 2
+leaf_start = 0.3
+bark_color = Color(0.67258066, 0.64032257, 0.42419356, 1)

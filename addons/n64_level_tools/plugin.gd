@@ -7,6 +7,7 @@ extends EditorPlugin
 const LevelPanel := preload("res://addons/n64_level_tools/ui/level_panel.gd")
 const TextureImporterPanel := preload("res://addons/n64_level_tools/ui/texture_importer_panel.gd")
 const LevelBlender := preload("res://addons/n64_level_tools/level_blender.gd")
+const RoofDrips := preload("res://addons/n64_level_tools/roof_drips.gd")
 
 enum Mode { OBJECT, VERTEX, EDGE, FACE, PAINT, SCULPT }
 enum Drag { NONE, AXIS_X, AXIS_Y, AXIS_Z, PLANE_XZ, BOX, RESIZE }
@@ -63,6 +64,7 @@ var _grid_info: Label
 ## Editor-only player-sized scale reference (never saved; see reference_character.gd).
 const ReferenceCharacter := preload("res://addons/n64_level_tools/reference_character.gd")
 const PlayHere := preload("res://addons/n64_level_tools/play_here.gd")
+const ExportBake := preload("res://addons/n64_level_tools/export/export_bake.gd")
 const PassageBuilder := preload("res://addons/n64_level_tools/passage_builder.gd")
 const FenceBuilder := preload("res://addons/n64_level_tools/fence_builder.gd")
 const FenceEditor := preload("res://addons/n64_level_tools/fence_editor.gd")
@@ -254,6 +256,70 @@ func _enter_tree() -> void:
 		ProjectSettings.set_setting(ExportBakeSetting, true)
 	ProjectSettings.set_initial_value(ExportBakeSetting, true)
 	ProjectSettings.add_property_info({name = ExportBakeSetting, type = TYPE_BOOL})
+	for key in ExportBake.BuildReport.DEFAULTS:
+		if not ProjectSettings.has_setting(key):
+			ProjectSettings.set_setting(key, ExportBake.BuildReport.DEFAULTS[key])
+		ProjectSettings.set_initial_value(key, ExportBake.BuildReport.DEFAULTS[key])
+		ProjectSettings.add_property_info({name = key, type = TYPE_INT})
+	if not ProjectSettings.has_setting(ExportBake.BuildReport.REPORT_ON_EXPORT):
+		ProjectSettings.set_setting(ExportBake.BuildReport.REPORT_ON_EXPORT, true)
+	ProjectSettings.set_initial_value(ExportBake.BuildReport.REPORT_ON_EXPORT, true)
+	ProjectSettings.add_property_info({name = ExportBake.BuildReport.REPORT_ON_EXPORT, type = TYPE_BOOL})
+	# Near detail / far stand-in distance (baked chunks, houses, stalls, signs).
+	if not ProjectSettings.has_setting(LevelRoot.LOD_SETTING):
+		ProjectSettings.set_setting(LevelRoot.LOD_SETTING, 40.0)
+	ProjectSettings.set_initial_value(LevelRoot.LOD_SETTING, 40.0)
+	ProjectSettings.add_property_info({name = LevelRoot.LOD_SETTING, type = TYPE_FLOAT, hint = PROPERTY_HINT_RANGE,
+		hint_string = "5,300,1,suffix:m"})
+	ProjectSettings.set_as_basic(LevelRoot.LOD_SETTING, true)
+	if not ProjectSettings.has_setting(LevelRoot.DETAIL_SETTING):
+		ProjectSettings.set_setting(LevelRoot.DETAIL_SETTING, 20.0)
+	ProjectSettings.set_initial_value(LevelRoot.DETAIL_SETTING, 20.0)
+	ProjectSettings.add_property_info({name = LevelRoot.DETAIL_SETTING, type = TYPE_FLOAT, hint = PROPERTY_HINT_RANGE,
+		hint_string = "5,300,1,suffix:m"})
+	ProjectSettings.set_as_basic(LevelRoot.DETAIL_SETTING, true)
+	if not ProjectSettings.has_setting(LevelBaker.CHUNK_SETTING):
+		ProjectSettings.set_setting(LevelBaker.CHUNK_SETTING, LevelBaker.CHUNK_SIZE)
+	ProjectSettings.set_initial_value(LevelBaker.CHUNK_SETTING, LevelBaker.CHUNK_SIZE)
+	ProjectSettings.add_property_info({name = LevelBaker.CHUNK_SETTING, type = TYPE_FLOAT, hint = PROPERTY_HINT_RANGE,
+		hint_string = "8,128,1,suffix:m"})
+	ProjectSettings.set_as_basic(LevelBaker.CHUNK_SETTING, true)
+	if not ProjectSettings.has_setting(LevelBaker.LOD_CELL_SETTING):
+		ProjectSettings.set_setting(LevelBaker.LOD_CELL_SETTING, LevelBaker.LOD_CELL)
+	ProjectSettings.set_initial_value(LevelBaker.LOD_CELL_SETTING, LevelBaker.LOD_CELL)
+	ProjectSettings.add_property_info({name = LevelBaker.LOD_CELL_SETTING, type = TYPE_FLOAT, hint = PROPERTY_HINT_RANGE,
+		hint_string = "4,64,1,suffix:m"})
+	ProjectSettings.set_as_basic(LevelBaker.LOD_CELL_SETTING, true)
+	if not ProjectSettings.has_setting(LevelRoot.LOD_FADE_SETTING):
+		ProjectSettings.set_setting(LevelRoot.LOD_FADE_SETTING, LevelRoot.LOD_FADE)
+	ProjectSettings.set_initial_value(LevelRoot.LOD_FADE_SETTING, LevelRoot.LOD_FADE)
+	ProjectSettings.add_property_info({name = LevelRoot.LOD_FADE_SETTING, type = TYPE_FLOAT, hint = PROPERTY_HINT_RANGE,
+		hint_string = "0,16,0.5,suffix:m"})
+	ProjectSettings.set_as_basic(LevelRoot.LOD_FADE_SETTING, true)
+	if not ProjectSettings.has_setting(LevelBaker.LOD_MODE_SETTING):
+		ProjectSettings.set_setting(LevelBaker.LOD_MODE_SETTING, 0)
+	ProjectSettings.set_initial_value(LevelBaker.LOD_MODE_SETTING, 0)
+	ProjectSettings.add_property_info({name = LevelBaker.LOD_MODE_SETTING, type = TYPE_INT, hint = PROPERTY_HINT_ENUM,
+		hint_string = "Hand-made,Automatic"})
+	ProjectSettings.set_as_basic(LevelBaker.LOD_MODE_SETTING, true)
+	var gc := LevelBaker.GroundCollision
+	if not ProjectSettings.has_setting(gc.TOLERANCE_SETTING):
+		ProjectSettings.set_setting(gc.TOLERANCE_SETTING, gc.TOLERANCE)
+	ProjectSettings.set_initial_value(gc.TOLERANCE_SETTING, gc.TOLERANCE)
+	ProjectSettings.add_property_info({name = gc.TOLERANCE_SETTING, type = TYPE_FLOAT, hint = PROPERTY_HINT_RANGE,
+		hint_string = "0,0.5,0.01,suffix:m"})
+	ProjectSettings.set_as_basic(gc.TOLERANCE_SETTING, true)
+	if not ProjectSettings.has_setting(GroundLOD.SETTING):
+		ProjectSettings.set_setting(GroundLOD.SETTING, 40.0)
+	ProjectSettings.set_initial_value(GroundLOD.SETTING, 40.0)
+	ProjectSettings.add_property_info({name = GroundLOD.SETTING, type = TYPE_FLOAT, hint = PROPERTY_HINT_RANGE,
+		hint_string = "5,300,1,suffix:m"})
+	ProjectSettings.set_as_basic(GroundLOD.SETTING, true)
+	if not ProjectSettings.has_setting(ExportBake.LIGHT_GRID):
+		ProjectSettings.set_setting(ExportBake.LIGHT_GRID, 4.0)
+	ProjectSettings.set_initial_value(ExportBake.LIGHT_GRID, 4.0)
+	ProjectSettings.add_property_info({name = ExportBake.LIGHT_GRID, type = TYPE_FLOAT, hint = PROPERTY_HINT_RANGE,
+		hint_string = "0,16,0.5,suffix:m"})
 	# Weather table lives in game/ (WeatherTable); only the setting is registered here.
 	const WEATHER_SETTING := "n64/weather/table"
 	if not ProjectSettings.has_setting(WEATHER_SETTING):
@@ -427,9 +493,10 @@ func _is_character_scene(root: Node) -> bool:
 ## Quick Play: bakes every level in the open zone, saves it, and runs it with the player on
 ## the reference character (if shown), else on the surface at the centre of the 3D view
 ## (facing the way the camera looks), else at the zone's default spawn. `build` (Build &
-## Play): the bake is then redone as the export does it (BuildSimplify: only the vertices
-## shape and vertex data need), so the run shows the shipped geometry; the brushes stay as
-## they are, only the stored bake is the build's (the next Bake replaces it).
+## Play): instead bakes exactly as the export does (ExportBake: a private copy cleaned up
+## on the build light grid, re-lit, simplified, baked), so the run is the shipped level;
+## the brushes stay as they are, only the stored bake is the build's (the next Bake
+## replaces it).
 func _play_here(build := false) -> void:
 	var scene := EditorInterface.get_edited_scene_root()
 	if scene == null or not scene is Zone:
@@ -438,9 +505,16 @@ func _play_here(build := false) -> void:
 	if scene.scene_file_path.is_empty():
 		push_warning("N64 Level Tools: save the zone scene once before using Play here.")
 		return
-	_bake_all()
+	var t := Time.get_ticks_msec()
+	print("[N64 Level Tools] %s: baking %s…" % ["Build & Play" if build else "Quick Play", scene.scene_file_path])
 	if build:
-		_build_bake()
+		EditorInterface.save_scene()
+		if not _build_bake(scene):
+			push_warning("N64 Level Tools: Build & Play: nothing baked, not starting.")
+			return
+	else:
+		_bake_all()
+	print("[N64 Level Tools] Baked in %.1f s; saving…" % ((Time.get_ticks_msec() - t) / 1000.0))
 	for root in _scene_level_roots():
 		if root.data and _is_external(root.data):
 			ResourceSaver.save(root.data)
@@ -474,28 +548,71 @@ func _play_here(build := false) -> void:
 			room_path = String(scene.get_path_to(n))
 		var hour := float(EditorInterface.get_editor_settings().get_project_metadata(SETTINGS_SECTION, "preview_hour", 12.0))
 		PlayHere.write(scene.scene_file_path, scene.global_transform.affine_inverse() * pos, yaw, room_path, hour)
+	print("[N64 Level Tools] Starting %s%s." % [scene.scene_file_path, (" at %s" % str(pos)) if pos != null else " at its default spawn"])
 	EditorInterface.play_current_scene()
 
 
-## Re-bakes every level of the open scene with the build's simplification (after _bake_all,
-## so lighting is current). Not undoable: the bake is derived data, and Bake redoes it.
-func _build_bake() -> void:
+## Build report (one-off): the open zone built as the export does, measured
+## (BuildReport) into build_reports/; the stored bakes stay as they are.
+func _build_report() -> void:
+	var scene := EditorInterface.get_edited_scene_root()
+	if scene == null or scene.scene_file_path.is_empty():
+		push_warning("N64 Level Tools: open and save a zone scene to report on.")
+		return
+	EditorInterface.save_scene()
+	_build_bake(scene, false, true)
+
+
+## Bakes the open zone as the export does (ExportBake) on a fresh copy of its saved scene,
+## in a hidden viewport, and stores each level's result as its bake (`store`). Not
+## undoable: the bake is derived data, and Bake redoes it. `report`: writes a build report
+## (BuildReport). Returns false when nothing could bake.
+func _build_bake(scene: Node, store := true, report := false) -> bool:
+	var t := Time.get_ticks_msec()
+	var copy: Node = load(scene.scene_file_path).instantiate()
+	var holder := SubViewport.new()
+	holder.own_world_3d = true
+	holder.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	EditorInterface.get_base_control().add_child(holder)
+	var result := ExportBake.bake_scene(copy, holder, scene.scene_file_path, report)
+	if report and not result.levels.is_empty():
+		var dir := ExportBake.BuildReport.write(result.levels, scene.scene_file_path.get_file().get_basename(), "one-off")
+		var errors := 0
+		var warnings := 0
+		for l in result.levels:
+			for p in l.problems:
+				errors += 1 if p.severity == "error" else 0
+				warnings += 1 if p.severity == "warning" else 0
+		print("[N64 Level Tools] Build report (%d error(s), %d warning(s)): %s" % [errors, warnings,
+			ProjectSettings.globalize_path(dir + "summary.md")])
+	var stored := 0
 	for root in _scene_level_roots():
-		if root.data == null or root.data.brushes.is_empty() or not LevelBaker.not_ready_reason(root.data).is_empty():
+		if not store:
+			break
+		var twin := copy.get_node_or_null(scene.get_path_to(root)) as LevelRoot
+		if twin == null or twin.data == null or not twin.data.has_bake():
 			continue
-		var t := Time.get_ticks_msec()
-		var result := LevelBaker.bake(root.data, root.merge_coplanar, true)
-		var s: Dictionary = result.stats
 		var data := root.data
-		data.baked_mesh = result.mesh
-		data.baked_chunks = result.chunks
-		data.set_baked_collision(result)
+		var built := twin.data
+		data.baked_mesh = built.baked_mesh
+		data.baked_chunks = built.baked_chunks
+		data.baked_collision = null
+		data.baked_collision_parts = built.baked_collision_parts
+		data.baked_collision_surfaces = built.baked_collision_surfaces
 		data.bake_hash = root.compute_hash()
-		data.bake_summary = "build: %d tris, %d surfaces in %d chunks (from %d tris; faces %d -> %d)" % [s.baked_tris,
-			s.surfaces, s.chunks, s.source_tris, s.simplified_from, s.simplified_to]
+		var tris := 0
+		for m in built.baked_meshes():
+			tris += m.get_faces().size() / 3
+		data.bake_summary = "build: %d tris in %d chunks" % [tris, maxi(built.baked_chunks.size(), 1)]
 		root._apply_bake()
-		print("[N64 Level Tools] Build bake %s: faces %d -> %d, %d tris, %d chunks, %d collision tris (%d ms)" % [root.name,
-			s.simplified_from, s.simplified_to, s.baked_tris, s.chunks, s.collision_tris, Time.get_ticks_msec() - t])
+		stored += 1
+		print("[N64 Level Tools] Build bake %s: %d tris, %d chunks" % [root.name, tris, maxi(built.baked_chunks.size(), 1)])
+	copy.free()
+	holder.queue_free()
+	for f in result.failed:
+		push_warning("N64 Level Tools: build bake skipped %s." % f)
+	print("[N64 Level Tools] Build bake done in %.1f s." % ((Time.get_ticks_msec() - t) / 1000.0))
+	return stored > 0 or result.failed.is_empty()
 
 
 ## Bakes ambient occlusion into the vertex AO channel of the active level (replacing the
@@ -692,11 +809,23 @@ func _on_action(action: StringName) -> void:
 		&"cleanup": _cleanup()
 		&"fence": _fence_from_selection()
 		&"rope": _start_rope()
+		&"prop": _place_prop()
+		&"sign": _place_sign()
+		&"tree": _place_tree()
+		&"drips": _add_roof_drips()
+		&"house": _place_house()
+		&"shop": _place_house(true)
+		&"stall_tent": _place_stall(MarketStall.Kind.TENT)
+		&"stall_carpet": _place_stall(MarketStall.Kind.CARPET)
+		&"stall_cart": _place_stall(MarketStall.Kind.CART)
+		&"stall_goods": _place_stall(MarketStall.Kind.GOODS)
+		&"window": _place_window()
 		&"ramp": _ramp()
 		&"move_dialog": _open_move_dialog()
 		&"grid_resize": _open_grid_resize_dialog()
 		&"play_here": _play_here()
 		&"build_play": _play_here(true)
+		&"build_report": _build_report()
 		&"bake_vertex_ao":
 			_bake_vertex_ao(panel.paint_panel.ao_add.button_pressed)
 		&"delete_faces": _delete_faces()
@@ -883,7 +1012,9 @@ func _active() -> LevelBrush:
 
 func _inspect_active() -> void:
 	if _active():
-		EditorInterface.inspect_object(_active(), "", true)
+		# A prop brush: its prop (kind + that kind's settings) is all there is to set.
+		var b := _active()
+		EditorInterface.inspect_object(b.prop if b.prop else b, "", true)
 
 
 func _select_brush(root: LevelRoot, brush: LevelBrush, additive: bool) -> void:
@@ -1408,6 +1539,7 @@ func _begin_drag(camera: Camera3D, handle: Drag, ctrl: bool) -> void:
 	drag_origin = _gizmo_center()
 	drag_axis = AXES[handle - Drag.AXIS_X] if handle <= Drag.AXIS_Z else Vector3.ZERO
 	if mode == Mode.OBJECT:
+		_take_house_openings()
 		drag_xforms.clear()
 		for b in sel_brushes:
 			drag_xforms.append(b.transform)
@@ -1485,6 +1617,23 @@ func _end_drag() -> void:
 	_commit_geometry(b, drag_geom_before, "Extrude" if drag_extruded else "Move Brush Vertices")
 
 
+## A house moves with the doors / windows in its walls: they join the selection.
+func _take_house_openings() -> void:
+	if level == null or level.data == null:
+		return
+	for h: LevelBrush in sel_brushes.duplicate():
+		if h == null or not h.is_house():
+			continue
+		var inv := h.transform.affine_inverse()
+		var reach := Vector3(h.house.width * 0.5, 0, h.house.depth * 0.5) + Vector3(0.1, 0, 0.1)
+		for o: LevelBrush in level.data.brushes:
+			if o == null or o in sel_brushes or o.opening_spec() == null:
+				continue
+			var p := inv * o.transform.origin
+			if absf(p.x) <= reach.x and absf(p.z) <= reach.z and p.y >= -0.1 and p.y <= h.house.wall_height() + 0.1:
+				sel_brushes.append(o)
+
+
 ## Parameter along a world line closest to the mouse ray.
 func _line_param(origin: Vector3, axis: Vector3, from: Vector3, dir: Vector3) -> float:
 	var w0 := origin - from
@@ -1502,6 +1651,8 @@ func _resize_handles() -> Array[Dictionary]:
 	if mode != Mode.OBJECT or sel_brushes.size() != 1 or _active() == null or _active().blend_file != "":
 		return out
 	var b := _active()
+	if b.is_prop():
+		return out  # sized in the Inspector (its pick box follows)
 	var box := b.resize_box()
 	var xf := _bxf(b)
 	var c := box.get_center()
@@ -1532,7 +1683,8 @@ func _begin_resize(camera: Camera3D, id: int) -> void:
 		drag_resize = {id = id, axis = h.axis, side = h.side, box = b.resize_box(), size = b.size,
 			transform = b.transform, verts = b.vertices.duplicate(), geom = b.snapshot(), fence_points = b.path_points().duplicate(),
 			passage = {width = b.passage.width, height = b.passage.height, depth = b.passage.depth} if b.is_passage() \
-				else ({width = b.door.width, height = b.door.height} if b.is_door() else {}),
+				else ({width = b.opening_spec().get(&"width"), height = b.opening_spec().get(&"height")} if b.opening_spec() \
+				else ({width = b.house.width, depth = b.house.depth} if b.is_house() else {})),
 			# Alt: grid-preserving (cells keep their size, new loops are added).
 			grid = Input.is_key_pressed(KEY_ALT),
 			cell = BrushOps.border_cell(b.vertices, h.axis, h.side)}
@@ -1575,8 +1727,21 @@ func _update_resize(camera: Camera3D) -> void:
 		xf.origin += xf.basis * off
 		b.size = s
 		b.transform = xf
-	elif b.is_passage() or b.is_door():
-		# A passage's / door's size: width (either side, the other stays), height (top),
+	elif b.is_house():
+		# A house's footprint: the dragged wall moves (to a grid line), the other stays.
+		if a != 1:
+			var xf: Transform3D = r.transform
+			var axis_w: Vector3 = (xf.basis * AXES[a]).normalized()
+			var at := xf.origin.dot(axis_w)
+			if r.side > 0:
+				nhi = maxf(snappedf(at + nhi, snap) - at, nlo + 2.0)
+			else:
+				nlo = minf(snappedf(at + nlo, snap) - at, nhi - 2.0)
+			b.house.set(&"width" if a == 0 else &"depth", nhi - nlo)
+			xf.origin += axis_w * ((nlo + nhi) - (lo + hi)) * 0.5
+			b.transform = xf
+	elif b.opening_spec() != null:
+		# A passage's / door's / window's size: width (either side, the other stays), height (top),
 		# a passage's depth (the far end; the threshold stays). The level rebuilds it.
 		var spec := b.opening_spec()
 		var xf: Transform3D = r.transform
@@ -1621,10 +1786,20 @@ func _end_resize() -> void:
 		return
 	var b := _active()
 	var r := drag_resize
-	if b.is_passage() or b.is_door():
+	if b.is_house():
+		var hur := get_undo_redo()
+		hur.create_action("Resize House", UndoRedo.MERGE_DISABLE, level)
+		for prop in r.passage:
+			hur.add_do_property(b.house, prop, b.house.get(prop))
+			hur.add_undo_property(b.house, prop, r.passage[prop])
+		hur.add_do_property(b, &"transform", b.transform)
+		hur.add_undo_property(b, &"transform", r.transform)
+		hur.commit_action(false)
+		return
+	if b.opening_spec() != null:
 		var spec := b.opening_spec()
 		var pur := get_undo_redo()
-		pur.create_action("Resize %s" % ("Door" if b.is_door() else "Passage"), UndoRedo.MERGE_DISABLE, level)
+		pur.create_action("Resize %s" % ("Door" if b.is_door() else ("Window" if b.is_window() else "Passage")), UndoRedo.MERGE_DISABLE, level)
 		for prop in r.passage:
 			pur.add_do_property(spec, prop, spec.get(prop))
 			pur.add_undo_property(spec, prop, r.passage[prop])
@@ -2303,6 +2478,304 @@ func _new_fence_at_view() -> void:
 	_add_fence_brush(start, PackedVector3Array([Vector3.ZERO, along * length]), false, style)
 
 
+## Drops a Signpost on whatever the view centre looks at, facing the camera (snapped to
+## 45°), and selects it.
+func _place_sign() -> void:
+	_place_prop(PropSpec.Kind.SIGN, {text = "Text for the sign goes here."})
+
+
+## Drops a tree (a tree prop brush) where the view centre looks, of the selected tree's
+## species (else the last one placed, sycamore at first) with a new seed, and selects it.
+func _place_tree() -> void:
+	for b in sel_brushes:
+		if b and b.is_prop() and b.prop.kind == PropSpec.Kind.TREE and b.prop.settings.get(&"species"):
+			_last_tree_species = b.prop.settings.species
+	var species: Resource = _last_tree_species
+	if species == null:
+		species = load("res://addons/n64_level_tools/trees/species/sycamore.tres")
+	_last_tree_species = species
+	_place_prop(PropSpec.Kind.TREE, {species = species, seed = randi_range(1, 99999)})
+
+
+var _last_tree_species: Resource
+
+
+## Drops a prop brush (`kind`, with `settings`) where the view centre looks, facing the
+## camera (45° steps), and selects it; its kind and settings are in the Inspector.
+func _place_prop(kind := PropSpec.Kind.SIGN, settings := {}) -> void:
+	if not _ensure_paint_level():
+		push_warning("N64 Level Tools: open a scene with a level first.")
+		return
+	var root := level
+	var camera := input_camera if input_camera and is_instance_valid(input_camera) else null
+	var at := root.global_position
+	var yaw := 0.0
+	if camera:
+		var hit := _pick(camera, camera.get_viewport().get_visible_rect().size * 0.5)
+		if not hit.is_empty():
+			at = hit.position
+		var to_cam := camera.global_position - at
+		yaw = snappedf(atan2(to_cam.x, to_cam.z), PI / 4.0)
+	var step := maxf(snap, 0.25)
+	at.x = snappedf(at.x, step)
+	at.z = snappedf(at.z, step)
+	var b := _prop_brush(root, kind, settings, root.global_transform.affine_inverse() * Transform3D(Basis(Vector3.UP, yaw), at))
+	var ur := get_undo_redo()
+	ur.create_action("Add Prop", UndoRedo.MERGE_DISABLE, root)
+	ur.add_do_method(root.data, &"add_brush", b)
+	ur.add_do_reference(b)
+	ur.add_undo_method(root.data, &"remove_brush", b)
+	ur.commit_action()
+	if mode != Mode.OBJECT:
+		_set_mode(Mode.OBJECT)
+	_select_brush(root, b, false)
+
+
+## A new prop brush (not yet in the level) at `xf` (level space).
+func _prop_brush(root: LevelRoot, kind: PropSpec.Kind, settings: Dictionary, xf: Transform3D, node_name := "") -> LevelBrush:
+	var spec := PropSpec.new()
+	spec.kind = kind
+	spec.settings = settings.duplicate()
+	spec.node_name = node_name
+	var b := LevelBrush.new()
+	b.tag = StringName("prop_%08x" % randi())
+	b.hand_edited = true
+	b.transform = xf
+	b.prop = spec
+	return b
+
+
+## Adds RainDrips along the level's house eaves and awnings (RoofDrips) under a "RainDrips"
+## node, skipping any drip already there by name (moved / deleted drips stay as left), as
+## one undo step.
+func _add_roof_drips() -> void:
+	if not _ensure_paint_level():
+		push_warning("N64 Level Tools: open a scene with a level first.")
+		return
+	var root := level
+	var done := {}  # houses that already have drips, and drip names taken
+	for b in root.data.brushes:
+		if b and b.is_prop() and b.prop.kind == PropSpec.Kind.RAIN_DRIP:
+			done[b.prop.node_name] = true
+			done[b.get_meta(&"house", "")] = true
+	var to_level := root.global_transform.affine_inverse()
+	var ur := get_undo_redo()
+	ur.create_action("Add Roof Drips", UndoRedo.MERGE_DISABLE, root)
+	var added := 0
+	for p in RoofDrips.plan(root):
+		if done.has(p.name) or done.has(p.house):
+			continue
+		var b := _prop_brush(root, PropSpec.Kind.RAIN_DRIP, {width = p.width, drop = p.drop}, to_level * p.transform, p.name)
+		b.set_meta(&"house", p.house)
+		ur.add_do_method(root.data, &"add_brush", b)
+		ur.add_do_reference(b)
+		ur.add_undo_method(root.data, &"remove_brush", b)
+		added += 1
+	ur.commit_action()
+	print("N64 Level Tools: added %d roof drips." % added)
+
+
+## Drops a HouseSpec house where the view centre looks (front facing the camera, snapped to
+## 90°), with a door to its own interior zone and a few windows, all cut into its walls and
+## undone as one; the house ends up selected.
+func _place_house(shop := false) -> void:
+	if not _ensure_paint_level():
+		push_warning("N64 Level Tools: open a scene with a level first.")
+		return
+	var root := level
+	var camera := input_camera if input_camera and is_instance_valid(input_camera) else null
+	var at := root.global_position
+	var yaw := 0.0
+	if camera:
+		var hit := _pick(camera, camera.get_viewport().get_visible_rect().size * 0.5)
+		if not hit.is_empty():
+			at = hit.position
+		var to_cam := camera.global_position - at
+		yaw = snappedf(atan2(to_cam.x, to_cam.z), PI / 2.0)
+	var step := maxf(snap, 0.25)
+	at.x = snappedf(at.x, step)
+	at.z = snappedf(at.z, step)
+	var spec := HouseSpec.new()
+	if shop:
+		spec.shopfront = true
+		spec.storeys = 2
+		spec.width = 7.0
+	var b := LevelBrush.new()
+	b.tag = StringName("house_%08x" % randi())
+	b.hand_edited = true
+	b.transform = root.global_transform.affine_inverse() * Transform3D(Basis(Vector3.UP, yaw), at)
+	b.house = spec
+	root.data.add_brush(b)
+	root._generate_house(b)
+	var added: Array[LevelBrush] = [b]
+	var carved := {}  # other brush -> snapshot before (cuts into anything already there)
+	var hw := spec.width * 0.5
+	var hd := spec.depth * 0.5
+	var t := spec.wall_thickness
+	var wall_tex := root._palette_index(spec.wall_texture)
+	# The door: front wall, left of centre, to an interior zone of its own (the nowhere room
+	# until that scene exists).
+	var door := _new_door_spec(1.1, 2.2)
+	door.mode = Door.Mode.ZONE
+	var scene_root := EditorInterface.get_edited_scene_root()
+	var dir := scene_root.scene_file_path.get_base_dir() if scene_root and scene_root.scene_file_path != "" else "res://zones"
+	door.target_zone = "%s/interiors/%s.tscn" % [dir, door.door_id]
+	door.target_spawn = &"default"
+	door.spawn_id = door.door_id
+	door.wall_depth = t
+	door.lining = true
+	door.wall_texture = wall_tex
+	door.wall_color = spec.wall_color
+	door.floor_texture = wall_tex
+	door.floor_color = spec.inside_color
+	door.panel_texture = load("res://textures/doors/wood_plank_door.res")
+	var casing := WindowSpec.default_dressing()
+	casing.side_width = 0.12
+	casing.top_height = 0.15
+	door.dressing = casing
+	var door_x := -minf(1.4, hw - 1.0)
+	if not shop:
+		_add_opening(root, b.transform * Transform3D(Basis(), Vector3(door_x, spec.foundation, hd - t * 0.5)), door, &"door", added, carved)
+	# Windows: the front's right in every storey (and above the door upstairs), one in each
+	# side wall per storey. A shop's open front has none downstairs; upstairs gets two.
+	for k in spec.storeys:
+		var sill := spec.foundation + k * spec.storey_height + 1.0
+		var spots := []
+		if not (shop and k == 0):
+			spots.append([Vector3(hw * 0.45, sill, hd - t * 0.5), 0.0])
+		if k > 0:
+			spots.append([Vector3(door_x, sill, hd - t * 0.5), 0.0])
+		spots.append([Vector3(hw - t * 0.5, sill, 0), PI / 2.0])
+		spots.append([Vector3(-hw + t * 0.5, sill, 0), -PI / 2.0])
+		for s in spots:
+			var w := WindowSpec.new()
+			w.wall_depth = t
+			w.wall_texture = wall_tex
+			w.wall_color = spec.wall_color
+			w.dressing = WindowSpec.default_dressing()
+			_add_opening(root, b.transform * Transform3D(Basis(Vector3.UP, s[1]), s[0]), w, &"window", added, carved)
+	var ur := get_undo_redo()
+	ur.create_action("Add House", UndoRedo.MERGE_DISABLE, root)
+	for nb in added:
+		ur.add_do_method(root.data, &"add_brush", nb)
+		ur.add_do_reference(nb)
+		ur.add_undo_method(root.data, &"remove_brush", nb)
+	for ob: LevelBrush in carved:
+		var after := ob.snapshot()
+		for key in after:
+			ur.add_do_property(ob, key, after[key])
+			ur.add_undo_property(ob, key, carved[ob][key])
+	# A shop's sign: a wall sign (prop brush) over the awning, its face in the in-game script.
+	if shop:
+		var local := Transform3D(Basis(), Vector3(0, spec.foundation + spec.shop_height + 0.8, hd))
+		var sb := _prop_brush(root, PropSpec.Kind.SIGN, {kind = Signpost.Kind.WALL, board_size = Vector2(1.6, 0.45),
+			text = "shop"}, b.transform * local)
+		root.data.add_brush(sb)
+		ur.add_do_method(root.data, &"add_brush", sb)
+		ur.add_do_reference(sb)
+		ur.add_undo_method(root.data, &"remove_brush", sb)
+	ur.commit_action(false)
+	if mode != Mode.OBJECT:
+		_set_mode(Mode.OBJECT)
+	sel_brushes = [b]
+	_inspect_active()
+
+
+## Drops a MarketStall of `kind` where the view centre looks, facing the camera (45°
+## steps), and selects it.
+func _place_stall(kind: MarketStall.Kind) -> void:
+	var settings := {kind = kind, goods_seed = randi() % 1000}
+	if kind == MarketStall.Kind.CART:
+		settings.size = Vector2(1.6, 1.0)
+	elif kind == MarketStall.Kind.GOODS:
+		settings.size = Vector2(1.2, 1.0)
+	_place_prop(PropSpec.Kind.STALL, settings)
+
+
+## Cuts a window into the wall where the view centre looks (centred there, snapped along
+## the wall) and selects it.
+func _place_window() -> void:
+	if not _ensure_paint_level():
+		push_warning("N64 Level Tools: open a scene with a level first.")
+		return
+	var camera := input_camera if input_camera and is_instance_valid(input_camera) else null
+	if camera == null:
+		return
+	var hit := _pick(camera, camera.get_viewport().get_visible_rect().size * 0.5)
+	if hit.is_empty() or absf(hit.normal.y) > 0.5:
+		push_warning("N64 Level Tools: Window: look at a wall (the view's centre) and try again.")
+		return
+	var root: LevelRoot = hit.root
+	var n: Vector3 = Vector3(hit.normal.x, 0, hit.normal.z).normalized()
+	# The wall's thickness: its far face behind the hit (else a thin wall).
+	var depth := 0.3
+	var back := _ray_scene(hit.position - n * 0.01, -n, true)
+	if not back.is_empty() and back.position.distance_to(hit.position) < 1.5:
+		depth = back.position.distance_to(hit.position)
+	var spec := WindowSpec.new()
+	spec.wall_depth = depth
+	var wall: LevelBrush = hit.brush
+	spec.wall_texture = wall.get_face_texture(hit.face)
+	var wuv := wall.get_face_uv(hit.face)
+	spec.wall_uv = Vector4(wuv.x, wuv.y, wuv.z, fposmod(wuv.w, 360.0))
+	spec.wall_color = PassageBuilder.face_color(wall, hit.face)
+	spec.dressing = WindowSpec.default_dressing()
+	var basis := Basis(Vector3.UP.cross(n), Vector3.UP, n)
+	var step := maxf(snap, 0.05)
+	var at: Vector3 = hit.position - n * depth * 0.5
+	var along := basis.x.dot(at)
+	at += basis.x * (snappedf(along, step) - along)
+	at.y = snappedf(hit.position.y - spec.height * 0.5, step)
+	var added: Array[LevelBrush] = []
+	var carved := {}
+	var wb := _add_opening(root, root.global_transform.affine_inverse() * Transform3D(basis, at), spec, &"window", added, carved)
+	var ur := get_undo_redo()
+	ur.create_action("Add Window", UndoRedo.MERGE_DISABLE, root)
+	ur.add_do_method(root.data, &"add_brush", wb)
+	ur.add_do_reference(wb)
+	ur.add_undo_method(root.data, &"remove_brush", wb)
+	for ob: LevelBrush in carved:
+		var after := ob.snapshot()
+		for key in after:
+			ur.add_do_property(ob, key, after[key])
+			ur.add_undo_property(ob, key, carved[ob][key])
+	ur.commit_action(false)
+	if mode != Mode.OBJECT:
+		_set_mode(Mode.OBJECT)
+	sel_brushes = [wb]
+	_inspect_active()
+
+
+## Adds a door / window brush at `xf` (level space) with `spec`, cuts its opening now and adds
+## it to the level. `added` gets the brush; `carved` gets the snapshot before of every other
+## brush the cut changed (for the caller's undo; brushes in `added` are new, so skipped).
+func _add_opening(root: LevelRoot, xf: Transform3D, spec: OpeningSpec, kind: StringName, added: Array[LevelBrush],
+		carved: Dictionary) -> LevelBrush:
+	var ob := LevelBrush.new()
+	ob.tag = StringName("%s_%08x" % [kind, randi()])
+	ob.hand_edited = true
+	ob.transform = xf
+	var oxf := spec.opening_xf(ob.transform)
+	var snaps := {}
+	for other in root.data.brushes:
+		if other and not other in added and not carved.has(other):
+			snaps[other] = other.snapshot()
+	var cuts := PassageBuilder.carve_opening(root, root.global_transform * oxf, spec.opening_size().x, spec.opening_size().y,
+		spec.carve_depth(), ob.tag, spec.trim(), spec.shape())
+	for c in cuts:
+		if not c.brush in added and not carved.has(c.brush):
+			carved[c.brush] = snaps.get(c.brush, c.before)
+	spec.mark_carved(oxf)
+	if kind == &"door":
+		ob.door = spec
+	else:
+		ob.window = spec
+	root.data.add_brush(ob)
+	_passage_seen[ob] = _passage_key(ob)
+	added.append(ob)
+	return ob
+
+
 ## Adds a fence brush at `origin` (world) with `points` relative to it, selected.
 func _add_fence_brush(origin: Vector3, points: PackedVector3Array, closed: bool, style: FenceStyle) -> LevelBrush:
 	var b := LevelBrush.new()
@@ -2648,6 +3121,11 @@ func _duplicate_brushes() -> void:
 	ur.create_action("Duplicate Brushes", UndoRedo.MERGE_DISABLE, level)
 	for b in sel_brushes:
 		var copy := b.duplicate() as LevelBrush
+		if b.prop:
+			# Its own prop (a shallow copy would share one with the original).
+			var spec := b.prop.duplicate() as PropSpec
+			spec.settings = b.prop.settings.duplicate(true)
+			copy.prop = spec
 		copies.append(copy)
 		ur.add_do_method(level.data, &"add_brush", copy)
 		ur.add_do_reference(copy)
@@ -2735,13 +3213,17 @@ func _paint_input(camera: Camera3D, event: InputEvent) -> int:
 			return AFTER_GUI_INPUT_STOP
 		if paint.scatter.is_stroking() and paint_hit:
 			paint.scatter.stroke_to(paint_hit.position)
+		if paint.grass.is_stroking() and paint_hit:
+			paint.grass.stroke_to(paint_hit.position)
+		if paint.trees.is_stroking() and paint_hit:
+			paint.trees.stroke_to(paint_hit.position)
 		if paint.is_stroking() and paint_hit:
 			if paint.tool == LevelPaintTool.Tool.FACE:
 				paint.paint_face(paint_hit.root, paint_hit.brush, paint_hit.face)
 			else:
 				paint.stroke_to(paint_hit.position)
 		update_overlays()
-		return AFTER_GUI_INPUT_STOP if paint.is_stroking() or paint.scatter.is_stroking() else AFTER_GUI_INPUT_PASS
+		return AFTER_GUI_INPUT_STOP if paint.is_stroking() or paint.scatter.is_stroking() or paint.grass.is_stroking() or paint.trees.is_stroking() else AFTER_GUI_INPUT_PASS
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if not event.pressed:
 			_region_cache = {}  # neighbours may have changed
@@ -2749,6 +3231,11 @@ func _paint_input(camera: Camera3D, event: InputEvent) -> int:
 				paint.scatter.end()
 				update_overlays()
 				return AFTER_GUI_INPUT_STOP
+			for t in [paint.grass, paint.trees]:
+				if t.is_stroking():
+					t.end()
+					update_overlays()
+					return AFTER_GUI_INPUT_STOP
 			if not _grad.is_empty():
 				paint.gradient.commit()
 				_grad_last = {basis = _grad.basis, normal = _grad.normal, dragged = _grad.dragged}
@@ -2835,6 +3322,13 @@ func _paint_input(camera: Camera3D, event: InputEvent) -> int:
 					push_warning("N64 Level Tools: add items to scatter first (Scatter section).")
 				else:
 					paint.scatter.begin(hit.root, hit.position, paint.size, erase)
+			LevelPaintTool.Tool.GRASS:
+				paint.grass.begin(hit.root, hit.position, paint.size, erase)
+			LevelPaintTool.Tool.TREES:
+				if paint.trees.species.is_empty() and not erase:
+					push_warning("N64 Level Tools: pick the species to plant first (Trees section).")
+				else:
+					paint.trees.begin(hit.root, hit.position, paint.size, erase)
 			LevelPaintTool.Tool.GRADIENT:
 				if paint.layer <= 0 or paint.layer > hit.root.data.active_layers().size():
 					push_warning("N64 Level Tools: the gradient paints overlay layers: select (or add) one.")
@@ -3249,10 +3743,21 @@ func _sync_paint_panel() -> void:
 		panel.paint_panel.set_data(level.data if _level_ok() else null)
 		_refresh_mask_sets()
 		panel.paint_panel.set_scatter_state(paint.scatter)
+		panel.paint_panel.set_grass_state(paint.grass, paint.trees)
 		panel.paint_panel.set_gradient_state(paint.gradient)
 
 
 func _on_paint_brush_changed(property: StringName, value: Variant) -> void:
+	if property == &"grass_height":
+		paint.grass.height = value
+		return
+	if String(property).begins_with("trees_"):
+		var key := String(property).trim_prefix("trees_")
+		if key == "species":
+			paint.trees.species.assign(value)
+		else:
+			paint.trees.set(key, value)
+		return
 	if String(property).begins_with("gradient_"):
 		paint.gradient.set(String(property).trim_prefix("gradient_"), value)
 		_grad_hover = {}
@@ -3883,6 +4388,18 @@ func _draw_paint_cursor(overlay: Control, camera: Camera3D) -> void:
 			var region := _border_region(paint_hit)
 			_show_fill_preview(paint_hit.root, region, color)
 			_draw_border_sides(overlay, camera, _border_outline(paint_hit.root, region))
+		LevelPaintTool.Tool.GRASS, LevelPaintTool.Tool.TREES:
+			# The brush circle, level on the ground.
+			_hide_fill_preview()
+			var prev := Vector3.ZERO
+			for i in 33:
+				var a := TAU * i / 32.0
+				var p: Vector3 = paint_hit.position + Vector3(cos(a), 0.0, sin(a)) * paint.size + Vector3.UP * 0.02
+				if i > 0:
+					_line3d(overlay, camera, prev, p, color, 2.0)
+				prev = p
+			if paint.tool == LevelPaintTool.Tool.GRASS and not Input.is_key_pressed(KEY_SHIFT):
+				_line3d(overlay, camera, paint_hit.position, paint_hit.position + Vector3.UP * paint.grass.height, color, 2.0)
 		LevelPaintTool.Tool.PLACE:
 			_hide_fill_preview()
 			var n: Vector3 = paint_hit.normal
@@ -4227,6 +4744,9 @@ func _paint_escape() -> void:
 		paint.end_stroke()
 	if paint.scatter.is_stroking():
 		paint.scatter.end()
+	for t in [paint.grass, paint.trees]:
+		if t.is_stroking():
+			t.end()
 	if _paint_saved_tool >= 0:
 		paint.tool = _paint_saved_tool
 		_paint_saved_tool = -1
@@ -4851,7 +5371,7 @@ func _cut_room_floor(root: LevelRoot, b: LevelBrush, world_xf: Transform3D, widt
 	var probe := world_xf.origin + world_xf.basis.z.normalized() * 0.05 + Vector3.UP * 0.5
 	var best := {}
 	for other: LevelBrush in root.data.brushes:
-		if other == null or other == b or other.is_passage() or other.is_door() or other.is_fence() or other.is_rope():
+		if other == null or other == b or other.opening_spec() != null or other.is_fence() or other.is_rope():
 			continue
 		var bxf := root.brush_global_transform(other)
 		var inv := bxf.affine_inverse()
@@ -5436,6 +5956,14 @@ func _bake_all() -> void:
 		if not not_ready.is_empty():
 			push_error("N64 Level Tools: not baking %s: %s. Wait a moment (or restart the editor) and bake again." % [root.name, not_ready])
 			continue
+		# Vertices no face uses (bakes before 2026-11-09 added some to ground brushes on
+		# every run): trimmed, so they don't bloat the file or get lit / AO'd for nothing.
+		var dropped := 0
+		for brush in root.data.brushes:
+			if brush:
+				dropped += brush.drop_unused_vertices()
+		if dropped > 0:
+			print("N64 Level Tools: %s: dropped %d unused vertices." % [root.name, dropped])
 		var relit := {}
 		if LevelData.mode_is_timed(root.data.lighting_mode):
 			# Timed levels re-light per key before baking (applied directly; part of this bake).
@@ -5457,6 +5985,8 @@ func _bake_all() -> void:
 				brush.corner_lighting = relit[brush]
 				relit[brush] = [old, relit[brush]]
 				brush.set_block_signals(false)
+		# The light rain catches around the lamps (every lamp, baked or live).
+		LevelLighting.bake_rain_light(root, roots + _dressing_occluders(), lights)
 		var result := LevelBaker.bake(root.data, root.merge_coplanar)
 		var s: Dictionary = result.stats
 		var summary := "%d tris, %d surfaces in %d chunks (from %d tris, %d brushes)" % [s.baked_tris, s.surfaces, s.chunks, s.source_tris, s.brushes]
@@ -5473,6 +6003,12 @@ func _bake_all() -> void:
 		print("[N64 Level Tools] Baked %s: %d brushes, %d -> %d tris, %d interior faces culled, %d coplanar faces merged, %d degenerate tris removed, %d verts, %d surfaces, %d chunks, %d collision tris" % [
 			root.name, s.brushes, s.source_tris, s.baked_tris, s.culled_faces, s.merged_faces,
 			s.degenerate_tris, s.baked_verts, s.surfaces, s.chunks, s.collision_tris])
+		# What's past the walls: the zones the passages lead to, low and flat (and a painted
+		# ring of what's further off).
+		var zones: Array[String] = await NeighbourBackdrop.bake(root, EditorInterface.get_base_control())
+		if not zones.is_empty():
+			root._apply_bake()
+			print("[N64 Level Tools] Backdrop for %s from %s" % [root.name, ", ".join(zones.map(func(z): return z.get_file().get_basename()))])
 
 
 ## Lighting undo ops for one level: per-key bakes for Baked Timed, else a single bake.
@@ -5481,6 +6017,8 @@ func _add_lighting_ops(ur: EditorUndoRedoManager, root: LevelRoot, roots: Array,
 	var corners := 0
 	if mode < 0:
 		mode = root.data.lighting_mode
+	# The light rain catches around the lamps (every lamp, baked or live; not undone).
+	LevelLighting.bake_rain_light(root, roots + _dressing_occluders(), lights)
 	if LevelData.mode_is_timed(mode):
 		var schedule := LightingSchedule.load_project()
 		if schedule == null:

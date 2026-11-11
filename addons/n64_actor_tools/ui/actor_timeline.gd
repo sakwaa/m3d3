@@ -68,6 +68,14 @@ func _init() -> void:
 	_btn(lb, "New from", _duplicate_anim, "Copy of the selected animation")
 	_btn(lb, "Mirrored copy", _mirror_anim, "Copy with left and right swapped")
 	_btn(lb, "Delete", _delete_anim)
+	var io := HFlowContainer.new()
+	left.add_child(io)
+	_btn(io, "Import…", func(): _file_dialog(EditorFileDialog.FILE_MODE_OPEN_FILE, ["*.tres ; Animation"], _import_anim),
+		"Add an animation saved as a .tres (Export, or the reference tools)")
+	_btn(io, "Export…", func(): _file_dialog(EditorFileDialog.FILE_MODE_SAVE_FILE, ["*.tres ; Animation"], _export_anim),
+		"Save the selected animation as a .tres (to share between characters, or keep a version)")
+	_btn(io, "From spec…", func(): _file_dialog(EditorFileDialog.FILE_MODE_OPEN_FILE, ["*.json ; Animation spec"], _spec_anim),
+		"Build an animation from a spec of key poses as joint angles (tools/anim_ref: measured from video)")
 	var gr := HBoxContainer.new()
 	left.add_child(gr)
 	_gen = OptionButton.new()
@@ -350,6 +358,54 @@ func _generate() -> void:
 	var anims := model.data.animations.duplicate()
 	anims.append(a)
 	_set_anims("Generate %s" % kind, anims, anims.size() - 1)
+
+
+func _file_dialog(mode: EditorFileDialog.FileMode, filters: PackedStringArray, done: Callable) -> void:
+	if model == null:
+		return
+	var d := EditorFileDialog.new()
+	d.file_mode = mode
+	d.access = EditorFileDialog.ACCESS_RESOURCES
+	d.filters = filters
+	d.current_dir = "res://references/anims"
+	d.file_selected.connect(func(path: String):
+		done.call(path)
+		d.queue_free())
+	d.canceled.connect(d.queue_free)
+	EditorInterface.get_base_control().add_child(d)
+	d.popup_file_dialog()
+
+
+func _import_anim(path: String) -> void:
+	var src := load(path) as ActorAnimation
+	if src == null:
+		push_error("Actor tools: %s isn't an ActorAnimation." % path)
+		return
+	var a := src.duplicate(true) as ActorAnimation
+	a.name = _unique(a.name)
+	var anims := model.data.animations.duplicate()
+	anims.append(a)
+	_set_anims("Import Animation", anims, anims.size() - 1)
+
+
+func _export_anim(path: String) -> void:
+	var a := _anim()
+	if a == null:
+		return
+	var err := ResourceSaver.save(a.duplicate(true), path)
+	print("Actor tools: exported %s to %s (%s)" % [a.name, path, error_string(err)])
+
+
+func _spec_anim(path: String) -> void:
+	var spec := ActorAnimSpec.load_spec(path)
+	if spec.is_empty():
+		push_error("Actor tools: %s isn't a valid animation spec." % path)
+		return
+	var a := ActorAnimSpec.build(model, spec)
+	a.name = _unique(a.name)
+	var anims := model.data.animations.duplicate()
+	anims.append(a)
+	_set_anims("Animation From Spec", anims, anims.size() - 1)
 
 
 func _unique(base: String) -> String:

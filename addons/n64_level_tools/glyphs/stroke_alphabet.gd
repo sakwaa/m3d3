@@ -335,6 +335,9 @@ static func _put(img: Image, p: Vector2i) -> void:
 
 # --- Banners -----------------------------------------------------------------------------
 
+const GlyphText := preload("res://addons/n64_level_tools/glyphs/glyph_text.gd")
+## A word symbol's side, in stroke sizes (`px`): about a word outline's height.
+const SYMBOL_SIZE := 2.0
 const PUNCT := {
 	".": [[Vector2(0, -1.75), Vector2(1.25, -1.25), Vector2(1.75, 0), Vector2(1.25, 1.25), Vector2(0, 1.75),
 		Vector2(-1.25, 1.25), Vector2(-1.75, 0), Vector2(-1.25, -1.25), Vector2(0, -1.75)]],
@@ -370,6 +373,11 @@ func draw(img: Image, items: Array, area: Rect2i, ink: Color, px: float) -> Dict
 				pieces[-1].image = _beside(pieces[-1].image, p, join)
 			else:
 				pieces.append({image = p, newline = false})  # a dash: a line of its own
+		elif it.has("symbol"):
+			# A word symbol (GlyphText.symbol_image), about as tall as a word's outline.
+			var s := GlyphText.symbol_image(self, it.symbol, mini(roundi(px * SYMBOL_SIZE), area.size.x))
+			if s:
+				pieces.append({image = s, newline = false})
 		else:
 			pieces.append({image = word_image(it, px, scale, area.size.x), newline = false})
 	var cols := [[]]

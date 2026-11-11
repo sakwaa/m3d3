@@ -12,6 +12,9 @@ extends Resource
 ##     (which of them it is); a number left empty gets the automatic tally.
 ##   - Syllables (optional): any consonant + vowel drawn whole; an empty square is the base
 ##     shape and the vowel mark laid over each other.
+##   - Word symbols (optional): one glyph for a whole word, like a kanji, for special names
+##     (token "@" + the word). A sign writes the word with it, or spelled out, as its
+##     inspector says (Signpost: Word symbols).
 ## Dark pixels are ink (draw in black; the template's light blue guides are ignored, and a
 ## white background is fine). Words that sound alike carry a spelling mark: a line under
 ## the word with tally ticks. Tooling only: the text is baked into textures; this resource,
@@ -46,6 +49,11 @@ const NAMES := {"_": ["none", "vowel"], "P": ["p", "pin"], "B": ["b", "bin"], "T
 @export_storage var glyphs := {}:
 	set(v):
 		glyphs = v
+		_dirty()
+## The words that have a symbol square (drawn or still empty), in the order they were added.
+@export_storage var symbol_words := PackedStringArray():
+	set(v):
+		symbol_words = v
 		_dirty()
 ## A filled-in template (PNG), for drawing in another program; squares drawn in the Script
 ## Builder win over it. Editing / reimporting it rebuilds whatever uses it.
@@ -117,6 +125,8 @@ func _dirty() -> void:
 func zones_for(token: String) -> Array[Rect2i]:
 	if token in PUNCT:  # before the prefix checks: "-", "--" and "." are punctuation
 		return [Rect2i(margin, margin, CELL - margin * 2, CELL - margin * 2)]
+	if token.begins_with(SYMBOL):
+		return [Rect2i(0, 0, CELL, CELL)]
 	if token.begins_with("#"):
 		return [zone_spell]
 	if token.begins_with("~"):
@@ -131,6 +141,23 @@ func zones_for(token: String) -> Array[Rect2i]:
 func content_key() -> int:
 	var img := _template_image()
 	return hash([img.get_data() if img else PackedByteArray(), glyphs, proportional, glyph_gap, word_gap, zone_spell])
+
+
+## Word symbols' tokens: SYMBOL + the word (lower case).
+const SYMBOL := "@"
+
+
+static func symbol_token(word: String) -> String:
+	return SYMBOL + word.to_lower()
+
+
+## The words with a symbol drawn.
+func drawn_symbols() -> PackedStringArray:
+	var out := PackedStringArray()
+	for w in symbol_words:
+		if cell(symbol_token(w)) != null:
+			out.append(w)
+	return out
 
 
 ## The token for spelling mark `n` (1 .. SPELL_MARKS).
@@ -438,6 +465,13 @@ func draw(img: Image, items: Array, area: Rect2i, ink: Color, _px := 0.0) -> Dic
 	for it in items:
 		if it.has("line"):
 			words.append(null)
+		elif it.has("symbol"):
+			# A word symbol keeps its whole square (they read as a set, like kanji).
+			var s := cell(symbol_token(it.symbol))
+			if s == null:
+				missing.append("symbol " + it.symbol)
+			else:
+				words.append(s)
 		elif it.has("punct"):
 			var p := cell(it.punct)
 			if p == null:

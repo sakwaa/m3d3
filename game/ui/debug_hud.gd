@@ -2,7 +2,9 @@ class_name DebugHud
 extends CanvasLayer
 ## Development overlay: zone, room, clock and flags.
 ## F3 toggle, hold T to fast-forward time, F2 save slot 0, F4 load slot 0, F6 next weather,
-## F7 profiler, F8 actor state labels, F9 collision view (surfaces), F11 fullscreen.
+## F7 profiler, F8 actor state labels, F9 collision view (surfaces), F10 wireframe (over
+## the game, lines only, off: where the triangles pile up), F11 fullscreen,
+## F5 warp to the climb sandbox (zones/debug: never exported).
 
 const FAST_TIME_SCALE := 60.0
 ## Profiler budgets (rough N64 / OoT-style targets); counts turn yellow past 80 %, red past 100 %.
@@ -11,6 +13,8 @@ const BUDGET_DRAW_CALLS := 150
 const BUDGET_FRAME_MS := 1000.0 / 60.0
 ## Profiler refresh interval (seconds); min / max cover the last second.
 const PROFILE_INTERVAL := 0.25
+
+const CLIMB_SANDBOX := "res://zones/debug/climb_sandbox/climb_sandbox.tscn"
 
 var _label: Label
 var _profile: RichTextLabel
@@ -21,6 +25,7 @@ var _shown_worst := 0.0
 var _peak_tris := 0
 var _shown_peak_tris := 0
 var _collision_view: CollisionView
+var _wireframe: WireframeView
 
 
 func _init() -> void:
@@ -68,6 +73,18 @@ func _unhandled_key_input(event: InputEvent) -> void:
 				_collision_view = CollisionView.new()
 				get_tree().root.add_child(_collision_view)
 				visible = true
+		KEY_F10:
+			if _wireframe == null:
+				_wireframe = WireframeView.new()
+				get_tree().root.add_child(_wireframe)
+			elif _wireframe.mode == WireframeView.Mode.OVERLAY:
+				_wireframe.mode = WireframeView.Mode.LINES
+			else:
+				_wireframe.queue_free()
+				_wireframe = null
+		KEY_F5:
+			if OS.is_debug_build() and ResourceLoader.exists(CLIMB_SANDBOX):
+				ZoneManager.travel(CLIMB_SANDBOX)
 		KEY_F11:
 			var full := DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
 			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_MAXIMIZED if full else DisplayServer.WINDOW_MODE_FULLSCREEN)
@@ -92,7 +109,7 @@ func _process(delta: float) -> void:
 		"Weather: %s%s" % [GameState.weather, "" if GameState.weather_blend >= 1.0 else " (from %s)" % GameState.weather_from],
 		"Flags: %s" % (", ".join(GameState.flags.keys()) if not GameState.flags.is_empty() else "none"),
 		"Items: %s" % (", ".join(GameState.items.keys().map(func(id): return "%s x%d" % [id, GameState.items[id]])) if not GameState.items.is_empty() else "none"),
-		"[F3] hud  [T] fast time  [F2] save  [F4] load  [F6] weather  [F7] profiler  [F9] collision  [F11] fullscreen",
+		"[F3] hud  [T] fast time  [F2] save  [F4] load  [F6] weather  [F7] profiler  [F9] collision  [F10] wireframe  [F11] fullscreen",
 	]
 	if _collision_view:
 		var player := get_tree().get_first_node_in_group(&"player") as Actor

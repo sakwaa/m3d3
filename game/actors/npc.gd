@@ -21,6 +21,9 @@ const PUSH := 2.6
 ## Hand-placed NPCs: what they say.
 @export var dialogue: Dialogue
 @export var dialogue_entry := ""
+## Hand-placed NPCs: feeding the birds (BirdFlock): they come down around it instead of
+## keeping away. Scheduled NPCs do while staying with an animation named "Feed…".
+@export var feeding_birds := false
 
 ## Scheduled NPCs: set by Schedules.
 var schedule: NpcSchedule
@@ -55,6 +58,18 @@ func _ready() -> void:
 		body.add_child(_def.model.instantiate())
 	else:
 		body.add_child(_stand_in(_def.name_color if _def else Color(0.8, 0.7, 0.6)))
+		# Debug builds: name the stand-in so schedules can be followed in play.
+		if OS.is_debug_build() and _def:
+			var tag := Label3D.new()
+			tag.text = _def.get_display_name()
+			tag.modulate = _def.name_color
+			tag.outline_modulate = Color(0, 0, 0, 0.8)
+			tag.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+			tag.fixed_size = true
+			tag.pixel_size = 0.0012
+			tag.font_size = 22
+			tag.position.y = BODY_HEIGHT + 0.35
+			add_child(tag)
 	_build_machines()
 	talkable = Talkable.new()
 	talkable.prompt = "Talk"
@@ -145,6 +160,16 @@ func set_entry(e: ScheduleEntry) -> void:
 			play_state_animation()
 
 
+## Birds come to it rather than flying off (BirdFlock): feeding them, hand-placed
+## (feeding_birds) or at a schedule spot with a "Feed…" animation, once it's there.
+func feeds_birds() -> bool:
+	if feeding_birds:
+		return true
+	if entry == null or entry.activity != ScheduleEntry.Activity.STAY:
+		return false
+	return String(entry.animation).to_lower().begins_with("feed") and global_position.distance_to(goal) < 0.5
+
+
 func _update_dialogue() -> void:
 	if talkable == null:
 		return
@@ -175,7 +200,9 @@ func drive(delta: float) -> void:
 		intent.move = to / d * (1.0 if d > CATCH_UP else 0.5)
 		_push_player(to / d)
 	elif not goal_facing.is_zero_approx():
-		facing = facing.slerp(goal_facing.normalized(), clampf(6.0 * delta, 0.0, 1.0)).normalized()
+		# Turn by yaw (slerp has no axis between opposite facings).
+		var yaw := lerp_angle(atan2(facing.x, facing.z), atan2(goal_facing.x, goal_facing.z), clampf(6.0 * delta, 0.0, 1.0))
+		facing = Vector3(sin(yaw), 0.0, cos(yaw))
 
 
 ## Walks through the player (no collision between them) and shoves them aside.

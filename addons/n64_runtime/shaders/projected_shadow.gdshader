@@ -9,11 +9,20 @@ stencil_mode read, compare_not_equal, 1;
 #include "res://addons/n64_runtime/shaders/n64_sampling.gdshaderinc"
 
 uniform sampler2D depth_tex : hint_depth_texture, filter_nearest;
-uniform sampler2D silhouette : filter_nearest;
+uniform sampler2D silhouette : filter_linear;
 uniform vec3 to_light = vec3(0.0, 1.0, 0.0);
 uniform float strength = 0.55;
 /// Surfaces turned away from the light by less than this (dot) fade out.
 uniform float normal_fade = 0.08;
+/// Blur (metres): at the caster's feet, and added per metre the shadow falls past them, so
+/// it's soft right under the actor and softer further out, like the N64's blurry shadows.
+uniform float blur = 0.07;
+uniform float blur_spread = 0.045;
+/// Box-local height of the caster's feet, the box's length along the light and its width
+/// (metres), from ProjectedShadow.
+uniform float feet_y = 0.0;
+uniform float reach_m = 4.0;
+uniform float size_m = 2.0;
 
 varying flat mat4 world_to_box;
 
@@ -37,10 +46,16 @@ void fragment() {
 	float facing = smoothstep(0.0, normal_fade, dot(n, to_light));
 	// Fade only the last few % of the box, so long shadows stay solid to the head.
 	float reach = smoothstep(-0.5, -0.42, local.y);
-	// N64 3-point blend between silhouette texels (same switch as level textures), so the
-	// edge fades across the surface instead of stepping in hard pixels.
+	// Blurred silhouette: a centre tap, an inner ring and an outer ring of filtered taps,
+	// wider the further the shadow falls from the feet (never hard texel steps).
 	vec2 suv = local.xz + 0.5;
-	float a = n64_three_point ? n64_sample_level(silhouette, suv, 0).a : texture(silhouette, suv).a;
+	float r = (blur + blur_spread * max((feet_y - local.y) * reach_m, 0.0)) / size_m;
+	float a = texture(silhouette, suv).a * 0.2;
+	for (int i = 0; i < 8; i++) {
+		float ang = float(i) * 0.785398;
+		vec2 d = vec2(cos(ang), sin(ang)) * r;
+		a += texture(silhouette, suv + d).a * 0.06 + texture(silhouette, suv + d * 0.45).a * 0.04;
+	}
 	ALBEDO = vec3(0.0);
 	// Fogged ground hides the shadow too (fog itself isn't applied to the darkening).
 	float fogged = n64_fog_amount(distance(world, n64_fog_origin)) * n64_fog.w;

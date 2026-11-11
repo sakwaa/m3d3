@@ -4,6 +4,7 @@ render_mode diffuse_lambert, specular_disabled;
 // (x vertex colour), alpha cut-out, 3-point filtering via the project-wide toggle.
 #include "res://addons/n64_runtime/shaders/n64_sampling.gdshaderinc"
 #include "res://addons/n64_runtime/shaders/n64_shine.gdshaderinc"
+#include "res://addons/n64_runtime/shaders/n64_lod_fade.gdshaderinc"
 
 uniform sampler2D albedo_texture : source_color, filter_nearest_mipmap, repeat_enable;
 uniform bool has_texture = true;
@@ -37,6 +38,7 @@ void vertex() {
 }
 
 void fragment() {
+	n64_lod_dither(CAMERA_POSITION_WORLD, MODEL_MATRIX, FRAGCOORD.xy);
 	vec4 c = albedo_color;
 	if (has_texture) {
 		float time = n64_time;

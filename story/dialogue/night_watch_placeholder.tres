@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="Dialogue" format=3]
+
+[ext_resource type="Script" path="res://game/story/dialogue/dialogue_node.gd" id="1_0bl13"]
+[ext_resource type="Script" path="res://game/story/dialogue/dialogue_line.gd" id="2_f8ve4"]
+[ext_resource type="Script" path="res://game/story/dialogue/dialogue.gd" id="3_6yiv8"]
+
+[sub_resource type="Resource" id="Resource_gp2my"]
+script = ExtResource("2_f8ve4")
+speaker = &"night_watch"
+text = "Mind your fires. Mind your fires."
+id = "hello"
+
+[resource]
+script = ExtResource("3_6yiv8")
+id = &"night_watch_placeholder"
+start = "hello"
+nodes = Array[ExtResource("1_0bl13")]([SubResource("Resource_gp2my")])
+notes = "Placeholder for the scheduling trial."

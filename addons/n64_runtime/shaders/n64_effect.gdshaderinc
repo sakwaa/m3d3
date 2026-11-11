@@ -1,8 +1,14 @@
 // N64 effect sprites (EffectEmitter): one MultiMesh of quads per emitter, simulated in
 // script. Per instance: transform (world position, size; flat sprites also their facing),
 // COLOR (colour x alpha over life), INSTANCE_CUSTOM.x = flipbook frame, .y = spin (radians,
-// camera-facing sprites only). Flat colour (unshaded), 3-point filtered, N64 fog.
+// camera-facing sprites only). Unshaded, but lit like the level per sprite: the time of
+// day's light (n64_ambient_light) plus baked lamp light where it is (the rain light grid,
+// shadowed), so dust doesn't glow at night. 3-point filtered, N64 fog.
 #include "res://addons/n64_runtime/shaders/n64_sampling.gdshaderinc"
+#include "res://addons/n64_runtime/shaders/n64_weather.gdshaderinc"
+#include "res://addons/n64_runtime/shaders/n64_rain_light.gdshaderinc"
+
+global uniform vec4 n64_ambient_light;
 
 uniform sampler2D sprite : source_color, filter_nearest_mipmap, repeat_disable;
 // Flipbook grid: columns, rows.
@@ -11,6 +17,7 @@ uniform bool billboard = true;
 varying vec2 n64_fogv;
 varying vec3 n64_fog_tintv;
 varying float frame;
+varying vec3 effect_light;
 
 void vertex() {
 	frame = INSTANCE_CUSTOM.x;
@@ -23,6 +30,7 @@ void vertex() {
 	} else {
 		world = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	}
+	effect_light = n64_ambient_light.rgb + n64_rain_grid(world);
 	n64_fogv = n64_fog_vertex(world);
 	n64_fog_tintv = n64_fog_tint_vertex(world);
 }

@@ -1,0 +1,74 @@
+[gd_scene format=3 uid="uid://dqeapmfkh6lnu"]
+
+[ext_resource type="Script" uid="uid://bav17pmnx06uq" path="res://game/world/zone.gd" id="1_g5pvp"]
+[ext_resource type="Script" uid="uid://bcvc33m1lfa5c" path="res://game/sky/dynamic_sky.gd" id="2_drx4b"]
+[ext_resource type="Script" uid="uid://d3axvhxk7pjyl" path="res://game/world/fog_settings.gd" id="2_inc4w"]
+[ext_resource type="Script" uid="uid://rmol5sj7jl8o" path="res://game/world/day_night_sun.gd" id="3_inc4w"]
+[ext_resource type="Shader" uid="uid://d4lmj1kn8lx7c" path="res://game/sky/n64_sky.gdshader" id="3_pc6sy"]
+[ext_resource type="Script" uid="uid://dbof576xv25u5" path="res://addons/n64_level_tools/level_root.gd" id="4_pc6sy"]
+[ext_resource type="Texture2D" uid="uid://cocicdg4an5we" path="res://textures/sky/clouds.res" id="4_uqian"]
+[ext_resource type="Resource" path="res://zones/town1/house_outside_town_level.res" id="5_uqian"]
+[ext_resource type="Script" uid="uid://0pm0hwpaajhf" path="res://game/world/spawn_point.gd" id="6_ebls4"]
+
+[sub_resource type="Resource" id="Resource_drx4b"]
+script = ExtResource("2_inc4w")
+start = 45.0
+end = 130.0
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_ebls4"]
+shader = ExtResource("3_pc6sy")
+shader_parameter/zenith = Color(0.18, 0.42, 0.88, 1)
+shader_parameter/horizon = Color(0.62, 0.78, 0.95, 1)
+shader_parameter/cloud_light = Color(1, 1, 1, 1)
+shader_parameter/cloud_dark = Color(0.66, 0.72, 0.84, 1)
+shader_parameter/stars = 0.0
+shader_parameter/cloud_cover = 0.3
+shader_parameter/cloud_softness = 0.3
+shader_parameter/cloud_offset = Vector2(0.13497645, 0.047242276)
+shader_parameter/cloud_scale = 0.25
+shader_parameter/cloud_tex = ExtResource("4_uqian")
+shader_parameter/star_angle = 3.141592653589793
+shader_parameter/star_density = 36.0
+shader_parameter/star_fill = 0.4
+shader_parameter/star_size = 0.002
+shader_parameter/star_softness = 0.35
+shader_parameter/star_twinkle = 0.3
+shader_parameter/disc_dir = Vector3(-2.1855694e-08, 1, -3.7855173e-08)
+shader_parameter/disc_color = Color(1, 0.92, 0.75, 1)
+shader_parameter/disc_size = 0.9993
+shader_parameter/disc_glow = 0.35
+shader_parameter/flash = 0.0
+shader_parameter/dither = true
+
+[sub_resource type="Sky" id="Sky_eyv8x"]
+sky_material = SubResource("ShaderMaterial_ebls4")
+radiance_size = 0
+
+[sub_resource type="Environment" id="Environment_eyv8x"]
+background_mode = 2
+sky = SubResource("Sky_eyv8x")
+ambient_light_source = 2
+ambient_light_color = Color(0.4, 0.59999996, 0.91499996, 1)
+ambient_light_energy = 0.6
+reflected_light_source = 1
+
+[node name="HouseOutsideTown" type="Node3D" unique_id=1042682625]
+script = ExtResource("1_g5pvp")
+display_name = "Outside Town"
+fog = SubResource("Resource_drx4b")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1366700682]
+environment = SubResource("Environment_eyv8x")
+script = ExtResource("2_drx4b")
+
+[node name="Sun" type="DirectionalLight3D" parent="." unique_id=1436590682]
+transform = Transform3D(0.8660254, -0.38302222, 0.32139382, 0, 0.64278764, 0.76604444, -0.5, -0.66341394, 0.5566704, 0, 0, 0)
+script = ExtResource("3_inc4w")
+
+[node name="Level" type="Node3D" parent="." unique_id=318139144]
+script = ExtResource("4_pc6sy")
+data = ExtResource("5_uqian")
+
+[node name="Spawn_default" type="Marker3D" parent="." unique_id=1090778150]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 29)
+script = ExtResource("6_ebls4")

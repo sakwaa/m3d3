@@ -1,0 +1,44 @@
+[gd_resource type="Resource" script_class="NpcSchedule" format=3]
+
+[ext_resource type="Resource" path="res://story/dialogue/lamplighter_placeholder.tres" id="1_l5geu"]
+[ext_resource type="Script" path="res://game/story/schedule/schedule_entry.gd" id="2_320wf"]
+[ext_resource type="Script" path="res://game/story/story_condition.gd" id="3_1wrs0"]
+[ext_resource type="Script" path="res://game/story/story_effect.gd" id="4_kjyvg"]
+[ext_resource type="Script" path="res://game/story/schedule/npc_schedule.gd" id="5_4v6fc"]
+
+[sub_resource type="Resource" id="Resource_1q3um"]
+script = ExtResource("2_320wf")
+label = "Lights the lamps"
+from_hour = 17.0
+to_hour = 20.0
+activity = 1
+zone = "res://zones/town1/town_1_market_square.tscn"
+place = &"lamp_round"
+vanish_at_end = true
+
+[sub_resource type="Resource" id="Resource_uw06y"]
+script = ExtResource("2_320wf")
+label = "Puts the lamps out"
+from_hour = 5.0
+to_hour = 8.0
+activity = 1
+zone = "res://zones/town1/town_1_market_square.tscn"
+place = &"lamp_round"
+reverse = true
+vanish_at_end = true
+
+[sub_resource type="Resource" id="Resource_wqtfs"]
+script = ExtResource("2_320wf")
+label = "Elsewhere"
+from_hour = 0.0
+to_hour = 0.0
+zone = "res://zones/nowhere/nowhere.tscn"
+place = &"offstage_lamplighter"
+
+[resource]
+script = ExtResource("5_4v6fc")
+id = &"lamplighter"
+character = &"lamplighter"
+dialogue = ExtResource("1_l5geu")
+entries = Array[ExtResource("2_320wf")]([SubResource("Resource_1q3um"), SubResource("Resource_uw06y"), SubResource("Resource_wqtfs")])
+notes = "Market square scheduling trial."

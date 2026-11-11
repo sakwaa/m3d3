@@ -3,7 +3,7 @@
 [ext_resource type="Script" uid="uid://bav17pmnx06uq" path="res://game/world/zone.gd" id="1_5rk7r"]
 [ext_resource type="Script" uid="uid://d3axvhxk7pjyl" path="res://game/world/fog_settings.gd" id="2_0grn3"]
 [ext_resource type="Script" uid="uid://dbof576xv25u5" path="res://addons/n64_level_tools/level_root.gd" id="2_22nc8"]
-[ext_resource type="Resource" uid="uid://mamk5s6etjr2" path="res://zones/forest_temple/forest_temple_zone_level.tres" id="3_qc3mq"]
+[ext_resource type="Resource" uid="uid://mamk5s6etjr2" path="res://zones/forest_temple/forest_temple_zone_level.res" id="3_qc3mq"]
 [ext_resource type="Script" uid="uid://0pm0hwpaajhf" path="res://game/world/spawn_point.gd" id="4_0grn3"]
 [ext_resource type="Script" uid="uid://nabeyx1w2i7k" path="res://game/world/passage.gd" id="5_22nc8"]
 [ext_resource type="Script" uid="uid://dk0pgbf4mj375" path="res://game/world/door.gd" id="6_qc3mq"]

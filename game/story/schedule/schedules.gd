@@ -50,7 +50,7 @@ func refresh() -> void:
 
 
 func _process(_delta: float) -> void:
-	if not is_instance_valid(_zone):
+	if not is_instance_valid(_zone) or not _zone.is_inside_tree():
 		_zone = null  # left with its scene (refresh() follows once the next zone is in)
 	_update(false)
 
@@ -70,12 +70,12 @@ func _update(snap: bool) -> void:
 						fx.apply(GameState)
 			entry_changed.emit(s, e)
 		var where := place(s, e) if e and e.activity != ScheduleEntry.Activity.AWAY and e.zone == zone_path and zone_path != "" else {}
-		var npc: Npc = npcs.get(s.id)
+		var npc: Npc = _npc(s.id)
 		if where.is_empty() or where.gone:
 			if npc:
 				_despawn(s.id)
 			continue
-		if npc == null or not is_instance_valid(npc):
+		if npc == null:
 			npc = _spawn(s, e, where)
 			continue
 		if changed:
@@ -123,10 +123,19 @@ func _spawn(s: NpcSchedule, e: ScheduleEntry, where: Dictionary) -> Npc:
 	return npc
 
 
+## The NPC spawned for schedule `id`, or null (also once it's gone with its zone).
+func _npc(id: StringName) -> Npc:
+	var npc = npcs.get(id)
+	if npc != null and not is_instance_valid(npc):
+		npcs.erase(id)
+		return null
+	return npc
+
+
 func _despawn(id: StringName) -> void:
-	var npc: Npc = npcs.get(id)
+	var npc := _npc(id)
 	npcs.erase(id)
-	if is_instance_valid(npc):
+	if npc:
 		# Not mid-conversation.
 		if Talk.active and Talk.partner == npc.talkable:
 			Talk._end()

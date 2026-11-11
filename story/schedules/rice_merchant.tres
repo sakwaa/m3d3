@@ -1,0 +1,39 @@
+[gd_resource type="Resource" script_class="NpcSchedule" format=3]
+
+[ext_resource type="Resource" path="res://story/dialogue/rice_merchant_placeholder.tres" id="1_o3fhp"]
+[ext_resource type="Script" path="res://game/story/schedule/schedule_entry.gd" id="2_tt887"]
+[ext_resource type="Script" path="res://game/story/story_condition.gd" id="3_e0hlw"]
+[ext_resource type="Script" path="res://game/story/story_effect.gd" id="4_r1nbv"]
+[ext_resource type="Script" path="res://game/story/schedule/npc_schedule.gd" id="5_ur7ix"]
+
+[sub_resource type="Resource" id="Resource_mtc7f"]
+script = ExtResource("2_tt887")
+label = "Sells rice"
+from_hour = 7.0
+to_hour = 18.0
+zone = "res://zones/town1/town_1_market_square.tscn"
+place = &"rice_shop"
+
+[sub_resource type="Resource" id="Resource_v3qom"]
+script = ExtResource("2_tt887")
+label = "Tidies up the shop"
+from_hour = 18.0
+to_hour = 20.0
+zone = "res://zones/town1/town_1_market_square.tscn"
+place = &"rice_shop"
+
+[sub_resource type="Resource" id="Resource_6j0em"]
+script = ExtResource("2_tt887")
+label = "Elsewhere"
+from_hour = 0.0
+to_hour = 0.0
+zone = "res://zones/nowhere/nowhere.tscn"
+place = &"offstage_rice_merchant"
+
+[resource]
+script = ExtResource("5_ur7ix")
+id = &"rice_merchant"
+character = &"rice_merchant"
+dialogue = ExtResource("1_o3fhp")
+entries = Array[ExtResource("2_tt887")]([SubResource("Resource_mtc7f"), SubResource("Resource_v3qom"), SubResource("Resource_6j0em")])
+notes = "Market square scheduling trial."

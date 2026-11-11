@@ -1,0 +1,109 @@
+{
+ "name": "Run",
+ "source": "MM3D Link, 'Southern Swamp' walkthrough 16:11 (frames 148-157 side, 159-175 front), read by eye at 30 fps; arms from the OoT remake 'Is Rolling Faster Than Sprinting' (swivSaA89Ho) 0:49-0:53 back view at 60 fps, RTMPose: upper arm ~38 deg out (22 used: our slimmer body reads wider), elbow ~158 deg, hands at hip height",
+ "fps": 30,
+ "length": 16,
+ "loop": true,
+ "root": "auto",
+ "mirror_half": true,
+ "lean": 12,
+ "keys": [
+  {
+   "frame": 0,
+   "ease": "ease_out",
+   "lift": 0.0,
+   "thigh_L": 34,
+   "shin_L": 18,
+   "thigh_R": -28,
+   "shin_R": -88,
+   "upper_arm_L": [
+    -18,
+    22
+   ],
+   "forearm_L": [
+    4,
+    26
+   ],
+   "upper_arm_R": [
+    18,
+    22
+   ],
+   "forearm_R": [
+    40,
+    26
+   ]
+  },
+  {
+   "frame": 2,
+   "lift": -0.03,
+   "thigh_L": 8,
+   "shin_L": -18,
+   "thigh_R": -6,
+   "shin_R": -112,
+   "upper_arm_L": [
+    -4,
+    22
+   ],
+   "forearm_L": [
+    18,
+    26
+   ],
+   "upper_arm_R": [
+    4,
+    22
+   ],
+   "forearm_R": [
+    26,
+    26
+   ]
+  },
+  {
+   "frame": 4,
+   "lift": 0.0,
+   "thigh_L": -22,
+   "shin_L": -38,
+   "thigh_R": 46,
+   "shin_R": -30,
+   "upper_arm_L": [
+    19,
+    22
+   ],
+   "forearm_L": [
+    41,
+    26
+   ],
+   "upper_arm_R": [
+    -19,
+    22
+   ],
+   "forearm_R": [
+    3,
+    26
+   ]
+  },
+  {
+   "frame": 6,
+   "lift": 0.035,
+   "thigh_L": -32,
+   "shin_L": -78,
+   "thigh_R": 50,
+   "shin_R": 8,
+   "upper_arm_L": [
+    20,
+    22
+   ],
+   "forearm_L": [
+    42,
+    26
+   ],
+   "upper_arm_R": [
+    -20,
+    22
+   ],
+   "forearm_R": [
+    2,
+    26
+   ]
+  }
+ ]
+}

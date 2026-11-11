@@ -1,0 +1,50 @@
+[gd_resource type="Resource" script_class="TreeSpecies" format=3]
+
+[ext_resource type="Texture2D" path="res://textures/wood/tree_bark.res" id="1_gb4vm"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_sawara_cypress_t0.res" id="2_3vjw8"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_sawara_cypress_t1.res" id="3_hq8di"]
+[ext_resource type="Texture2D" path="res://textures/plants/leaves_sawara_cypress.res" id="3_lsah7"]
+[ext_resource type="Script" path="res://addons/n64_level_tools/trees/tree_level.gd" id="4_3vjw8"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_sawara_cypress_t2.res" id="4_w0r1f"]
+[ext_resource type="Script" path="res://addons/n64_level_tools/trees/tree_species.gd" id="5_hq8di"]
+[ext_resource type="Texture2D" path="res://textures/plants/tree_card_sawara_cypress_t3.res" id="5_rac5r"]
+
+[sub_resource type="Resource" id="Resource_w0r1f"]
+script = ExtResource("4_3vjw8")
+count = 4
+whorls = 9
+end = 0.97
+angle = 78.0
+angle_var = 8.0
+length = 0.4028021943768216
+length_var = 0.2
+curve = -12.0
+radius = 0.35
+bark = false
+segments = 2
+
+[resource]
+script = ExtResource("5_hq8di")
+display_name = "Sawara Cypress"
+latin = "Chamaecyparis pisifera"
+reference = "Imported from 5CHAPIC0.BMP (Chamaecyparis pisifera, archetype conifer, real height ~8 m): crown 0.99x the height, bare trunk 13%, widest at 34% of the crown."
+height = 4.8
+trunk_radius = 0.612
+trunk_taper = 0.1
+trunk_top = 1.0
+lean = 1.0
+wander = 1.5
+clear = 0.092
+crown = 4
+crown_profile = PackedFloat32Array(0.4724, 0.48, 0.4762, 0.4593, 0.4816, 0.4939, 0.4839, 0.3948, 0.4048, 0.4247, 0.3472, 0.2972, 0.245, 0.2273, 0.1313, 0.1075)
+levels = Array[ExtResource("4_3vjw8")]([SubResource("Resource_w0r1f")])
+leaf_texture = ExtResource("3_lsah7")
+bark_texture = ExtResource("1_gb4vm")
+card_textures = Array[Texture2D]([ExtResource("2_3vjw8"), ExtResource("3_hq8di"), ExtResource("4_w0r1f"), ExtResource("5_rac5r")])
+card_aspects = PackedFloat32Array(1.023)
+card_tiles = Vector2i(2, 2)
+card_aspect = 1.023
+card_size = 1.2
+leaf_start = 0.15
+bark_color = Color(0.016129032, 0.075806454, 0.016129032, 1)
+crown_ao = 0.4

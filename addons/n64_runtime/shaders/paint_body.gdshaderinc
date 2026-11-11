@@ -2,6 +2,8 @@
 // painted mask (UV2 atlas). UV is world-aligned metres (+ per-face tweaks).
 // Layers are unrolled (no sampler-array indexing) so this also runs on Compatibility.
 #include "res://addons/n64_runtime/shaders/n64_sampling.gdshaderinc"
+#include "res://addons/n64_runtime/shaders/n64_lod_fade.gdshaderinc"
+#include "res://addons/n64_runtime/shaders/n64_weather.gdshaderinc"
 
 uniform sampler2D base_tex : source_color, filter_nearest_mipmap, repeat_enable;
 uniform bool has_base = false;
@@ -62,10 +64,29 @@ uniform int light_keys = 0;
 uniform float light_contrast = 1.0;
 // Baked Vertex / Timed Dynamic: how much of the bake shows; the scene's own ambient fills the rest.
 uniform float bake_strength = 1.0;
+// Baked modes: the darkest baked light shows as on screen, as a fraction of the surface's
+// fully lit look (MM's dark scenes keep about a fifth); 0 = no floor.
+uniform float light_floor = 0.0;
 // Baked Timed Dynamic: the keys already carry the time of day (no world tint on top).
 uniform bool timed_bake = false;
 
 varying vec3 key_light;
+
+// Baked shading on screen: `shade` (paint x AO x light) through the contrast curve, held
+// above light_floor of the painted colour alone, in the light's own hue (night stays blue).
+// A soft maximum, so shading eases into the floor instead of flattening at it.
+vec3 n64_baked_shade(vec3 shade, vec3 paint, vec3 light) {
+	vec3 s = mix(shade, pow(shade, vec3(2.2)), light_contrast);
+	if (light_floor <= 0.0) {
+		return s;
+	}
+	vec3 p = mix(paint, pow(paint, vec3(2.2)), light_contrast);
+	float f = mix(light_floor, pow(light_floor, 2.2), light_contrast);
+	vec3 hue = light / max(max(light.r, max(light.g, light.b)), 1e-4);
+	vec3 fl = f * p * hue;
+	vec3 k = fl * 0.5;
+	return 0.5 * (s + fl + sqrt((s - fl) * (s - fl) + k * k));
+}
 varying vec2 n64_fogv;
 varying vec3 n64_fog_tintv;
 
@@ -349,6 +370,7 @@ vec2 scrolled_uv(vec4 flow, vec2 uv, vec3 view_pos, mat4 view, float time) {
 }
 
 void fragment() {
+	n64_lod_dither(CAMERA_POSITION_WORLD, MODEL_MATRIX, FRAGCOORD.xy);
 	vec3 c = base_color.rgb;
 	float h = 0.0;
 	float ho = 0.0;
@@ -403,12 +425,23 @@ void fragment() {
 		float g = n64_texture(stair_tex, stair_uv).r;
 		c *= max(mix(1.0, g / max(stair_params.z, 0.05), stair_params.x), 0.0);
 	}
+	// Rain: surfaces open to the sky (RainCover) darken and saturate as they soak; the ground
+	// (walls much less) also picks up a dim sheen of the sky towards grazing angles.
+	if (n64_wetness > 0.0) {
+		vec3 world = (INV_VIEW_MATRIX * vec4(VERTEX, 1.0)).xyz;
+		float up = smoothstep(0.3, 0.8, (INV_VIEW_MATRIX * vec4(NORMAL, 0.0)).y);
+		float wet = n64_wetness * n64_rain_exposed(world) * mix(0.35, 1.0, up);
+		c = n64_wet(c, wet);
+		float graze = pow(1.0 - clamp(dot(normalize(NORMAL), VIEW), 0.0, 1.0), 4.0);
+		c += n64_fog_color.rgb * graze * up * wet * 0.35;
+	}
 	// Vertex colours (painted x baked lighting) shade the result, like the N64's per-vertex
 	// colour. Vertex-lit levels are unlit: the colour goes out through EMISSION so scene
 	// lights and ambient don't light them twice.
 	// Painted vertex colour x baked vertex AO (alpha), AO hideable in the editor.
 	// (Recoloured faces took their colour in the gradient; AO still shades them.)
-	vec3 vc = (base_recolour ? vec3(1.0) : COLOR.rgb * vertex_color_scale) * mix(1.0, COLOR.a, n64_vertex_ao);
+	vec3 paint = base_recolour ? vec3(1.0) : COLOR.rgb * vertex_color_scale;
+	vec3 vc = paint * mix(1.0, COLOR.a, n64_vertex_ao);
 	// N64 fog: flat colour blended in last (after lighting), amount from the vertices.
 	FOG = n64_fog_out(n64_fogv, n64_fog_tintv, VERTEX, INV_VIEW_MATRIX);
 #if defined(N64_CUTOUT)
@@ -420,20 +453,20 @@ void fragment() {
 	// Baked light (one key, or the time-of-day keys, in CUSTOM0..3) through EMISSION; live
 	// lights on ALBEDO. The
 	// scene's ambient comes back as the bake fades (AO only dims ambient, not lights).
-	vec3 shade = vc * key_light * (timed_bake ? vec3(1.0) : n64_world_tint.rgb);
+	vec3 light = key_light * (timed_bake ? vec3(1.0) : n64_world_tint.rgb);
 	ALBEDO = c * vc * n64_weather_tint.rgb;
-	EMISSION = c * mix(shade, pow(shade, vec3(2.2)), light_contrast) * n64_weather_tint.rgb * bake_strength;
+	EMISSION = c * n64_baked_shade(vc * light, paint, light) * n64_weather_tint.rgb * bake_strength;
 	AO = clamp(1.0 - bake_strength, 0.0, 1.0);
 #elif defined(N64_UNSHADED)
 	// Baked lighting variant: unshaded, colour through ALBEDO (decals such as character
 	// shadows then still apply; EMISSION would ignore them).
-	vec3 shade = vc * (light_keys > 0 ? key_light : n64_world_tint.rgb);
-	ALBEDO = c * mix(shade, pow(shade, vec3(2.2)), light_contrast) * n64_weather_tint.rgb;
+	vec3 light = light_keys > 0 ? key_light : n64_world_tint.rgb;
+	ALBEDO = c * n64_baked_shade(vc * light, paint, light) * n64_weather_tint.rgb;
 #else
 	if (vertex_lit) {
-		vec3 shade = vc * (light_keys > 0 ? key_light : n64_world_tint.rgb);
+		vec3 light = light_keys > 0 ? key_light : n64_world_tint.rgb;
 		ALBEDO = vec3(0.0);
-		EMISSION = c * mix(shade, pow(shade, vec3(2.2)), light_contrast) * n64_weather_tint.rgb;
+		EMISSION = c * n64_baked_shade(vc * light, paint, light) * n64_weather_tint.rgb;
 	} else {
 		ALBEDO = c * vc;
 	}

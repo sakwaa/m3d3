@@ -41,7 +41,7 @@ signal scatter_cover_requested(size: int)
 
 const ICON_DIR := "res://addons/n64_level_tools/icons/"
 const TOOL_ICONS := ["paint_brush", "paint_erase", "paint_fill", "paint_normal", "paint_face", "paint_fill_same",
-	"paint_scatter", "paint_place", "paint_gradient", "paint_border"]
+	"paint_scatter", "paint_place", "paint_gradient", "paint_border", "paint_grass", "paint_trees"]
 const BRUSH_DIR := "res://brushes"
 
 var _scale := 1.0
@@ -183,6 +183,8 @@ const TOOL_HINTS := [
 	"Click: one item (Shift: remove)",
 	"Click a face: gradient across the face mask (else that face) in the direction set.\nDrag: from press (0 %) to release (100 %). Shift: erase. Overlay layers only.",
 	"Click a face: a band of the overlay layer along the outer edge of the face mask\n(else the flat surface clicked). Any shape, across brushes. Shift: erase. Overlay layers only.",
+	"Drag: grass carpet of the height set, on any ground (Shift: erase carpet, also where\nit grows by itself on grass textures). The outline rounds and frays by itself.",
+	"Drag: plant trees of the species listed over the ground, spaced apart, each its own seed,\nsize and turn (Shift: remove trees). Each is a tree brush to edit after. One tree: Props > Tree.",
 ]
 ## Section title -> {button, content}.
 var _sections := {}
@@ -505,7 +507,9 @@ func _init(panel_style: StyleBox = null, button_factory: Callable = Callable()) 
 	_build_scatter()
 	_build_gradient()
 	_build_border()
-	for box in [_scatter_box, _gradient_box, _border_box]:
+	_build_grass()
+	_build_trees()
+	for box in [_scatter_box, _gradient_box, _border_box, _grass_box, _trees_box]:
 		options.add_child(box)
 
 	var level := VBoxContainer.new()
@@ -727,7 +731,8 @@ func _build_surface() -> void:
 	var tips := ["Speed builds up and dies away slowly (ice).", "Hurts and bounces actors standing on it (lava, spikes).",
 		"Sends actors back to the last safe ground, with a heart of damage (pits, deep water).",
 		"The camera passes through (canopies, railings, the near side of a wall).",
-		"Ladders, vines (stored for the climb state).", "Hookshot targets (stored for the hookshot)."]
+		"Vines: walls and ceilings the player climbs.", "Hookshot targets (stored for the hookshot).",
+		"Ledges here can't be caught or hung from (any other top edge with a wall below can)."]
 	for i in Surface.FLAGS.size():
 		var c := CheckBox.new()
 		c.text = Surface.FLAG_NAMES[i]
@@ -1034,15 +1039,78 @@ func _update_tool_visibility(tool: int) -> void:
 	var T := LevelPaintTool.Tool
 	var stroke := tool == T.BRUSH or tool == T.ERASE
 	var whole := _layer == 0 or (_data != null and _layer == _surface_row())
-	_size_row.visible = stroke or tool == T.SCATTER
+	_size_row.visible = stroke or tool in [T.SCATTER, T.GRASS, T.TREES]
 	_hardness_row.visible = stroke and not whole
 	_shape_row.visible = stroke and not whole
-	_strength_row.visible = not whole and not tool in [T.SCATTER, T.PLACE]
+	_strength_row.visible = not whole and not tool in [T.SCATTER, T.PLACE, T.GRASS, T.TREES]
 	_stay.visible = tool in [T.BRUSH, T.ERASE, T.FACE, T.FILL_SAME]
 	_normal_box.visible = tool == T.FILL_NORMAL
 	_scatter_box.visible = tool == T.SCATTER or tool == T.PLACE
 	_gradient_box.visible = tool == T.GRADIENT
 	_border_box.visible = tool == T.BORDER
+	_grass_box.visible = tool == T.GRASS
+	_trees_box.visible = tool == T.TREES
+
+
+var _grass_box: Control
+var _grass_height: SpinBox
+var _trees_box: Control
+var _trees_list: ItemList
+var _trees_spacing: SpinBox
+var _trees_size_var: HSlider
+
+
+## Grass settings: the carpet height painted.
+func _build_grass() -> void:
+	_grass_box = VBoxContainer.new()
+	_grass_height = _spin(_grass_box, "Carpet height (m)", 0.05, 1.0, 0.05)
+	_grass_height.tooltip_text = "Height of the carpet painted (about a quarter to a third of the player's height reads\nlike Majora's Mask: 0.45 m). The rest (lumps, rounding, tufts) is in the level's Grass settings."
+	_grass_height.value_changed.connect(func(v): if not _updating: brush_changed.emit(&"grass_height", v))
+
+
+## Trees settings: which species (several = a mix), spacing, size variation.
+func _build_trees() -> void:
+	_trees_box = VBoxContainer.new()
+	_trees_list = ItemList.new()
+	_trees_list.select_mode = ItemList.SELECT_MULTI
+	_trees_list.auto_height = true
+	_trees_list.custom_minimum_size.y = 120 * _scale
+	_trees_list.tooltip_text = "Species to plant: select one, or several for a mix (a random one per tree)."
+	var dir := "res://addons/n64_level_tools/trees/species/"
+	for f in DirAccess.get_files_at(dir):
+		if f.ends_with(".tres"):
+			var i := _trees_list.add_item(f.get_basename().capitalize())
+			_trees_list.set_item_metadata(i, dir + f)
+	_trees_list.multi_selected.connect(func(_i, _on): _emit_tree_species())
+	_trees_list.item_selected.connect(func(_i): _emit_tree_species())
+	_trees_box.add_child(_trees_list)
+	_trees_spacing = _spin(_trees_box, "Spacing (m)", 1.0, 40.0, 0.5)
+	_trees_spacing.tooltip_text = "Closest two trees stand (also to trees already there)."
+	_trees_spacing.value_changed.connect(func(v): if not _updating: brush_changed.emit(&"trees_spacing", v))
+	_trees_size_var = _slider(_trees_box, "Size variation", 0.0, 0.6, 0.05)
+	_trees_size_var.value_changed.connect(func(v): if not _updating: brush_changed.emit(&"trees_size_var", v))
+
+
+func _emit_tree_species() -> void:
+	if _updating:
+		return
+	var list: Array[Resource] = []
+	for i in _trees_list.get_selected_items():
+		list.append(load(_trees_list.get_item_metadata(i)))
+	brush_changed.emit(&"trees_species", list)
+
+
+func set_grass_state(g: LevelGrassTool, t: LevelTreeTool) -> void:
+	_updating = true
+	_grass_height.value = g.height
+	_trees_spacing.value = t.spacing
+	_trees_size_var.value = t.size_var
+	_trees_list.deselect_all()
+	for i in _trees_list.item_count:
+		for sp in t.species:
+			if sp and sp.resource_path == _trees_list.get_item_metadata(i):
+				_trees_list.select(i, false)
+	_updating = false
 
 
 ## Scatter / Place settings: the items (cut-outs) and how they're placed.

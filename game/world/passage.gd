@@ -15,6 +15,7 @@ extends Node3D
 @export_file("*.tscn") var target_zone := "":
 	set(value):
 		target_zone = value
+		notify_property_list_changed()  # (target_spawn's choices)
 		_queue_rebuild()
 @export var target_spawn: StringName = &"default":
 	set(value):
@@ -26,6 +27,8 @@ extends Node3D
 @export var room: Room
 ## How far inside the threshold the player appears.
 @export var arrival_offset := 1.5
+## Seconds the player walks in on arriving (while the screen fades in).
+const ARRIVAL_WALK := 0.45
 
 @export_group("Shape")
 @export var width := 1.2:
@@ -119,6 +122,21 @@ func _ready() -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_TRANSFORM_CHANGED:
 		_sync_floor()
+
+
+## Arriving through this passage (ZoneManager, as the screen fades in): a few steps in
+## from the corridor, Majora's Mask style, before control comes back.
+func play_arrival(player: Node3D) -> void:
+	if not player is Actor:
+		return
+	var a := player as Actor
+	a.scripted = true
+	a.intent.clear()
+	a.intent.move = -get_spawn_transform().basis.z * 0.5
+	await get_tree().create_timer(ARRIVAL_WALK).timeout
+	if is_instance_valid(a):
+		a.intent.clear()
+		a.scripted = false
 
 
 func get_spawn_transform() -> Transform3D:
@@ -219,3 +237,7 @@ static func arch_params(w: float, h: float, top_kind: int, rise_setting: float) 
 		return Vector4(1, spring, w * 0.5, rise)
 	var c := (rise * rise - w * w * 0.25) / w
 	return Vector4(2, spring, c, c + w * 0.5)
+
+
+func _validate_property(property: Dictionary) -> void:
+	ZoneArrivals.hint(property, target_zone)
