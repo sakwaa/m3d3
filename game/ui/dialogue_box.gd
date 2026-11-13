@@ -24,10 +24,11 @@ const BOX_SIZE := Vector2(1100, 240)
 ## Text inset inside the box (left, top, right, bottom); three lines fit.
 const BOX_MARGIN := Vector4(56, 34, 56, 30)
 const FONT_SIZE := 36
-## Signs (DialogueLine.Style.SIGN): smaller text, two bitmap pixels per font pixel.
+## Signs (DialogueLine.Style.SIGN): smaller text, one bitmap pixel per font pixel.
 const SIGN_FONT_SIZE := 24
-## The bitmap look: glyphs drawn at this size, scaled up by whole pixels.
-const PIXEL_SIZE := 12
+## The bitmap look: glyphs drawn at this size, then scaled to the text size (1.5× for
+## dialogue; the 3-point filter evens out the fractional step).
+const PIXEL_SIZE := 24
 const PUNCTUATION_PAUSE := {".": 0.22, "!": 0.22, "?": 0.22, ",": 0.1, "…": 0.3}
 const BOX_COLOR := Color(0.07, 0.05, 0.04, 0.9)
 const TEXT_COLOR := Color(1.0, 0.98, 0.92)
@@ -187,7 +188,7 @@ func _ready() -> void:
 
 func _fit() -> void:
 	var vp := get_viewport().get_visible_rect().size
-	# Thirds, so the 3× pixel font lands on whole screen pixels.
+	# Thirds of 1080p, so text sizes stay whole screen pixels.
 	var s := maxf(roundf(vp.y / 1080.0 * 3.0) / 3.0, 1.0 / 3.0)
 	_root.scale = Vector2(s, s)
 	_root.size = vp / s
@@ -202,15 +203,15 @@ static func _key_name() -> String:
 	return "A"
 
 
-## The built-in font with hard pixels (no smoothing, scaled by whole steps), until a bitmap
-## font is set.
+## The built-in font with hard pixels (no smoothing, drawn at PIXEL_SIZE and scaled), until
+## a bitmap font is set.
 static func pixel_font() -> Font:
 	var base := ThemeDB.fallback_font
 	if not base is FontFile:
 		return base
 	var f: FontFile = base.duplicate()
 	f.fixed_size = PIXEL_SIZE
-	f.fixed_size_scale_mode = TextServer.FIXED_SIZE_SCALE_INTEGER_ONLY
+	f.fixed_size_scale_mode = TextServer.FIXED_SIZE_SCALE_ENABLED
 	f.antialiasing = TextServer.FONT_ANTIALIASING_NONE
 	f.hinting = TextServer.HINTING_NORMAL
 	f.subpixel_positioning = TextServer.SUBPIXEL_POSITIONING_DISABLED

@@ -1,5 +1,5 @@
 shader_type spatial;
-render_mode diffuse_lambert, specular_disabled;
+render_mode diffuse_lambert, specular_disabled, vertex_lighting;
 // Characters / actors: lit by the scene's lights, flat colour (x optional texture), N64
 // per-vertex fog. Writes stencil 1 so ProjectedShadow never darkens the actor itself.
 stencil_mode write, compare_always, 1;

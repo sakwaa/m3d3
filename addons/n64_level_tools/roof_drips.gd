@@ -33,30 +33,32 @@ static func plan(level: LevelRoot) -> Array:
 				out.append({name = "Drip_%s_%s" % [tag, s[0]], transform = at.call(0.0, eave, s[2]), width = half * 2.0, drop = eave, house = tag})
 			else:
 				# Over the awning the eave's water lands on it; either side, on the ground.
-				var cw: float = minf(awning.half, half)
+				var c: float = awning.centre
+				var lo := maxf(c - awning.half, -half)
+				var hi := minf(c + awning.half, half)
 				var on_awning: float = awning.top - awning.fall * (o / awning.depth)
-				out.append({name = "Drip_%s_front_over" % tag, transform = at.call(0.0, eave, s[2]), width = cw * 2.0,
+				out.append({name = "Drip_%s_front_over" % tag, transform = at.call((lo + hi) * 0.5, eave, s[2]), width = hi - lo,
 					drop = maxf(eave - on_awning, 0.2), house = tag})
-				for sx in [-1.0, 1.0]:
-					var w := half - cw
+				for part in [["left", -half, lo], ["right", hi, half]]:
+					var w: float = part[2] - part[1]
 					if w > 0.2:
-						out.append({name = "Drip_%s_front_%s" % [tag, "right" if sx > 0.0 else "left"],
-							transform = at.call(sx * (cw + w * 0.5), eave, s[2]), width = w, drop = eave, house = tag})
+						out.append({name = "Drip_%s_front_%s" % [tag, part[0]],
+							transform = at.call((part[1] + part[2]) * 0.5, eave, s[2]), width = w, drop = eave, house = tag})
 			if not awning.is_empty():
-				out.append({name = "Drip_%s_awning" % tag, transform = at.call(0.0, awning.edge_y, hd + awning.depth + 0.01),
+				out.append({name = "Drip_%s_awning" % tag, transform = at.call(awning.centre, awning.edge_y, hd + awning.depth + 0.01),
 					width = awning.half * 2.0, drop = awning.edge_y, house = tag})
 	return out
 
 
-## A shop's awning as HouseBuilder._cover makes it: {half (width / 2), top (height at the
+## A shop's awning as HouseBuilder._cover makes it: {half (width / 2), centre (x), top (height at the
 ## wall), fall (drop to its front), depth, edge_y (its valance's foot)}, or {} without one.
 static func _awning(h: HouseSpec) -> Dictionary:
 	if not h.shopfront or not (h.cover == HouseSpec.Cover.AWNING or h.cover == HouseSpec.Cover.BOTH):
 		return {}
-	var hw := h.width * 0.5
-	var half := clampf(h.shop_opening * 0.5, 0.3, hw - minf(h.wall_thickness, minf(hw, h.depth * 0.5) - 0.05) - 0.2)
+	var span := h.shop_span()
+	var half := span.y
 	var y0 := h.foundation
 	var top := minf(y0 + h.shop_height, y0 + h.storey_height - 0.2)
 	var ya := top + 0.35
 	var fall := h.awning_depth * 0.35
-	return {half = half + 0.3, top = ya, fall = fall, depth = h.awning_depth, edge_y = ya - fall - 0.22}
+	return {half = half + 0.3, centre = span.x, top = ya, fall = fall, depth = h.awning_depth, edge_y = ya - fall - 0.22}

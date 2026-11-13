@@ -173,6 +173,9 @@ func _replace_level_root(root: LevelRoot, scene: Node, scene_path: String) -> No
 			oi.name = "Occluder"
 			oi.occluder = occ
 			out.add_child(oi)
+		var culling := LevelRoot.room_culling(data)
+		if culling:
+			out.add_child(culling)
 		var rain := RainCover.from_build(data.rain_cover_built(), data.rain_light_built())
 		if rain:
 			out.add_child(rain)

@@ -1,115 +1,263 @@
 class_name TargetLock
 extends Node3D
-## Z-targeting for an actor (the player): picks the best Targetable in view, holds it,
-## and shows a reticle over it. Kind-agnostic rules:
-##  - in range (the target's lock_range), roughly in front of the view (`max_angle`) and
-##    in line of sight (level geometry blocks);
-##  - kind order: enemies first, then NPCs, then points of interest; within a kind the
-##    one nearest the view centre (weighted by distance) wins, `priority` breaking ties;
-##  - the lock drops when the target is disabled, dies, leaves 1.3x its range or stays
-##    out of sight for `lose_time`.
+## Z-targeting for the player, after Majora's Mask (references/targeting/z_targeting_spec.md).
+##
+## Every frame it searches for the best Targetable (`hover`, shown by the arrow before Z is
+## pressed: what Z will grab):
+##   - in front of the player's body (not the camera): within 60°; while locked, the next
+##     target is looked for within 90°, nearer straight ahead counting as closer (x0.6..1
+##     on the squared distance);
+##   - within its acquire range (3D, feet to feet), roughly on screen and in line of sight;
+##   - two tiers: if any enemy / boss qualifies, NPCs and points of interest are not
+##     considered; within the tier the nearest wins (ties: the one that appeared first).
+## A lock lets go only when its target dies / is disabled, or the player passes its release
+## range (not in the first 0.5 s) - not for walls, turning away or time.
+##
+## Buttons (MM's timer, in its 20 Hz frames): pressing locks the hover target; locked,
+## pressing moves to the next one (`hover`). Hold mode: the lock lasts while Z is held and
+## lingers 0.25 s after; pressing again within 0.2 s of letting go takes the next target
+## (the old one is still left out). Switch mode: a press latches; pressing again with no
+## other target lets go. Holding the stick back while locked pauses the search (no next
+## target: in Switch mode the press lets go). Pressing with nothing to lock: Parallel - the
+## facing holds (squared up to a wall in front) and the camera swings behind, until Z is
+## let go.
 
-@export var max_angle := 75.0
-## Seconds out of sight before the lock drops.
-@export var lose_time := 1.0
+signal locked(target: Targetable)
+signal released(target: Targetable, forced: bool)
 
+## Battle music (MM): the nearest hostile enemy (not a boss) within BATTLE_FAR, wherever it is
+## (behind, through walls), sets it; the enemy layer is full within BATTLE_NEAR and fades out
+## linearly to BATTLE_FAR. Nodes in BATTLE_GROUP get set_battle_level(0..1) when it changes.
+const BATTLE_NEAR := 6.0  # 150 units
+const BATTLE_FAR := 20.0  # 500 units
+const BATTLE_GROUP := &"battle_music"
+
+## MM frames per second (its timers count these).
+const FPS := 20.0
+## Unlocked search cone, and the next-target cone while locked (degrees off the facing).
+const CONE := 60.0
+const NEXT_CONE := 90.0
+## Screen leeway (MM pixels on its 320x240 screen).
+const LEEWAY := Vector2(20.0, 160.0)
+
+## Switch mode instead of Hold (the player's option).
+@export var switch_mode := false
+## Targets must be roughly on screen (off for tests without a real view).
+@export var check_screen := true
+
+## The locked target (MM's focus actor), or null.
 var target: Targetable
+## The arrow's target: unlocked, what Z would lock; locked, the next target.
+var hover: Targetable
+## Parallel: no target, the facing holds (`parallel_facing`).
+var parallel := false
+var parallel_facing := Vector3.FORWARD
+## The lock was lost (target gone / out of range) with Z still held: the camera stays
+## behind and Parallel can't start until Z is let go.
+var forced := false
 
-var _reticle: Label3D
-var _unseen := 0.0
+## The enemy setting the battle music (null = none), and its level 0..1.
+var bgm_enemy: Targetable
+var battle_level := 0.0
+
+var _timer := 0.0  # MM's zTargetActiveTimer, in its frames
+var _latch := false  # Switch mode holding the lock
 var _owner_actor: Actor
 
 
 func _ready() -> void:
 	_owner_actor = get_parent() as Actor
-	_reticle = Label3D.new()
-	_reticle.text = "▼"
-	_reticle.font_size = 64
-	_reticle.outline_size = 12
-	_reticle.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	_reticle.no_depth_test = true
-	_reticle.fixed_size = true
-	_reticle.pixel_size = 0.0015
-	_reticle.top_level = true
-	_reticle.visible = false
-	add_child(_reticle)
 
 
-## Best target seen from `from` looking along `view` (horizontal), or null.
-func pick(from: Vector3, view: Vector3, exclude: Targetable = null) -> Targetable:
-	view.y = 0.0
-	view = view.normalized()
-	var best: Targetable = null
-	var best_key := Vector3.ZERO
-	for node in get_tree().get_nodes_in_group(Targetable.GROUP):
-		var t := node as Targetable
-		if t == null or t == exclude or not _valid(t):
-			continue
-		var to := t.global_position - from
-		var flat := Vector3(to.x, 0.0, to.z)
-		var d := flat.length()
-		if d > t.lock_range() or d < 0.01:
-			continue
-		var angle := rad_to_deg(view.angle_to(flat / d))
-		if angle > max_angle or not _visible(from, t):
-			continue
-		# Lower is better: kind, then off-centre angle scaled by distance, then priority.
-		var key := Vector3(int(t.kind), angle * (1.0 + d * 0.15), -t.priority)
-		if best == null or _better(key, best_key):
-			best = t
-			best_key = key
-	return best
+## The lock is on (the reticle shows): MM's timer >= 5. Below that it's on its way out.
+func active() -> bool:
+	return target != null and _timer >= 5.0
 
 
-static func _better(a: Vector3, b: Vector3) -> bool:
-	if a.x != b.x:
-		return a.x < b.x
-	if absf(a.y - b.y) > 2.0:
-		return a.y < b.y
-	return a.z < b.z if a.z != b.z else a.y < b.y
+## The first 0.5 s of a lock: the release range doesn't apply yet.
+func in_grace() -> bool:
+	return _timer >= 6.0
+
+
+## Locked onto something hostile (battle stance, battle camera).
+func hostile() -> bool:
+	return active() and target.is_hostile()
+
+
+## One frame of Z-targeting: `pressed` / `held` the target button, `stick_back` the stick
+## held back (see the class notes), `blocked` no targeting at all (cutscene, dead...).
+func update(delta: float, pressed: bool, held: bool, stick_back: bool, blocked := false) -> void:
+	var f := delta * FPS
+	if blocked:
+		_timer = 0.0
+	elif held or _latch:
+		_timer = 5.0 if _timer <= 5.0 else maxf(_timer - f, 5.0)
+	elif parallel:
+		_timer = 0.0
+	elif _timer > 0.0:
+		_timer = maxf(_timer - f, 0.0)
+	if not held:
+		forced = false
+	if _timer > 0.0 and pressed and not blocked:
+		_press()
+	if _timer <= 0.0:
+		if target:
+			var t := target
+			target = null
+			released.emit(t, false)
+		parallel = false
+		_latch = false
+	if target and (not valid(target) or (not in_grace() and _outside_leash(target))):
+		var t := target
+		release()
+		forced = held
+		released.emit(t, true)
+	_search(stick_back and active())
+
+
+func _press() -> void:
+	var c := hover
+	if c and not c.lock_disabled:
+		lock(c)
+	elif active():
+		if switch_mode:
+			var t := target
+			release()
+			released.emit(t, false)
+	elif target == null and not parallel and not forced:
+		_start_parallel()
+	# (Hold mode, letting go then pressing with nothing else to take: the old lock stays.)
 
 
 func lock(t: Targetable) -> void:
 	target = t
-	_unseen = 0.0
+	_timer = 15.0
+	_latch = switch_mode
+	parallel = false
+	locked.emit(t)
 
 
 func release() -> void:
 	target = null
+	_latch = false
 
 
-func _valid(t: Targetable) -> bool:
+func _start_parallel() -> void:
+	parallel = true
+	parallel_facing = _owner_actor.facing if _owner_actor else -global_basis.z
+	# Against a wall, facing within 45° of it: square up to it first.
+	if _owner_actor:
+		var from := _owner_actor.global_position + Vector3.UP * 0.8
+		var hit := _ray(from, from + parallel_facing * 0.7)
+		if not hit.is_empty() and absf(hit.normal.y) < 0.5:
+			var into := -Vector3(hit.normal.x, 0.0, hit.normal.z).normalized()
+			if parallel_facing.dot(into) > cos(deg_to_rad(45.0)):
+				parallel_facing = into
+
+
+# --- Search -------------------------------------------------------------------------------
+
+## Fills `hover`. While locked (active), the next target under the locked weighting; else
+## the best target, leaving out a lock on its way out (tap-tap moves on).
+func _search(paused: bool) -> void:
+	hover = null
+	if paused or _owner_actor == null:
+		return  # (MM: no battle music search either)
+	var weighted := active()
+	var from := _owner_actor.global_position
+	var eye := from + Vector3.UP * 1.4
+	var face := _owner_actor.facing
+	var cam := get_viewport().get_camera_3d()
+	var best := [null, null, null]  # hostile tier, other tier, non-zero priority
+	var best_d := [INF, INF, INF]
+	var bgm: Targetable = null
+	var bgm_d2 := BATTLE_FAR * BATTLE_FAR
+	for node in get_tree().get_nodes_in_group(Targetable.GROUP):
+		var t := node as Targetable
+		if t == null or not valid(t):
+			continue
+		var to := t.origin() - from
+		var d2 := to.length_squared()
+		if t.kind == Targetable.Kind.ENEMY and t.hostile and d2 < bgm_d2:
+			bgm = t
+			bgm_d2 = d2
+		if t == target:
+			continue
+		var flat := Vector3(to.x, 0.0, to.z)
+		var ang := rad_to_deg(face.angle_to(flat)) if flat.length() > 0.01 else 0.0
+		if weighted:
+			if ang > NEXT_CONE or t.lock_disabled:
+				continue
+			d2 *= 1.0 - 0.8 * (NEXT_CONE - ang) / 180.0
+		elif ang > CONE:
+			continue
+		var slot := 2 if t.priority != 0 else (0 if t.is_hostile_tier() else 1)
+		var key := float(t.priority) if slot == 2 else d2
+		if key > best_d[slot] or (key == best_d[slot] and best[slot] and t.order > best[slot].order):
+			continue
+		var r := t.acquire_range()
+		if d2 >= r * r or (check_screen and not on_screen(cam, t.global_position)) or not _sees(eye, t):
+			continue
+		best[slot] = t
+		best_d[slot] = key
+	hover = best[0] if best[0] else (best[1] if best[1] else best[2])
+	_set_battle(bgm, sqrt(bgm_d2))
+
+
+func _set_battle(enemy: Targetable, d: float) -> void:
+	bgm_enemy = enemy
+	var level := 0.0
+	if enemy:
+		level = 1.0 - clampf(d - BATTLE_NEAR, 0.0, BATTLE_FAR - BATTLE_NEAR) / (BATTLE_FAR - BATTLE_NEAR)
+	if absf(level - battle_level) > 0.001:
+		battle_level = level
+		get_tree().call_group(BATTLE_GROUP, &"set_battle_level", level)
+
+
+func _outside_leash(t: Targetable) -> bool:
+	var r := t.release_range()
+	return _owner_actor and t.origin().distance_squared_to(_owner_actor.global_position) >= r * r
+
+
+func valid(t: Targetable) -> bool:
 	if not is_instance_valid(t) or not t.enabled or not t.is_visible_in_tree():
 		return false
 	var a := t.actor()
 	return a == null or (a != _owner_actor and not a.is_dead())
 
 
-func _visible(from: Vector3, t: Targetable) -> bool:
-	var space := get_world_3d().direct_space_state
-	var q := PhysicsRayQueryParameters3D.create(from, t.global_position)
+## Within MM's screen leeway (a little past the sides, well past the top and bottom).
+static func on_screen(cam: Camera3D, p: Vector3) -> bool:
+	if cam == null:
+		return true
+	if cam.is_position_behind(p):
+		return false
+	var size := cam.get_viewport().get_visible_rect().size
+	var s := cam.unproject_position(p)
+	var lx := LEEWAY.x / 320.0 * size.x
+	var ly := LEEWAY.y / 240.0 * size.y
+	return s.x > -lx and s.x < size.x + lx and s.y > -ly and s.y < size.y + ly
+
+
+## Nothing of the level between the eye and the target's focus (actors don't block).
+func _sees(eye: Vector3, t: Targetable) -> bool:
+	return _ray(eye, t.global_position).is_empty()
+
+
+func _ray(a: Vector3, b: Vector3) -> Dictionary:
+	var q := PhysicsRayQueryParameters3D.create(a, b)
 	var exclude: Array[RID] = []
-	for a in get_tree().get_nodes_in_group(&"actors"):
-		exclude.append((a as CollisionObject3D).get_rid())
+	for n in get_tree().get_nodes_in_group(&"actors"):
+		if n is CollisionObject3D:
+			exclude.append((n as CollisionObject3D).get_rid())
 	q.exclude = exclude
-	return space.intersect_ray(q).is_empty()
+	return get_world_3d().direct_space_state.intersect_ray(q)
 
 
-func _physics_process(delta: float) -> void:
-	if target and not _valid(target):
-		release()
-	if target and _owner_actor:
-		var eye := _owner_actor.global_position + Vector3.UP * 1.4
-		var d := Vector2(target.global_position.x - eye.x, target.global_position.z - eye.z).length()
-		if d > target.lock_range() * 1.3:
-			release()
-		elif not _visible(eye, target):
-			_unseen += delta
-			if _unseen > lose_time:
-				release()
-		else:
-			_unseen = 0.0
-	_reticle.visible = target != null
-	if target:
-		_reticle.global_position = target.global_position + Vector3.UP * 0.55
-		_reticle.modulate = Color(1.0, 0.85, 0.2) if target.kind == Targetable.Kind.ENEMY else Color(0.4, 1.0, 0.5)
+## Whether `who` is what the player has locked on (enemies take turns by it).
+static func is_locked_on(who: Node, tree: SceneTree) -> bool:
+	var p := tree.get_first_node_in_group(&"player")
+	if p == null or not "lock" in p or p.lock == null or not p.lock.active():
+		return false
+	var t: Targetable = p.lock.target
+	return t.actor() == who or t.get_parent() == who

@@ -13,6 +13,7 @@ config_version=5
 config/name="m3d3"
 run/main_scene="res://zones/overworld/overworld.tscn"
 config/features=PackedStringArray("4.7", "C#", "Forward Plus")
+run/max_fps=60
 
 [autoload]
 
@@ -21,12 +22,15 @@ ZoneManager="*res://game/zone_manager.gd"
 Talk="*res://game/story/talk.gd"
 Schedules="*res://game/story/schedule/schedules.gd"
 Cutscenes="*res://game/story/cutscene/cutscenes.gd"
+RenderScale="*res://game/render_scale.gd"
 
 [display]
 
 window/size/viewport_width=1920
 window/size/viewport_height=1080
 window/size/mode=2
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
 
 [dotnet]
 
@@ -34,15 +38,28 @@ project/assembly_name="m3d3"
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/n64_actor_tools/plugin.cfg", "res://addons/n64_audio_tools/plugin.cfg", "res://addons/n64_level_tools/plugin.cfg", "res://addons/n64_script_builder/plugin.cfg", "res://addons/n64_story_tools/plugin.cfg", "res://addons/zz_view_debug/plugin.cfg")
+enabled=PackedStringArray("res://addons/n64_actor_tools/plugin.cfg", "res://addons/n64_audio_tools/plugin.cfg", "res://addons/n64_grade/plugin.cfg", "res://addons/n64_level_tools/plugin.cfg", "res://addons/n64_script_builder/plugin.cfg", "res://addons/n64_story_tools/plugin.cfg", "res://addons/zz_view_debug/plugin.cfg")
 
 [n64]
 
+build/lod_distance=25.0
+build/ground_lod_distance=30.0
+build/chunk_size=64.0
+build/lod_cell_size=32.0
+build/unseen_cull=true
 textures/texels_per_metre=16
+render/target_lines=900
+
+[physics]
+
+3d/physics_engine="Jolt Physics"
 
 [rendering]
 
+lights_and_shadows/directional_shadow/size=1024
+anti_aliasing/quality/msaa_3d=1
 occlusion_culling/use_occlusion_culling=true
+lights_and_shadows/positional_shadow/atlas_size=1024
 
 [shader_globals]
 
@@ -145,6 +162,14 @@ n64_fog={
 n64_fog_origin={
 "type": "vec3",
 "value": Vector3(0, 0, 0)
+}
+n64_fog_height={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}
+n64_fog_drift={
+"type": "vec4",
+"value": Vector4(0, 8, 0, 0)
 }
 n64_key_light={
 "type": "vec4",

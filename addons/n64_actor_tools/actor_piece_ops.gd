@@ -1054,3 +1054,220 @@ static func remap_pins_to(pieces: Array, before: ActorPiece, target: ActorPiece)
 					best = u
 			if best >= 0:
 				p.pins[v] = [pin[0], best]
+
+
+# --- Connected limbs ------------------------------------------------------------------------
+
+## Largest gap a connection closes, as a fraction of the child's joint-end radius. Further
+## apart, pinning would drag the child's base into the parent's shape (a wide chest box onto
+## a thin spine, a foot onto the shin's ring), so those joints are left as they are.
+const CONNECT_TOLERANCE := 0.25
+
+
+## N64 "connected limbs" (Fast64 / Kaze Emanuar): the child's joint-end vertices become the
+## parent piece's end vertices through pins (same position and skin weights, i.e. the
+## parent bone's matrix), so the joint's triangles span both bones and neither side needs a
+## cap or an overlap. Matching tube rings pair vertex for vertex (the rotation / direction
+## with the least total distance); otherwise each takes the nearest parent end vertex. The
+## caps go only when the pairs cover every edge of the parent's end ring (no hole opens).
+## `apply` false = dry run. Returns {ok, text, pinned, caps, parent, gap}.
+static func connect_to_parent(model: ActorModel, pi: int, apply := true, tolerance := CONNECT_TOLERANCE) -> Dictionary:
+	var pieces := model.data.pieces
+	var p: ActorPiece = pieces[pi]
+	var out := {ok = false, text = "", pinned = 0, caps = false, parent = &"", gap = 0.0}
+	var bi := model.bone_index(p.bone)
+	if bi < 0:
+		out.text = "bone %s isn't in the body plan" % p.bone
+		return out
+	if model.data.rigid_joints.get(p.bone, false):
+		out.text = "rigid joint (overlaps on purpose)"
+		return out
+	# Child joint end: a tube's first ring (ordered around the bone), or a free mesh's base.
+	var child_ids := PackedInt32Array()
+	var ordered := p.is_tube()
+	if ordered:
+		child_ids = p.rings[0]
+	else:
+		var jv := ActorMannequin._joint_vertices(p)
+		for v in jv:
+			child_ids.append(v)
+	if child_ids.is_empty():
+		out.text = "the piece doesn't reach its joint"
+		return out
+	var pxf := model.piece_transform(p)
+	var child_pts := PackedVector3Array()
+	var mid := Vector3.ZERO
+	for v in child_ids:
+		child_pts.append(pxf * p.vertices[v])
+		mid += child_pts[-1]
+	mid /= child_pts.size()
+	var radius := 0.0
+	for c in child_pts:
+		radius += c.distance_to(mid) / child_pts.size()
+	# Parent pieces: on the stitch bone, or the nearest ancestor that has any (clavicles
+	# have none, so an upper arm finds the chest).
+	var cands := []
+	var anc: StringName = p.stitch_to if p.stitch_to != &"" else model.bones[bi].parent
+	while anc != &"" and cands.is_empty():
+		cands = _pieces_on(model, anc, pi)
+		var ai := model.bone_index(anc)
+		anc = model.bones[ai].parent if ai >= 0 else &""
+	if cands.is_empty():
+		out.text = "no parent piece"
+		return out
+	var best := {}
+	for c in cands:
+		var m := _pair_ends(model, c, child_pts, ordered)
+		if not m.is_empty() and (best.is_empty() or m.total < best.total):
+			best = m
+	if best.is_empty():
+		out.text = "the parent piece has no vertices"
+		return out
+	var q: ActorPiece = best.piece
+	out.parent = q.bone
+	out.gap = best.worst
+	var tol := maxf(tolerance * radius, model.data.model_grid)
+	if best.worst > tol:
+		out.text = "too far from %s (%.1f cm gap, limit %.1f cm): left as is" % [q.bone, best.worst * 100.0, tol * 100.0]
+		return out
+	# Caps: safe to drop when the child's ring walks the whole parent ring edge by edge.
+	var safe: bool = ordered and q.is_tube() and not best.mirror_copy and _covers_ring(best.slots, q.rings[-1].size())
+	out.ok = true
+	out.pinned = child_ids.size()
+	out.caps = safe
+	var note := "caps off" if safe else ("caps kept (%s)" % ("the right side's parent is a mirror copy" if best.mirror_copy
+		else "the parent's end ring isn't fully covered" if ordered and q.is_tube() else "free-mesh joint, its end faces stay"))
+	out.text = "%d vertices pinned to %s, %s" % [out.pinned, q.bone, note]
+	if not apply:
+		return out
+	var source: ActorPiece = pieces[best.index]
+	if safe:
+		_drop_cap(pieces, source, false)
+		_drop_cap(pieces, p, true)
+		pxf = model.piece_transform(p)
+	var inv := pxf.affine_inverse()
+	var qxf := model.piece_transform(q)
+	var child_now := p.rings[0] if ordered else child_ids
+	var parent_now: PackedInt32Array = source.rings[-1] if q.is_tube() else PackedInt32Array(range(q.vertices.size()))
+	if best.mirror_copy and q.is_tube():
+		parent_now = q.rings[-1]  # the copy's ring order (ids are the source's)
+	source.ensure_id()
+	for k in child_now.size():
+		var cv: int = child_now[k]
+		var pv: int = parent_now[best.slots[k]]
+		p.pins[cv] = [best.id, pv]
+		p.vertices[cv] = inv * (qxf * q.vertices[pv])
+	if p.is_tube():
+		p.rebuild_tube_faces()
+	return out
+
+
+## Every piece whose joint has a parent piece: connect_to_parent on each. Returns one
+## result per piece (with `bone`), roots left out.
+static func connect_all(model: ActorModel, apply := true, tolerance := CONNECT_TOLERANCE) -> Array:
+	var out := []
+	for i in model.data.pieces.size():
+		var r := connect_to_parent(model, i, apply, tolerance)
+		if r.text == "no parent piece":
+			continue
+		r.bone = model.data.pieces[i].bone
+		out.append(r)
+	return out
+
+
+## Pieces built on `bone` (other than `skip`): [{piece, index, id, mirror_copy}]. Right-side
+## bones also find the mirrored copies of their left twins (pins target those as id~R).
+static func _pieces_on(model: ActorModel, bone: StringName, skip: int) -> Array:
+	var out := []
+	for j in model.data.pieces.size():
+		if j == skip:
+			continue
+		var q: ActorPiece = model.data.pieces[j]
+		q.ensure_id()
+		if q.bone == bone:
+			out.append({piece = q, index = j, id = q.id, mirror_copy = false})
+		elif q.mirror and String(q.bone).ends_with("_L") and BodyPlan.mirror_name(q.bone) == bone:
+			out.append({piece = q.mirrored(bone), index = j, id = q.id + "~R", mirror_copy = true})
+	return out
+
+
+## Pairs the child's joint-end points with candidate `c`'s end: a tube's last ring, a free
+## mesh's nearest vertices. `slots[k]`: the parent ring slot (or vertex id) for child point
+## k. {piece, index, id, mirror_copy, slots, total, worst} or {} when it has no vertices.
+static func _pair_ends(model: ActorModel, c: Dictionary, child_pts: PackedVector3Array, ordered: bool) -> Dictionary:
+	var q: ActorPiece = c.piece
+	var qxf := model.piece_transform(q)
+	var ids := q.rings[-1] if q.is_tube() else PackedInt32Array(range(q.vertices.size()))
+	if ids.is_empty():
+		return {}
+	var pts := PackedVector3Array()
+	for v in ids:
+		pts.append(qxf * q.vertices[v])
+	var n := pts.size()
+	var slots := PackedInt32Array()
+	if ordered and q.is_tube() and n == child_pts.size():
+		# Same ring size: pair in order around the bone, trying every rotation both ways.
+		var best_total := INF
+		for dir in [1, -1]:
+			for off in n:
+				var total := 0.0
+				for k in n:
+					total += child_pts[k].distance_to(pts[posmod(off + dir * k, n)])
+				if total < best_total - 1e-9:
+					best_total = total
+					slots.resize(n)
+					for k in n:
+						slots[k] = posmod(off + dir * k, n)
+	else:
+		for cp in child_pts:
+			var bj := 0
+			var bd := INF
+			for j in n:
+				var d := cp.distance_squared_to(pts[j])
+				if d < bd:
+					bd = d
+					bj = j
+			slots.append(bj)
+	var total := 0.0
+	var worst := 0.0
+	for k in slots.size():
+		var d := child_pts[k].distance_to(pts[slots[k]])
+		total += d
+		worst = maxf(worst, d)
+	var out := c.duplicate()
+	if not q.is_tube():
+		# Free meshes: slots are vertex ids already.
+		for k in slots.size():
+			slots[k] = ids[slots[k]]
+	out.merge({slots = slots, total = total, worst = worst})
+	return out
+
+
+## True when the cyclic child sequence of parent ring slots steps only to the same or a
+## neighbouring slot and crosses every edge of the parent's ring (n slots).
+static func _covers_ring(slots: PackedInt32Array, n: int) -> bool:
+	var edges := {}
+	for k in slots.size():
+		var a := slots[k]
+		var b := slots[(k + 1) % slots.size()]
+		if a == b:
+			continue
+		var step := posmod(b - a, n)
+		if step != 1 and step != n - 1:
+			return false
+		edges[mini(a, b) * n + maxi(a, b)] = true
+	return edges.size() == n
+
+
+## Turns off a tube's start / end cap, rebuilding it; pins on other pieces that pointed at
+## its vertices follow (rebuilding compacts the vertex ids).
+static func _drop_cap(pieces: Array, p: ActorPiece, start: bool) -> void:
+	if (p.cap_start if start else p.cap_end) == false:
+		return
+	var before := p.duplicate(true) as ActorPiece
+	if start:
+		p.cap_start = false
+	else:
+		p.cap_end = false
+	p.rebuild_tube_faces()
+	remap_pins_to(pieces, before, p)

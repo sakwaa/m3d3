@@ -20,6 +20,18 @@ extends ActorState
 @export var climb_state: StringName
 ## Seconds off the floor before falling (walking off ledges; small bumps don't count).
 @export var coyote_time := 0.12
+@export_group("Z-targeting")
+## While Z-targeting (Actor.z_targeting): standing is `z_stance` (battle-ready), moving left /
+## right / back relative to the facing are the strafes, forward is `z_forward` (walking at
+## the target as usual). Empty = no change.
+@export var z_stance: StringName
+@export var z_left: StringName
+@export var z_right: StringName
+@export var z_back: StringName
+@export var z_forward: StringName
+## One of those: without Z-targeting it hands back to `idle_state` / `z_forward`.
+@export var z_only := false
+@export_group("")
 
 var _air := 0.0
 
@@ -44,6 +56,16 @@ func update(delta: float) -> void:
 		go(jump_state)
 		return
 	var m := actor.intent.move.length()
+	if z_stance != &"" and actor.z_targeting():
+		var want := _z_state(m)
+		if want != &"" and want != name:
+			go(want)
+			return
+		if want != &"" or z_only:
+			return
+	elif z_only:
+		go(idle_state if m < min_input else z_forward)
+		return
 	if m < min_input:
 		if idle_state != &"" and idle_state != name:
 			go(idle_state)
@@ -53,3 +75,18 @@ func update(delta: float) -> void:
 		go(faster)
 	elif slower != &"" and m < slower_below:
 		go(slower)
+
+
+## The Z-targeting state for input strength `m`: the stance, a strafe by the stick's side of
+## the facing, or z_forward ahead (empty: as usual).
+func _z_state(m: float) -> StringName:
+	if m < min_input:
+		return z_stance
+	var mv := Vector3(actor.intent.move.x, 0.0, actor.intent.move.z)
+	var f := actor.facing
+	var a := rad_to_deg(atan2(mv.dot(f.cross(Vector3.UP).normalized()), mv.dot(f)))
+	if absf(a) <= 45.0:
+		return z_forward if z_only else &""
+	if absf(a) >= 135.0:
+		return z_back
+	return z_right if a > 0.0 else z_left

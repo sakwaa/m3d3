@@ -14,7 +14,7 @@ enum Style { UPRIGHT, CROSS, FLAT }
 
 const SHADER := preload("res://addons/n64_runtime/shaders/n64_scatter.gdshader")
 ## Metres: points are split into cells this size, one MultiMesh each.
-const CELL := 16.0
+const CELL := 48.0  # (one draw per set per cell: flowers are tiny, keep the cells big)
 ## Auto draw distance: this many times the item size (a 0.4 m flower: 60 m, a few pixels).
 const AUTO_DISTANCE := 150.0
 

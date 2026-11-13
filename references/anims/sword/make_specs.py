@@ -92,6 +92,24 @@ spec("SlashV", 20, [
 	key(20),
 ], {"windup": [0, 5], "active": [6, 10], "cancel": [13, 20], "opening": [14, 20]}, measured=False)
 
+# Vertical finisher (the third locked-on neutral press: MM / OoT normal_kiru_finsh). Read by
+# eye from the N64 original in "Remake vs Original" (short 6qNOIcnL8P8, 24 fps frames
+# 198-213, ~0.37 s strike + ~0.25 s recovery): from low on the left the blade sweeps up and
+# over the head in a big arc and comes down to the front right (a huge crescent), then is
+# lifted back over the left shoulder.
+spec("SlashVFin", 22, [
+	key(0),
+	key(3, "ease_in", twist=-40, hip_twist=-20, lean=8, lift=-0.03,
+		upper_arm_R=[20, -50], forearm_R=[35, -70], blade_R=[-15, -60], **CROUCH),
+	key(7, twist=-10, hip_twist=-6, lean=-2,
+		upper_arm_R=[165, 10], forearm_R=[200, 5], blade_R=[205, 0], **STEP),
+	key(11, "ease_out", twist=40, hip_twist=20, hip_roll=-8, lean=24, lift=-0.04,
+		upper_arm_R=[55, 45], forearm_R=[45, 50], blade_R=[35, 60], **STEP),
+	key(16, twist=-20, hip_twist=-8, lean=8,
+		upper_arm_R=[125, -35], forearm_R=[155, -55], blade_R=[165, -40], **STANCE),
+	key(22),
+], {"windup": [0, 3], "active": [4, 11], "cancel": [15, 22], "opening": [16, 22]}, measured=False)
+
 # Stab (locked on, stick forward): blade drawn back level at the hip -> thrust straight ahead.
 spec("Stab", 16, [
 	key(0),

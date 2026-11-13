@@ -19,6 +19,7 @@ const DEFAULT_BLENDER := "/Applications/Blender.app/Contents/MacOS/Blender"
 const SCRIPT := "res://tools/blender_dissolve/dissolve.py"
 ## Faces within this many degrees of one plane merge.
 const ANGLE := 1.0
+const BuildCache := preload("res://addons/n64_level_tools/export/build_cache.gd")
 
 
 static func blender() -> String:
@@ -31,12 +32,15 @@ static func enabled() -> bool:
 
 
 ## Dissolves `data`'s brushes in place (the build's copy). Returns {before, after} (triangles
-## of the brushes sent) or {error} when Blender couldn't be run.
+## of the brushes sent) or {error} when Blender couldn't be run. While BuildCache is active,
+## brushes dissolved before come from its files.
 static func dissolve(data: LevelData) -> Dictionary:
+	var use_cache := BuildCache.active
 	var shade := _prop_shade(data)
 	var meshes := []
 	var jobs := []  # [brush, per-face group, corner info]
 	var before := 0
+	_shade_cuts(data, shade)
 	for b in data.brushes:
 		if b == null or b.is_prop() or b.is_fence() or b.is_rope() or b.blend_file != "":
 			continue
@@ -50,6 +54,36 @@ static func dissolve(data: LevelData) -> Dictionary:
 			before += f.size() - 2
 	if meshes.is_empty():
 		return {before = 0, after = 0}
+	# Brushes dissolved before with the same shape and groups: their result from the cache
+	# (Build & Play only; exports always run Blender).
+	var results := []
+	results.resize(jobs.size())
+	var keys := []
+	var send := []  # job indices Blender still has to do
+	var script_md5 := FileAccess.get_md5(SCRIPT)
+	for i in jobs.size():
+		keys.append(BuildCache.key([meshes[i], ANGLE, script_md5]))
+		var hit = BuildCache.read("dissolve", keys[i]) if use_cache else null
+		if hit is Dictionary:
+			results[i] = hit
+		else:
+			send.append(i)
+	if not send.is_empty():
+		var fresh := _run_blender(send.map(func(i): return meshes[i]))
+		if fresh.has("error"):
+			return fresh
+		for k in send.size():
+			results[send[k]] = fresh.meshes[k]
+			if use_cache:
+				BuildCache.write("dissolve", keys[send[k]], fresh.meshes[k])
+	var after := 0
+	for i in jobs.size():
+		after += _apply(jobs[i], results[i])
+	return {before = before, after = after, cached = jobs.size() - send.size()}
+
+
+## Blender's dissolve of `meshes`: {meshes} or {error}.
+static func _run_blender(meshes: Array) -> Dictionary:
 	var dir := ProjectSettings.globalize_path("user://")
 	var inp := dir.path_join("blender_dissolve_in.json")
 	var outp := dir.path_join("blender_dissolve_out.json")
@@ -61,20 +95,17 @@ static func dissolve(data: LevelData) -> Dictionary:
 	var code := OS.execute(blender(), ["-b", "--factory-startup", "--python", ProjectSettings.globalize_path(SCRIPT), "--",
 		inp, outp, str(ANGLE)], log, true)
 	var parsed = JSON.parse_string(FileAccess.get_file_as_string(outp)) if FileAccess.file_exists(outp) else null
-	if not parsed is Dictionary or (parsed.meshes as Array).size() != jobs.size():
+	if not parsed is Dictionary or (parsed.meshes as Array).size() != meshes.size():
 		return {error = "Blender dissolve failed (exit %d): %s" % [code, "\n".join(log).right(800)]}
-	var after := 0
-	for i in jobs.size():
-		after += _apply(jobs[i], parsed.meshes[i])
-	return {before = before, after = after}
+	return parsed
 
 
-## Where props shade the ground (level-space XZ rects: a stall's or tree's footprint and
-## SHADE_MARGIN round it, the height it reaches up to): faces lying up in them keep their
-## vertices (stay out of the dissolve), so the baked lighting still has the vertices to
-## draw the props' shadows with (merged into one big face, the ground under a stall would
-## get none).
-const SHADE_MARGIN := 1.5
+## Where props shade the ground: [outer rect (level-space XZ: a stall's or tree's footprint
+## and SHADE_RING round it), the height it reaches up to, the footprint]. The ground there is
+## cut along the footprint's edges and the ring's (_shade_cuts) and merges only within each
+## zone (inside the footprint, the ring), so the baked lighting has vertices along the
+## shadow's edges - a few lines that follow the prop, not a grid of cells left whole.
+const SHADE_RING := 0.0
 const SHADE_KINDS := [PropSpec.Kind.STALL, PropSpec.Kind.TREE]
 
 
@@ -83,34 +114,118 @@ static func _prop_shade(data: LevelData) -> Array:
 	for b in data.brushes:
 		if b and b.is_prop() and b.prop.kind in SHADE_KINDS:
 			var box: AABB = b.transform * b.local_aabb()
-			out.append([Rect2(box.position.x, box.position.z, box.size.x, box.size.z).grow(SHADE_MARGIN), box.end.y])
+			var fp := Rect2(box.position.x, box.position.z, box.size.x, box.size.z)
+			out.append([fp.grow(SHADE_RING), box.end.y, fp])
 	return out
 
 
-## Whether brush `b`'s face `f` lies up under / beside a prop (`shade`: _prop_shade).
-static func _shaded(b: LevelBrush, f: int, shade: Array) -> bool:
+## Ground brushes (not props, houses, openings, fences, ropes, Blender set pieces).
+static func _is_ground(b: LevelBrush) -> bool:
+	return b != null and not (b.is_prop() or b.is_fence() or b.is_rope() or b.is_house() or b.opening_spec() != null) \
+		and b.blend_file == "" and b.bake_mode != LevelBrush.BakeMode.COLLISION_ONLY
+
+
+## Cuts the ground under / round each prop along its footprint's and ring's edges (only the
+## faces there: the lines don't run on across the ground). Keeps every face's data.
+static func _shade_cuts(data: LevelData, shade: Array) -> void:
+	if shade.is_empty():
+		return
+	for b: LevelBrush in data.brushes:
+		if not _is_ground(b) or b.get_face_count() == 0:
+			continue
+		b.ensure_geometry()
+		var to_local := b.transform.affine_inverse()
+		var verts := b.vertices
+		var faces := b.get_faces()
+		var rects := {}
+		for f in faces.size():
+			rects[f] = b.get_face_planar_rect(f)
+		var map := PackedInt32Array()
+		for f in faces.size():
+			map.append(f)
+		var sources: Array[PackedInt32Array] = []
+		for i in verts.size():
+			sources.append(PackedInt32Array([i]))
+		var changed := false
+		for s in shade:
+			var outer: Rect2 = s[0]
+			var fp: Rect2 = s[2]
+			var lines := [[Vector3.RIGHT, fp.position.x], [Vector3.RIGHT, fp.end.x], [Vector3.RIGHT, outer.position.x],
+				[Vector3.RIGHT, outer.end.x], [Vector3.BACK, fp.position.y], [Vector3.BACK, fp.end.y],
+				[Vector3.BACK, outer.position.y], [Vector3.BACK, outer.end.y]]
+			for ln in lines:
+				var only := {}
+				for f in faces.size():
+					var lo := Vector3(INF, INF, INF)
+					var hi := -lo
+					var pts := PackedVector3Array()
+					for v in faces[f]:
+						var w: Vector3 = b.transform * verts[v]
+						pts.append(w)
+						lo = lo.min(w)
+						hi = hi.max(w)
+					if PolyUtil.newell_normal(pts).normalized().y < 0.7 or (lo.y + hi.y) * 0.5 >= s[1]:
+						continue
+					if Rect2(Vector2(lo.x, lo.z), Vector2(hi.x - lo.x, hi.z - lo.z)).intersects(outer, true):
+						only[f] = true
+				if only.is_empty():
+					continue
+				var n: Vector3 = ln[0]
+				var nl: Vector3 = (to_local.basis * n).normalized()
+				var dl: float = nl.dot(to_local * (n * float(ln[1])))
+				var res := BrushOps.cut_plane(verts, faces, nl, dl, only)
+				if res.faces.size() == faces.size():
+					continue
+				changed = true
+				verts = res.verts
+				faces = res.faces
+				for pair in res.new_vertices:
+					var src := PackedInt32Array(sources[pair.x])
+					src.append_array(sources[pair.y])
+					sources.append(src)
+				var nm := PackedInt32Array()
+				for f in res.map.size():
+					nm.append(map[res.map[f]])
+				map = nm
+		if not changed:
+			continue
+		b.vertices = verts
+		b.set_faces(faces)
+		b.remap_faces(map)
+		b.blend_vertex_colors(sources)
+		var parents := {}
+		for f in map.size():
+			parents[f] = rects[map[f]]
+		b.crop_child_masks(parents)
+
+
+## Which shade zone brush `b`'s face `f` is in: 2 * prop + 0 under the prop (its footprint),
+## + 1 in the ring round it; -1 elsewhere (`shade`: _prop_shade).
+static func _shade_zone(b: LevelBrush, f: int, shade: Array) -> int:
 	if shade.is_empty() or (b.transform.basis * b.get_face_normal(f)).normalized().y < 0.7:
-		return false
+		return -1
 	var c := Vector3.ZERO
 	var pts := b.get_face_points(f)
 	for p in pts:
 		c += b.transform * p
 	c /= pts.size()
-	for s in shade:
-		if (s[0] as Rect2).has_point(Vector2(c.x, c.z)) and c.y < s[1]:
-			return true
-	return false
+	for i in shade.size():
+		var s: Array = shade[i]
+		if c.y >= s[1]:
+			continue
+		if (s[2] as Rect2).has_point(Vector2(c.x, c.z)):
+			return i * 2
+		if (s[0] as Rect2).has_point(Vector2(c.x, c.z)):
+			return i * 2 + 1
+	return -1
 
 
 ## What Blender gets for a brush: its vertices, faces, a merge group per face and the edges
-## that must stay; plus what _apply needs to put the corner data back. Painted faces and
-## faces in a prop's shade (_prop_shade) each stay whole.
+## that must stay; plus what _apply needs to put the corner data back. Painted faces each
+## stay whole; faces in a prop's shade merge only within their zone (_shade_zone).
 static func _job(b: LevelBrush, shade := []) -> Dictionary:
 	var faces := b.get_faces()
 	var painted := _painted_faces(b)
-	for f in faces.size():
-		if _shaded(b, f, shade):
-			painted[f] = true
 	var cuv := b.has_corner_uvs()
 	var ccol := b.has_corner_colors()
 	var groups := PackedInt32Array()
@@ -126,9 +241,9 @@ static func _job(b: LevelBrush, shade := []) -> Dictionary:
 				maps.append(_linear_map(b, faces[f], first, func(c): return [b.corner_uvs[c].x, b.corner_uvs[c].y], 0.001))
 			if ccol:
 				maps.append(_linear_map(b, faces[f], first, func(c): var k: Color = b.corner_colors[c]; return [k.r, k.g, k.b], 1.0 / 255.0))
-			groups.append(hash([b.get_face_texture(f), b.get_face_uv(f), b.get_face_surface(f),
+			groups.append(hash([b.get_face_texture(f), b.get_face_uv(f), b.get_face_uv_stretch(f), b.get_face_surface(f),
 				b.face_bake[f] if f < b.face_bake.size() else 0, b.get_face_lod(f), b.get_face_layer_set(f),
-				b.get_face_piece(f), cuv, ccol, maps]))
+				b.get_face_piece(f), cuv, ccol, maps, _shade_zone(b, f, shade)]))
 		first += faces[f].size()
 	# Per vertex: the corners using it ([face, corner]), and per corner its exact UV / colour.
 	var at_vertex := {}
@@ -261,8 +376,9 @@ static func _apply(job: Dictionary, r: Dictionary) -> int:
 	var has_uv: bool = not (job.cuv as PackedVector2Array).is_empty()
 	var has_col: bool = not (job.ccol as PackedColorArray).is_empty()
 	var tris := 0
+	var out_faces := _rejoin(b, r.faces)
 	for k in r.faces.size():
-		var poly := PackedInt32Array(r.faces[k])
+		var poly: PackedInt32Array = out_faces[k]
 		var src := int(r.src[k])
 		faces.append(poly)
 		map.append(src)
@@ -314,6 +430,60 @@ static func _apply(job: Dictionary, r: Dictionary) -> int:
 		ao.fill(1.0)
 		b.vertex_ao = ao
 	return tris
+
+
+## Blender's faces with the vertices their neighbours still use put back on their edges:
+## merge groups are dissolved apart, so a group can drop a vertex from the middle of a
+## straight border that the face across it keeps - a T-junction, which opens as a hairline
+## crack. Any vertex used by an output face that lies on another output face's edge (within
+## 1 mm) goes back into that edge, in order.
+static func _rejoin(b: LevelBrush, faces: Array) -> Array[PackedInt32Array]:
+	var used := {}
+	for f in faces:
+		for v in f:
+			used[int(v)] = true
+	var grid := {}
+	for v: int in used:
+		var p := b.vertices[v]
+		grid.get_or_add(Vector3i(floori(p.x), floori(p.y), floori(p.z)), []).append(v)
+	var out: Array[PackedInt32Array] = []
+	for f in faces:
+		var poly := PackedInt32Array()
+		var n := (f as Array).size()
+		for i in n:
+			var ia := int(f[i])
+			var ib := int(f[(i + 1) % n])
+			poly.append(ia)
+			var a := b.vertices[ia]
+			var c := b.vertices[ib]
+			var len := a.distance_to(c)
+			if len < 0.002:
+				continue
+			var dir := (c - a) / len
+			var on := []
+			var cells := {}
+			for s in ceili(len) + 1:
+				var q := a.lerp(c, minf(float(s) / maxf(ceil(len), 1.0), 1.0))
+				for dx in [-1, 0, 1]:
+					for dy in [-1, 0, 1]:
+						for dz in [-1, 0, 1]:
+							cells[Vector3i(floori(q.x) + dx, floori(q.y) + dy, floori(q.z) + dz)] = true
+			for cell in cells:
+				for v: int in grid.get(cell, []):
+					if v == ia or v == ib:
+						continue
+					var p := b.vertices[v]
+					var t := (p - a).dot(dir)
+					if t <= 0.001 or t >= len - 0.001:
+						continue
+					if (a + dir * t).distance_to(p) <= 0.001:
+						on.append([t, v])
+			on.sort_custom(func(x, y): return x[0] < y[0])
+			for e in on:
+				if poly[-1] != e[1]:
+					poly.append(e[1])
+		out.append(poly)
+	return out
 
 
 ## Whether old face `face`'s middle lies inside the polygon `pts` (normal `n`).

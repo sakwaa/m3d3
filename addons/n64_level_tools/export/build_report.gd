@@ -52,6 +52,12 @@ static func level(root: LevelRoot, scene: Node, scene_path: String, editor_data:
 		if tris > b.budget_chunk_tris:
 			problems.append(_problem("warning", "chunk_over_budget", "chunk %d has %d tris (budget %d)" % [i, tris,
 				b.budget_chunk_tris], box.get_center()))
+	# Vertex paint far from neutral on textured faces: it multiplies over the texture and its
+	# grade (the market's lime grass), so it should be deliberate.
+	if editor_data:
+		for p in loud_paint(editor_data):
+			problems.append(_problem("warning", "loud_vertex_paint", "%d corners of %s painted %s (saturation %.2f): vertex paint multiplies the texture; keep it near grey unless meant" % [
+				p.corners, p.texture, p.color, p.saturation], xf * p.at))
 	# Props: meshes in the scene that aren't the level's own (lanterns, hangs, dressing).
 	var props := {}
 	var prop_boxes := []
@@ -415,6 +421,37 @@ static func _kind(b: LevelBrush) -> String:
 	if b.blend_file != "":
 		return "set_piece"
 	return "brush"
+
+
+## Vertex paint saturated past LOUD_PAINT on textured faces, grouped by texture and colour:
+## [{texture, color, saturation, corners, at (level space)}], most corners first.
+const LOUD_PAINT := 0.35
+
+
+static func loud_paint(data: LevelData) -> Array:
+	var groups := {}
+	for b: LevelBrush in data.brushes:
+		if b == null or not b.has_corner_colors():
+			continue
+		var cc := b.full_corner_colors()
+		var c := 0
+		for f in b.get_face_count():
+			var ids := b.get_face_vertex_ids(f)
+			var ti := b.get_face_texture(f)
+			for k in ids.size():
+				var col := cc[c]
+				c += 1
+				if ti < 0 or col.s < LOUD_PAINT:
+					continue
+				var key := [ti, col.to_html(false)]
+				if not groups.has(key):
+					var t: Texture2D = data.textures[ti] if ti < data.textures.size() else null
+					groups[key] = {texture = t.resource_path.get_file() if t and t.resource_path != "" else "texture %d" % ti,
+						color = "#" + col.to_html(false), saturation = snappedf(col.s, 0.01), corners = 0, at = b.transform * b.vertices[ids[k]]}
+				groups[key].corners += 1
+	var out := groups.values()
+	out.sort_custom(func(a, b2): return a.corners > b2.corners)
+	return out.filter(func(g): return g.corners >= 8)
 
 
 static func _problem(severity: String, kind: String, message: String, at) -> Dictionary:

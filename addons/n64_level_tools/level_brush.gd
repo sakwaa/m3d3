@@ -26,6 +26,20 @@ enum BakeMode { VISUAL_AND_COLLISION, VISUAL_ONLY, COLLISION_ONLY }
 	set(value):
 		transform = value
 		emit_changed()
+## Texture anchor. On: the base texture is laid from the world across X / Z, so touching
+## brushes tile on without a seam (heights still count from the brush's own base: courses
+## start whole at its foot). Off: the texture rides with the brush when it moves (a trim
+## board's grain, a prop). Face offsets, turns, scale and A-align apply on top either way;
+## switching keeps faces you've placed by hand where they are. (Declared before face_uv:
+## while a saved brush loads, face_uv is still empty here, so nothing is shifted twice.)
+@export var uv_world := false:
+	set(value):
+		if value == uv_world:
+			return
+		var before := uv_anchor()
+		uv_world = value
+		_keep_placed_textures(before)
+		emit_changed()
 @export var material: Material:
 	set(value):
 		material = value
@@ -167,6 +181,12 @@ var passage_dirty := false
 		if house:
 			house.changed.connect(_on_passage_changed)
 		_on_passage_changed()
+## A door, window or sign on a house's wall (HouseFixtures): the house brush's tag, and where
+## on it: x metres along the wall from its middle (+ = right seen from outside), y metres above
+## the ground floor, z the wall (HouseSpec side: 0 front, 1 right, 2 back, 3 left). The house
+## keeps it there when it's moved, resized or rebuilt, and dragging it slides it along the wall.
+@export_storage var host := &""
+@export_storage var mount := Vector3.ZERO
 ## Prop brush (set): a sign, stall, rain drip, bird flock or NPC spot (PropSpec); the
 ## LevelRoot builds its node at the brush and a pick box to select it by. Origin = the
 ## prop's own (a sign's foot, a drip's edge...).
@@ -291,6 +311,12 @@ var passage_dirty := false
 	set(value):
 		face_uv = value
 		emit_changed()
+## Per-face texture scale across / up (X, Y), times face_uv's scale (which stays 1 on faces
+## set this way: an older face's single scale reads as the same X and Y). Missing = (1, 1).
+@export_storage var face_uv_scale := PackedVector2Array():
+	set(value):
+		face_uv_scale = value
+		emit_changed()
 ## Painted overlay masks: Vector2i(face, layer) -> Image (L8) covering the face's planar
 ## bounds. Images are never edited in place once stored (replace them), so duplicated
 ## brushes and undo snapshots can share them safely.
@@ -324,6 +350,14 @@ var passage_dirty := false
 ## Multiplies the shade like vertex_colors but is kept apart from painting, so it can be
 ## re-baked, cleared or hidden in the editor (n64_vertex_ao) without touching paint.
 ## Rendered through the vertex colour alpha. Missing entries are 1.
+## Painted AO layers (the Grade screen): layer id -> darkness per vertex (aligned with
+## vertices; 0 = none, 1 = full), folded into the time keys' light by each layer's per-key
+## settings (ZoneGrade.ao_layers). Follows vertex edits like vertex_ao; a stale size is
+## ignored.
+@export_storage var ao_paint := {}:
+	set(value):
+		ao_paint = value
+		emit_changed()
 @export_storage var vertex_ao := PackedFloat32Array():
 	set(value):
 		vertex_ao = value
@@ -466,6 +500,13 @@ func drop_unused_vertices() -> int:
 	_corner_src = {}  # same corners in the same order: nothing to carry over
 	vertex_colors = vc
 	vertex_ao = ao
+	if not ao_paint.is_empty():
+		var vmap := PackedInt32Array()
+		vmap.resize(verts.size())
+		for v in remap.size():
+			if remap[v] >= 0:
+				vmap[remap[v]] = v
+		_carry_ao_paint(func(arr: PackedFloat32Array, i: int) -> float: return arr[vmap[i]] if vmap[i] < arr.size() else 0.0, verts.size())
 	return dropped
 
 
@@ -473,7 +514,7 @@ func drop_unused_vertices() -> int:
 func snapshot() -> Dictionary:
 	return {vertices = vertices.duplicate(), face_indices = face_indices.duplicate(),
 		face_counts = face_counts.duplicate(), face_ids = face_ids.duplicate(), hand_edited = hand_edited,
-		face_textures = face_textures.duplicate(), face_uv = face_uv.duplicate(), face_masks = face_masks.duplicate(),
+		face_textures = face_textures.duplicate(), face_uv = face_uv.duplicate(), face_uv_scale = face_uv_scale.duplicate(), face_masks = face_masks.duplicate(),
 		face_surfaces = face_surfaces.duplicate(), face_layer_sets = face_layer_sets.duplicate(),
 		face_pieces = face_pieces.duplicate(), face_bake = face_bake.duplicate(), face_lod = face_lod.duplicate(), corner_uvs = corner_uvs.duplicate(),
 		fence_points = fence_points.duplicate(), fence_open = fence_open.duplicate(),
@@ -848,6 +889,12 @@ func full_vertex_colors() -> PackedColorArray:
 
 ## New vertices that average several old ones (subdivision) average their colours.
 func blend_vertex_colors(sources: Array[PackedInt32Array]) -> void:
+	if not ao_paint.is_empty():
+		_carry_ao_paint(func(arr: PackedFloat32Array, i: int) -> float:
+			var sum := 0.0
+			for src in sources[i]:
+				sum += arr[src] if src < arr.size() else 0.0
+			return sum / maxf(sources[i].size(), 1.0), sources.size())
 	if not vertex_ao.is_empty():
 		var ao := PackedFloat32Array()
 		ao.resize(sources.size())
@@ -867,6 +914,32 @@ func blend_vertex_colors(sources: Array[PackedInt32Array]) -> void:
 			c += get_vertex_color(s)
 		out[i] = c / maxf(sources[i].size(), 1.0)
 	vertex_colors = out
+
+
+## Every painted AO layer remade at `count` vertices, value i from `pick(old array, i)`.
+func _carry_ao_paint(pick: Callable, count: int) -> void:
+	var out := {}
+	for id in ao_paint:
+		var arr: PackedFloat32Array = ao_paint[id]
+		var n := PackedFloat32Array()
+		n.resize(count)
+		for i in count:
+			n[i] = pick.call(arr, i)
+		out[id] = n
+	ao_paint = out
+
+
+## A painted AO layer's darkness at vertex `v` (0 when unpainted or stale).
+func get_ao_paint(id: int, v: int) -> float:
+	var arr: PackedFloat32Array = ao_paint.get(id, PackedFloat32Array())
+	return arr[v] if arr.size() == vertices.size() and v < arr.size() else 0.0
+
+
+## A key's light with a painted AO layer's darkness folded in: towards `tint` by
+## darkness x strength (the Grade AO layers; same in the editor mesh and the bake).
+static func fold_ao(light: Color, darkness: float, strength: float, tint: Color) -> Color:
+	var t := clampf(darkness * strength, 0.0, 1.0)
+	return Color(light.r * lerpf(1.0, tint.r, t), light.g * lerpf(1.0, tint.g, t), light.b * lerpf(1.0, tint.b, t), light.a)
 
 
 ## After a face was split, crops each child's (copied) parent masks to the part of the
@@ -897,6 +970,10 @@ func crop_child_masks(parent_rects: Dictionary) -> void:
 
 ## Follows a vertex remap (vertex_map[new] = old, -1 = new white vertex).
 func remap_vertex_colors(vertex_map: PackedInt32Array) -> void:
+	if not ao_paint.is_empty():
+		_carry_ao_paint(func(arr: PackedFloat32Array, i: int) -> float:
+			var o := vertex_map[i]
+			return arr[o] if o >= 0 and o < arr.size() else 0.0, vertex_map.size())
 	if not vertex_ao.is_empty():
 		var ao := PackedFloat32Array()
 		ao.resize(vertex_map.size())
@@ -1062,7 +1139,7 @@ func merge_faces(faces: Array, density: float, pieces_only := false) -> PackedIn
 		var tweak := get_face_uv(f)
 		if pieces_only:
 			tweak.w = fposmod(tweak.w, 360.0)
-		compat.append([get_face_texture(f), tweak, get_face_surface(f), get_face_layer_set(f),
+		compat.append([get_face_texture(f), tweak, get_face_uv_stretch(f), get_face_surface(f), get_face_layer_set(f),
 			get_face_piece(f) if pieces_only else 0] if chosen.has(f) else ["keep", f])
 	var r := BrushOps.merge_coplanar(vertices, polys, compat)
 	if r.faces.size() == polys.size():
@@ -1179,6 +1256,41 @@ func with_face_surfaces(faces: Array, value: int) -> PackedInt32Array:
 
 func get_face_uv(face: int) -> Vector4:
 	return face_uv[face] if face < face_uv.size() else DEFAULT_UV
+
+
+## The face's own X / Y texture scale factor (face_uv_scale; (1, 1) where unset).
+func get_face_uv_stretch(face: int) -> Vector2:
+	return face_uv_scale[face] if face < face_uv_scale.size() else Vector2.ONE
+
+
+## get_face_uv with its X / Y scale folded into the one scale (their average where they
+## differ): for what copies a face's look into a single tweak (door / window / passage
+## specs continuing a wall or floor).
+func get_face_uv_uniform(face: int) -> Vector4:
+	var t := get_face_uv(face)
+	var st := get_face_uv_stretch(face)
+	t.z *= sqrt(st.x * st.y)
+	return t
+
+
+## The face's texture scale as shown: X and Y, its UV scale included (2 = twice as big).
+func get_face_scale(face: int) -> Vector2:
+	return get_face_uv_stretch(face) * uv_scale(get_face_uv(face))
+
+
+## face_uv_scale with `faces` given `scale` (X, Y); their face_uv scale must be set to 1.
+func with_face_uv_scale(faces: Array, scale: Vector2) -> PackedVector2Array:
+	var out := face_uv_scale.duplicate()
+	for f: int in faces:
+		while out.size() <= f:
+			out.append(Vector2.ONE)
+		out[f] = scale
+	return out
+
+
+## Base UV (metres, tweaks applied) at brush-local point `p` on `face`.
+func face_uv_at(p: Vector3, face: int) -> Vector2:
+	return tweaked_uv(p + uv_anchor(), get_face_normal(face), get_face_uv(face), get_face_uv_stretch(face))
 
 
 ## Overlay code of a face: how its overlay textures sit on top of the base's projection.
@@ -1336,6 +1448,7 @@ func masked_faces() -> Array:
 func remap_faces(map: PackedInt32Array, masks_follow := true) -> void:
 	var tex := PackedInt32Array()
 	var uv := PackedVector4Array()
+	var uv_scale_out := PackedVector2Array()
 	var surf := PackedInt32Array()
 	var sets := PackedInt32Array()
 	var pieces := PackedInt32Array()
@@ -1351,6 +1464,7 @@ func remap_faces(map: PackedInt32Array, masks_follow := true) -> void:
 		surf.append(get_face_surface(old) if old >= 0 else 0)
 		sets.append(get_face_layer_set(old) if old >= 0 else 0)
 		uv.append(get_face_uv(old) if old >= 0 else DEFAULT_UV)
+		uv_scale_out.append(get_face_uv_stretch(old) if old >= 0 else Vector2.ONE)
 		if old >= 0 and (masks_follow or old == i) and _masked_faces.has(old):
 			for layer in LevelData.MAX_LAYERS:
 				var img: Image = face_masks.get(Vector2i(old, layer))
@@ -1358,6 +1472,7 @@ func remap_faces(map: PackedInt32Array, masks_follow := true) -> void:
 					masks[Vector2i(i, layer)] = img
 	face_textures = tex
 	face_uv = uv
+	face_uv_scale = uv_scale_out if not face_uv_scale.is_empty() else PackedVector2Array()
 	face_masks = masks
 	face_surfaces = surf if not face_surfaces.is_empty() else PackedInt32Array()
 	face_layer_sets = sets if not face_layer_sets.is_empty() else PackedInt32Array()
@@ -1406,12 +1521,44 @@ func stair_runs(stairs: Dictionary) -> Dictionary:
 	return {faces = faces, runs = runs}
 
 
+## Where the base texture's projection starts, brush-local: the brush's origin across X / Z
+## (in its own frame) with uv_world, so tweaked_uv(p + uv_anchor()) lines up across brushes.
+func uv_anchor() -> Vector3:
+	if not uv_world:
+		return Vector3.ZERO
+	return transform.basis.inverse() * Vector3(transform.origin.x, 0.0, transform.origin.z)
+
+
+## After the anchor moved from `before`: faces with a hand-set offset or turn get their offset
+## shifted back, so they look as they did (the projection is linear: one shift per face).
+func _keep_placed_textures(before: Vector3) -> void:
+	var after := uv_anchor()
+	if after == before or face_uv.is_empty():
+		return
+	var uvs := face_uv.duplicate()
+	for f in mini(uvs.size(), get_face_count()):
+		var t := uvs[f]
+		if t.x == 0.0 and t.y == 0.0 and t.w == 0.0:
+			continue  # untouched: it lines up with the new anchor
+		var c := Vector3.ZERO
+		var pts := get_face_points(f)
+		for q in pts:
+			c += q
+		c /= maxf(pts.size(), 1)
+		var n := get_face_normal(f)
+		var st := get_face_uv_stretch(f)
+		var d := tweaked_uv(c + before, n, t, st) - tweaked_uv(c + after, n, t, st)
+		uvs[f] = Vector4(t.x + d.x, t.y + d.y, t.z, t.w)
+	face_uv = uvs
+
+
 ## UV in metres for a brush-local point on a face: world-aligned projection + face tweak.
-static func tweaked_uv(p: Vector3, n: Vector3, tweak: Vector4) -> Vector2:
+## `stretch`: the face's X / Y scale factor (get_face_uv_stretch).
+static func tweaked_uv(p: Vector3, n: Vector3, tweak: Vector4, stretch := Vector2.ONE) -> Vector2:
 	var uv := slope_uv(p, n) if uv_follows_slope(tweak) else PolyUtil.planar_uv(p, n)
 	if tweak.w != 0.0:
 		uv = uv.rotated(deg_to_rad(tweak.w))
-	return uv / uv_scale(tweak) + Vector2(tweak.x, tweak.y)
+	return uv / (uv_scale(tweak) * stretch) + Vector2(tweak.x, tweak.y)
 
 
 ## `tweak` turned and shifted so the texture's rows run along edge a→b (local points) and
@@ -1420,7 +1567,7 @@ static func tweaked_uv(p: Vector3, n: Vector3, tweak: Vector4) -> Vector2:
 ## cleared, so overlays (a border's turn / slant) line up with the same edge. null when the
 ## edge runs along the face normal.
 static func uv_aligned_to_edge(tweak: Vector4, n: Vector3, a: Vector3, b: Vector3, foot: Vector3, inside: Vector3,
-		flip: bool) -> Variant:
+		flip: bool, stretch := Vector2.ONE) -> Variant:
 	var slope := uv_follows_slope(tweak)
 	var ua := slope_uv(a, n) if slope else PolyUtil.planar_uv(a, n)
 	var along := (slope_uv(b, n) if slope else PolyUtil.planar_uv(b, n)) - ua
@@ -1431,7 +1578,7 @@ static func uv_aligned_to_edge(tweak: Vector4, n: Vector3, a: Vector3, b: Vector
 		else (PolyUtil.planar_uv(inside, n) - PolyUtil.planar_uv(foot, n))).rotated(theta)
 	if (into.y > 0.0) != flip:
 		theta += PI
-	var off := -ua.rotated(theta) / uv_scale(tweak)
+	var off := -ua.rotated(theta) / (uv_scale(tweak) * stretch)
 	return Vector4(off.x, off.y, tweak.z, fposmod(rad_to_deg(theta), 360.0))
 
 
@@ -1518,7 +1665,7 @@ func resize_box() -> AABB:
 
 func bake_hash() -> int:
 	return hash([transform, vertices, face_indices, face_counts, material, bake_mode, stairs_collision_ramp,
-		face_textures, face_uv, face_masks, face_surfaces, face_layer_sets, face_pieces, corner_uvs, cutout, face_bake, vertex_colors, vertex_ao, corner_lighting, corner_lighting_keys, _resolved_corners()])
+		face_textures, face_uv, face_uv_scale, face_masks, face_surfaces, face_layer_sets, face_pieces, corner_uvs, cutout, face_bake, vertex_colors, vertex_ao, corner_lighting, corner_lighting_keys, _resolved_corners(), ao_paint])
 
 
 ## Flat-shaded, unoptimised editor mesh.
@@ -1624,8 +1771,10 @@ static func key_uncut(key: int) -> int:
 ## `color_scale`: the level's vertex colour scale (LevelData.vertex_color_scale()); colours
 ## go into the mesh divided by it (mesh colours are 8-bit, so 2× keeps headroom to brighten).
 ## `face_from` / `face_to` (-1 = the end): only those faces (a chunk of a big brush).
+## `ao_fold`: painted AO layers to fold into the time keys' light ([[layer id, strength per
+## key (PackedFloat32Array), tint per key (PackedColorArray)]], ZoneGrade.ao_fold()).
 func build_painted_mesh(atlas: Dictionary, brush_index: int, timed := false, baked := false, stairs := {}, hybrid := false,
-		color_scale := 1.0, face_from := 0, face_to := -1) -> Dictionary:
+		color_scale := 1.0, face_from := 0, face_to := -1, ao_fold: Array = [], shade := Callable()) -> Dictionary:
 	_ensure_cache()
 	if _tri_faces.is_empty():
 		return {mesh = null, keys = []}
@@ -1665,10 +1814,38 @@ func build_painted_mesh(atlas: Dictionary, brush_index: int, timed := false, bak
 	for s in 4:
 		var arr: PackedColorArray = corner_lighting_keys[s] if s < corner_lighting_keys.size() else PackedColorArray()
 		key_lights.append(arr if arr.size() == face_indices.size() else PackedColorArray())
+	# (zones with one lighting: the AO layers fold into the single bake, as key 0)
+	if (hybrid or baked) and not timed and light_ok and not ao_fold.is_empty() and not ao_paint.is_empty():
+		light = light.duplicate()
+		for e in ao_fold:
+			var d: PackedFloat32Array = ao_paint.get(e[0], PackedFloat32Array())
+			if d.size() != vertices.size():
+				continue
+			for c in light.size():
+				var dv := d[face_indices[c]]
+				if dv > 0.0:
+					light[c] = fold_ao(light[c], dv, e[1][0], e[2][0])
+	if timed and not ao_fold.is_empty() and not ao_paint.is_empty():
+		for s in 4:
+			if key_lights[s].is_empty():
+				continue
+			var folded := key_lights[s].duplicate()
+			for e in ao_fold:
+				var d: PackedFloat32Array = ao_paint.get(e[0], PackedFloat32Array())
+				if d.size() != vertices.size():
+					continue
+				var st: float = e[1][s]
+				var tint: Color = e[2][s]
+				for c in folded.size():
+					var dv := d[face_indices[c]]
+					if dv > 0.0:
+						folded[c] = fold_ao(folded[c], dv, st, tint)
+			key_lights[s] = folded
 	var keyed := timed or hybrid
 	var inv_scale := 1.0 / color_scale
 	var atlas_size := Vector2(atlas.size)
 	var empty := PaintAtlas.empty_uv(atlas.size)
+	var anchor := uv_anchor()
 	var mesh := ArrayMesh.new()
 	for key in keys:
 		var n_verts: int = key_count[key] * 3
@@ -1696,7 +1873,7 @@ func build_painted_mesh(atlas: Dictionary, brush_index: int, timed := false, bak
 			var n := _face_normals[f]
 			var tweak := get_face_uv(f)
 			var rot := deg_to_rad(tweak.w)
-			var inv_zoom := 1.0 / uv_scale(tweak)
+			var inv_zoom := Vector2.ONE / (uv_scale(tweak) * get_face_uv_stretch(f))
 			var on_slope := uv_follows_slope(tweak)
 			var exact := has_corner_uvs()
 			var chart = atlas.rects.get(Vector2i(brush_index, f)) if face_has_mask(f) else null
@@ -1719,11 +1896,14 @@ func build_painted_mesh(atlas: Dictionary, brush_index: int, timed := false, bak
 				elif timed:
 					for s in 4:
 						_put_rgba8(kb[s], w, key_lights[s][corner] if not key_lights[s].is_empty() else Color.WHITE)
+				elif baked and shade.is_valid():
+					# (the Grade on a Baked Vertex zone: GradeVertex.cpu_shade)
+					c = shade.call(c, light[corner] if light_ok else Color.WHITE, c.a, color_scale)
 				elif baked and light_ok:
 					c *= light[corner]
 				col[w] = Color(clampf(c.r * inv_scale, 0.0, 1.0), clampf(c.g * inv_scale, 0.0, 1.0), clampf(c.b * inv_scale, 0.0, 1.0), c.a)
 				var planar := PolyUtil.planar_uv(p, n)
-				var base_uv := slope_uv(p, n) if on_slope else planar
+				var base_uv := slope_uv(p + anchor, n) if on_slope else PolyUtil.planar_uv(p + anchor, n)
 				uv[w] = corner_uvs[corner] if exact else (base_uv.rotated(rot) if rot != 0.0 else base_uv) * inv_zoom + Vector2(tweak.x, tweak.y)
 				if chart != null:
 					var tt := (planar - rect.position) / rect_size

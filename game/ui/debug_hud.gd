@@ -85,6 +85,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		KEY_F5:
 			if OS.is_debug_build() and ResourceLoader.exists(CLIMB_SANDBOX):
 				ZoneManager.travel(CLIMB_SANDBOX)
+		KEY_F12:
+			RenderScale.toggle_video_out()
+		KEY_F1:
+			RenderScale.toggle_value_view()
 		KEY_F11:
 			var full := DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
 			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_MAXIMIZED if full else DisplayServer.WINDOW_MODE_FULLSCREEN)
@@ -109,7 +113,7 @@ func _process(delta: float) -> void:
 		"Weather: %s%s" % [GameState.weather, "" if GameState.weather_blend >= 1.0 else " (from %s)" % GameState.weather_from],
 		"Flags: %s" % (", ".join(GameState.flags.keys()) if not GameState.flags.is_empty() else "none"),
 		"Items: %s" % (", ".join(GameState.items.keys().map(func(id): return "%s x%d" % [id, GameState.items[id]])) if not GameState.items.is_empty() else "none"),
-		"[F3] hud  [T] fast time  [F2] save  [F4] load  [F6] weather  [F7] profiler  [F9] collision  [F10] wireframe  [F11] fullscreen",
+		"[F3] hud  [T] fast time  [F2] save  [F4] load  [F6] weather  [F7] profiler  [F9] collision  [F10] wireframe  [F11] fullscreen  [F12] video out  [F1] values",
 	]
 	if _collision_view:
 		var player := get_tree().get_first_node_in_group(&"player") as Actor

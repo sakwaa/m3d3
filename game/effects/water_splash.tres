@@ -1,7 +1,7 @@
 [gd_resource type="Resource" script_class="N64Effect" format=3 uid="uid://cjqehopr56j7s"]
 
 [ext_resource type="Script" uid="uid://b8b2olhwlgvyw" path="res://addons/n64_runtime/effects/n64_effect.gd" id="1_g8dt2"]
-[ext_resource type="Texture2D" uid="uid://db0we503xua28" path="res://game/effects/sprites/soft_dot.png" id="2_jqjpg"]
+[ext_resource type="Texture2D" path="res://textures/effects/soft_dot.res" id="2_jqjpg"]
 [ext_resource type="Resource" uid="uid://dbhv6y8wm62oc" path="res://game/effects/splash_ring.tres" id="3_whmjb"]
 
 [sub_resource type="Gradient" id="Gradient_s7vts"]
@@ -11,6 +11,7 @@ colors = PackedColorArray(0.85, 0.93, 1, 0.9, 0.7, 0.85, 1, 0.3)
 resource_name = "water_splash"
 script = ExtResource("1_g8dt2")
 texture = ExtResource("2_jqjpg")
+intensity = true
 burst = 10
 max_sprites = 12
 radius = 0.1

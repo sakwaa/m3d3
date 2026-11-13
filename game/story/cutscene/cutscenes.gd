@@ -274,6 +274,12 @@ func _fire_event(c: CutsceneCue) -> void:
 			_waiting_input = true
 		CutsceneCue.Event.SET_TIME:
 			GameState.set_time(c.hour)
+		CutsceneCue.Event.SCREEN:
+			RenderScale.screen_to(c.screen_grade, Color(c.color.r, c.color.g, c.color.b), c.screen_echo, c.duration)
+			if c.look_change == CutsceneCue.LookChange.SET:
+				RenderScale.force_look(c.screen_look, c.duration)
+			elif c.look_change == CutsceneCue.LookChange.CLEAR:
+				RenderScale.release_look(c.duration)
 		CutsceneCue.Event.TITLE:
 			var zone := get_tree().current_scene as Zone
 			show_title(c.title if c.title != "" else (zone.display_name if zone else ""), c.duration)
@@ -294,7 +300,7 @@ func _update_title(delta: float) -> void:
 	if _title_t >= _title_len:
 		_title.visible = false
 		return
-	# Whole font pixels (the pixel font scales by integers only), outline and shadow to match.
+	# Whole font pixels (sizes in steps of the pixel font), outline and shadow to match.
 	var px := DialogueBox.PIXEL_SIZE
 	var size := maxi(roundi(get_viewport().get_visible_rect().size.y * TITLE_HEIGHT / px), 1) * px
 	var dot := maxi(size / px, 1)
@@ -436,6 +442,11 @@ func _finish(skipped: bool) -> void:
 		_fade_to = Color(_fade.color, 0.0)
 		_fade_len = 0.4
 		_fade_t = 0.0
+	# Screen filters and looks never outlast their cutscene.
+	RenderScale.release_look(0.4)
+	var vo := RenderScale.video_out()
+	if vo and (float(vo.get(&"grade")) > 0.0 or float(vo.get(&"echo")) > 0.0):
+		RenderScale.screen_clear(0.4)
 	playing = null
 	_touched.clear()
 	finished.emit(c, skipped)

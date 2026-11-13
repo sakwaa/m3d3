@@ -11,6 +11,11 @@ extends Actor
 const BODY_RADIUS := 0.35
 const BODY_HEIGHT := 1.6
 const CAMERA_HEIGHT := 1.4
+## Z-targeting: side-shuffle and back-step speeds (m/s).
+const STRAFE_SPEED := 2.4
+const BACKSTEP_SPEED := 1.9
+## Z-targeting control: Switch (press to latch) instead of Hold.
+const Z_SWITCH_SETTING := "game/controls/z_target_switch"
 const WALK_SPEED := 2.5
 const RUN_SPEED := 6.0
 ## Jump (OoT remake, measured at 60 fps: ~0.25 s up to ~1 m, ~0.33 s down, ~0.57 s in the air):
@@ -69,10 +74,12 @@ func _ready() -> void:
 	body.add_child(model)
 	_model = model
 	_sword = ActorSockets.attach(model, &"prop_R", SWORD.instantiate())
+	add_child(SwordTrail.new(_sword, _swing_trail, self))
 	_sheathe(true)
 	var skeleton := model.find_children("*", "Skeleton3D", true, false)
 	if not skeleton.is_empty():
 		skeleton[0].add_child(ClimbRig.new(self))  # hands and feet on what's climbed
+		skeleton[0].add_child(StrikeRig.new(self))  # swings bent onto the strike point aimed at
 		skeleton[0].add_child(LandDip.new(self))  # the knees give on soft landings
 	add_child(GrassWake.new(self))  # wading through grass carpets
 	_build_machines()
@@ -103,6 +110,7 @@ func _ready() -> void:
 	add_child(director)
 
 	lock = TargetLock.new()
+	lock.switch_mode = ProjectSettings.get_setting(Z_SWITCH_SETTING, false)
 	add_child(lock)
 
 	var grip := Grip.new()
@@ -112,6 +120,9 @@ func _ready() -> void:
 	hud.name = "Hud"
 	add_child(hud)
 	hud.add_child(GripMeter.new(grip))
+	var marks := TargetMarks.new(lock)
+	marks.letterboxed = func() -> bool: return director.z_targeting()
+	hud.add_child(marks)
 
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	footsteps = true
@@ -140,6 +151,26 @@ func _build_machines() -> void:
 	run.slower = &"Walk"
 	run.speed = RUN_SPEED
 	run.sync_phase = true
+	# Z-targeting (OoT remake / N64: references/anims/strafe): standing, the battle-ready
+	# stance (shield up, sword low); moving round the target, a side-shuffle; backing off,
+	# back-steps; forward, the usual walk / run at it.
+	var stance := LocoGround.new()
+	stance.name = "BattleIdle"
+	stance.speed = 0.0
+	var strafes: Array[LocoGround] = [stance]
+	for spec in [["StrafeL", STRAFE_SPEED], ["StrafeR", STRAFE_SPEED], ["StrafeB", BACKSTEP_SPEED]]:
+		var st := LocoGround.new()
+		st.name = spec[0]
+		st.speed = spec[1]
+		strafes.append(st)
+	for st in strafes:
+		st.z_only = true
+	for st: LocoGround in [idle, walk, run] + strafes:
+		st.z_stance = &"BattleIdle"
+		st.z_left = &"StrafeL"
+		st.z_right = &"StrafeR"
+		st.z_back = &"StrafeB"
+		st.z_forward = &"Walk"
 	var jump := LocoAir.new()
 	jump.name = "Jump"
 	jump.launch_velocity = JUMP_VELOCITY
@@ -181,16 +212,19 @@ func _build_machines() -> void:
 	pull_up.name = "ClimbUp"
 	pull_up.exit_mode = ActorState.Exit.FINISH
 	pull_up.next_state = &"Idle"
-	var climbing: Array[ClimbState] = [climb, hang, ceiling, leap, pull_up]
+	# Ladders: hand over hand on the rungs, free of grip.
+	var ladder := LocoLadder.new()
+	ladder.name = "Ladder"
+	var climbing: Array[ClimbState] = [climb, hang, ceiling, leap, pull_up, ladder]
 	# Limbs come from the ClimbRig; the body holds a neutral pose under them.
-	for s in [climb, hang, ceiling, leap]:
+	for s in [climb, hang, ceiling, leap, ladder]:
 		s.animation = &"Idle"
 	for s in climbing:
 		s.tags = PackedStringArray(["climbing"])
 		s.restrict = {&"Action": PackedStringArray(["Ready"])}
-	for s in [idle, walk, run, jump, fall]:
+	for s in [idle, walk, run, jump, fall] + strafes:
 		s.climb_state = &"Climb"
-	for s in [idle, walk, run, jump, fall, land]:
+	for s in [idle, walk, run, jump, fall, land] + strafes:
 		loco.add_child(s)
 	for s in climbing:
 		loco.add_child(s)
@@ -198,26 +232,35 @@ func _build_machines() -> void:
 
 	var action := StateMachine.new()
 	action.name = "Action"
-	# Sword attacks by situation (OoT): standing / moving diagonal; locked on:
-	# neutral vertical, forward stab, sideways horizontal; jump (locked on) or in the air:
-	# jump slash. Repeating chains into the backhand: SlashD -> SlashH2 -> SlashD.
-	var attacks: Dictionary[StringName, StringName] = {&"neutral": &"SlashD", &"moving": &"SlashD",
-		&"lock": &"SlashV", &"lock_forward": &"Stab", &"lock_side": &"SlashH", &"lock_back": &"SlashV",
-		&"air": &"JumpSlash"}
+	# Sword attacks picked like MM's (references/combat/mm_sword_attacks_decomp.md): from the
+	# stick at the press. Free: neutral / left / back the horizontal cut (right to left,
+	# SlashH), right the other way (SlashH2), forward a vertical chop stepping in. Z-targeting:
+	# neutral the vertical chop, forward a stab stepping in, sides as free. Air / jump while
+	# locked: the jump slash. Pressing into the same cut again repeats it; the third in a row
+	# is its finisher ("<name>Fin", once measured). SlashD (the OoT remake's diagonal) isn't
+	# picked.
+	var attacks: Dictionary[StringName, StringName] = {&"neutral": &"SlashH", &"forward": &"SlashV", &"left": &"SlashH",
+		&"back": &"SlashH", &"right": &"SlashH2", &"lock": &"SlashV", &"lock_forward": &"Stab", &"lock_left": &"SlashH",
+		&"lock_back": &"SlashH", &"lock_right": &"SlashH2", &"air": &"JumpSlash"}
 	var ready_state := ActionState.new()
 	ready_state.name = "Ready"
 	ready_state.inputs = {&"attack": ActionState.PICK, &"jump_attack": &"JumpSlash"}
 	ready_state.attacks = attacks
 	ready_state.holds = {&"guard": &"Guard"}
 	var swings: Array[AttackState] = [_attack("SlashH", 1, 2.0), _attack("SlashH2", 1, 2.0), _attack("SlashD", 1, 1.5),
-		_attack("SlashV", 2, 0.0), _attack("Stab", 1, 0.0, 3.0), _attack("JumpSlash", 2, 1.5)]
+		_attack("SlashV", 2, 0.0), _attack("Stab", 1, 0.0), _attack("JumpSlash", 2, 1.5)]
+	swings[0].slash_axis = Vector3.RIGHT
+	swings[1].slash_axis = Vector3.RIGHT
+	swings[2].slash_axis = Vector3(1, 1, 0).normalized()
+	swings[4].slash_axis = Vector3.BACK  # (the attacker's forward)
+	# Finishers (the third press of a cut in a row): a bigger swing, the blade's reach 1.5x at
+	# first (MM). Only the vertical one is measured so far.
+	var fin_v := _attack("SlashVFin", 2, 3.0)
+	fin_v.trigger_boost = 1.5
+	swings.append(fin_v)
 	for a in swings:
 		a.attacks = attacks
 		a.inputs = {&"attack": ActionState.PICK}
-	# Standing combo (OoT remake, measured): diagonal -> backhand -> diagonal...
-	swings[2].inputs = {&"attack": &"SlashH2"}
-	swings[1].inputs = {&"attack": &"SlashD"}
-	swings[0].inputs = {&"attack": &"SlashH2"}  # (locked-on horizontal chains the same way)
 	# Jump slash (OoT): the leap holds the sword up for as long as it's airborne; the chop
 	# and landing (JumpSlashLand, the hit) start as the ground comes up, whatever the height.
 	var jump_slash: AttackState = swings[5]
@@ -241,7 +284,7 @@ func _build_machines() -> void:
 	# Shield: walk slowly behind it, slash out of it.
 	var guard := GuardState.new()
 	guard.name = "Guard"
-	guard.restrict = {&"Locomotion": PackedStringArray(["Idle", "Walk"])}
+	guard.restrict = {&"Locomotion": PackedStringArray(["Idle", "Walk", "BattleIdle", "StrafeL", "StrafeR", "StrafeB"])}  # (strafing behind the shield)
 	guard.move_scale = 0.6
 	guard.inputs = {&"attack": ActionState.PICK}
 	guard.attacks = attacks
@@ -274,10 +317,50 @@ func _attack(state_name: String, damage: int, knockback: float, lunge := 0.0) ->
 	return a
 
 
-## Draws the sword while fighting (attacking, guarding, targeting), sheathes it a moment
+## The sword's BladeTrigger (made for a sword scene that has none: the top of the blade).
+var _trigger: BladeTrigger
+
+
+func _sword_trigger() -> BladeTrigger:
+	if _trigger == null and _sword:
+		_trigger = BladeTrigger.of(_sword)
+		if _trigger == null:
+			_trigger = BladeTrigger.new()
+			_trigger.name = "Trigger"
+			_trigger.position = Vector3(0, 0.48, 0)
+			_sword.add_child(_trigger)
+	return _trigger
+
+
+func blade() -> Array:
+	if _sword == null or _sheathed:
+		return []
+	var a := state_of(ACTION) as AttackState
+	return _sword_trigger().segment(a.trigger_scale() if a else 1.0)
+
+
+func blade_power() -> int:
+	return _sword_trigger().power if _sword else 1
+
+
+func blade_trigger_local() -> Vector3:
+	return _sword.transform * _sword_trigger().position if _sword else super.blade_trigger_local()
+
+
+## The sword leaves a smear from just before a swing's active window to just after it.
+func _swing_trail() -> bool:
+	var a := state_of(ACTION) as AttackState
+	if a == null or not Combat.juice.trail or not a.windows.has(&"active"):
+		return false
+	var w: Vector2 = a.windows[&"active"]
+	var p := a.progress()
+	return p >= w.x - 0.08 and p <= w.y + 0.03
+
+
+## Draws the sword while fighting (attacking, guarding, locked onto an enemy), sheathes it a moment
 ## after, and whenever climbing.
 func _update_sword(delta: float) -> void:
-	if has_tag(&"attacking") or has_tag(&"guarding") or lock.target != null:
+	if has_tag(&"attacking") or has_tag(&"guarding") or lock.hostile():
 		_combat_left = SHEATHE_DELAY
 	else:
 		_combat_left = maxf(_combat_left - delta, 0.0)
@@ -311,7 +394,8 @@ static func _ensure_input_actions() -> void:
 	_add_action(&"jump", [KEY_SPACE], [JOY_BUTTON_Y])
 	_add_action(&"attack", [KEY_J], [JOY_BUTTON_X], [MOUSE_BUTTON_LEFT])
 	_add_action(&"guard", [KEY_K], [JOY_BUTTON_RIGHT_SHOULDER], [MOUSE_BUTTON_RIGHT])
-	_add_action(&"target", [KEY_Q], [JOY_BUTTON_LEFT_SHOULDER])
+	_add_action(&"target", [KEY_Q], [JOY_BUTTON_LEFT_SHOULDER])  # (not Shift: it clashes with screenshot keys)
+	_add_action(&"walk", [[KEY_ALT, KEY_LOCATION_LEFT]], [])
 	# Left stick moves (with WASD / arrows), right stick turns the camera.
 	_add_axis_action(&"move_left", [KEY_A, KEY_LEFT], JOY_AXIS_LEFT_X, -1.0)
 	_add_axis_action(&"move_right", [KEY_D, KEY_RIGHT], JOY_AXIS_LEFT_X, 1.0)
@@ -337,13 +421,18 @@ static func _add_axis_action(action: StringName, keys: Array, axis: JoyAxis, sig
 	InputMap.action_add_event(action, j)
 
 
+## `keys`: physical key codes, or [key, KEY_LOCATION_LEFT / RIGHT] for one side's key only.
 static func _add_action(action: StringName, keys: Array, pads: Array, mouse := []) -> void:
 	if InputMap.has_action(action):
 		return
 	InputMap.add_action(action)
 	for k in keys:
 		var e := InputEventKey.new()
-		e.physical_keycode = k
+		if k is Array:
+			e.physical_keycode = k[0]
+			e.location = k[1]
+		else:
+			e.physical_keycode = k
 		InputMap.action_add_event(action, e)
 	for b in pads:
 		var e := InputEventJoypadButton.new()
@@ -365,7 +454,7 @@ func teleport(xf: Transform3D) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-		if lock.target == null and director.allows_turn():  # locked on, the camera frames the target
+		if not _z_camera() and director.allows_turn():  # Z-targeting, the camera frames the target / holds behind
 			_yaw.rotation.y -= event.relative.x * MOUSE_SENSITIVITY
 		if director.allows_pitch():
 			_pitch.rotation.x = clampf(_pitch.rotation.x - event.relative.y * MOUSE_SENSITIVITY, -1.2, 0.4)
@@ -376,9 +465,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()  # the click that grabs the mouse isn't an attack
 
 
-## Input -> intent: camera-relative move (Shift = walk strength), button presses.
+## Input -> intent: camera-relative move (Left Alt = walk strength), button presses.
 ## Grass parts round the player (n64_bender0: position, radius).
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	super(delta)
 	var p := global_position
 	RenderingServer.global_shader_parameter_set(&"n64_bender0", Vector4(p.x, p.y, p.z, 0.9))
 
@@ -395,7 +485,6 @@ func drive(delta: float) -> void:
 			heal_full()
 			ZoneManager.respawn_player()
 		return
-	_update_lock(delta)
 	_update_sword(delta)
 	_turn_camera(delta)
 	# Left stick (analog strength) or WASD / arrow keys.
@@ -404,17 +493,18 @@ func drive(delta: float) -> void:
 	var dir := basis * Vector3(input.x, 0.0, input.y)
 	dir.y = 0.0
 	dir = dir.normalized() * minf(input.length(), 1.0)
-	if Input.is_physical_key_pressed(KEY_SHIFT):
+	if Input.is_action_pressed(&"walk"):
 		dir *= 0.5
 	intent.move = dir
 	intent.stick = Vector2(input.x, -input.y).limit_length(1.0)
 	intent.view_right = Vector3(basis.x.x, 0.0, basis.x.z).normalized()
+	_update_lock(delta, dir)
 	# Climbing, the hands are busy: no attacks or shield (they'd queue up and go off the
 	# moment the climb ends).
 	var climbing := has_tag(&"climbing")
 	if Input.is_action_just_pressed(&"jump"):
 		# Locked on, on the ground: a jump slash at the target (OoT), not a plain jump.
-		intent.press(&"jump_attack" if lock.target != null and is_on_floor() and not climbing else &"jump")
+		intent.press(&"jump_attack" if lock.active() and is_on_floor() and not climbing else &"jump")
 	if Input.is_action_just_pressed(&"attack") and not climbing:
 		intent.press(&"attack")
 	intent.hold(&"guard", Input.is_action_pressed(&"guard") and not climbing)
@@ -428,28 +518,26 @@ func _turn_camera(delta: float) -> void:
 	var look := Input.get_vector(&"camera_left", &"camera_right", &"camera_up", &"camera_down")
 	if look == Vector2.ZERO:
 		return
-	if lock.target == null and director.allows_turn():
+	if not _z_camera() and director.allows_turn():
 		_yaw.rotation.y -= look.x * STICK_TURN_SPEED * delta
 	if director.allows_pitch():
 		_pitch.rotation.x = clampf(_pitch.rotation.x - look.y * STICK_TURN_SPEED * 0.6 * delta, -1.2, 0.4)
 
 
-## Hold to lock (OoT hold mode): picks the best target in front of the camera; the
-## camera swings behind the player to frame it and the player faces it (so left / right
-## circle it). Pressing with nothing to lock just recentres the camera behind the player.
-func _update_lock(delta: float) -> void:
-	var held := Input.is_action_pressed(&"target") and not has_tag(&"climbing")
-	if held and Input.is_action_just_pressed(&"target"):
-		var view := -_yaw.global_basis.z
-		var t := lock.pick(global_position + Vector3.UP * CAMERA_HEIGHT, view)
-		if t:
-			lock.lock(t)
-		else:
-			_yaw.rotation.y = atan2(-facing.x, -facing.z)
-	elif not held:
-		lock.release()
+## Z-targeting (TargetLock: MM's rules, Hold or Switch mode). Locked on, the player faces
+## the target (left / right circle it); in Parallel (Z with nothing to lock) the facing
+## holds. The CameraDirector frames it. No targeting while climbing.
+func _update_lock(delta: float, move: Vector3) -> void:
+	# Stick held back (most of the way, within 45° of straight back): no next target.
+	var back := move.length() > 0.9 and move.normalized().dot(-facing) > cos(deg_to_rad(45.0))
+	lock.update(delta, Input.is_action_just_pressed(&"target"), Input.is_action_pressed(&"target"), back,
+		has_tag(&"climbing"))
 	face_target = lock.target
-	if lock.target:
-		var to := lock.target.global_position - global_position
-		var want := atan2(-to.x, -to.z)
-		_yaw.rotation.y = lerp_angle(_yaw.rotation.y, want, clampf(8.0 * delta, 0.0, 1.0))
+	face_dir = lock.parallel_facing if lock.parallel else Vector3.ZERO
+	# (The camera's Z framing is the CameraDirector's.)
+
+
+## The camera is Z-targeting (locked, Parallel or a lock just lost with Z held): the stick
+## and mouse don't turn it.
+func _z_camera() -> bool:
+	return lock.target != null or lock.parallel or lock.forced

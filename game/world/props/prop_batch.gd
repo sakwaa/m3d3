@@ -6,8 +6,12 @@ extends RefCounted
 ## Colours move into the vertex colours (and UV scales into the UVs), so props that differ
 ## only in tint share a surface. The props keep their collision, spots and talk areas; only
 ## their MeshInstance3Ds go. Nothing changes in the editor.
+## Every static prop kind batches without asking: prop nodes made from a PropSpec join AUTO_GROUP
+## (saved with an exported scene too), and a Zone hands them over when it's ready (add_auto);
+## a prop can still call add() on its parts itself (scenes without a Zone, rebuilt parts).
 
-const CELL := 8.0  # metres; small, so merged LOD swaps stay close to where each prop's would be
+const CELL := 16.0  # metres; merged LOD swaps happen per cell, close enough to each prop's own
+const AUTO_GROUP := &"prop_batch_auto"  # static prop nodes, batched whole (add_auto)
 const ARRAYS_META := &"prop_batch_arrays"  # commit(): a surface's arrays, kept for merging
 const GROUP := &"prop_batch"  # props' "Parts" nodes whose MeshInstance3D children batch
 const TEXTURED := preload("res://addons/n64_runtime/shaders/n64_textured.gdshader")
@@ -72,13 +76,45 @@ static func commit_arrays(arr: Array, mesh: ArrayMesh) -> void:
 	mesh.set_meta(ARRAYS_META, kept)
 
 
-## The visible meshes a prop's parts node holds.
+## The visible meshes a prop's parts node holds (a whole prop node from add_auto: every
+## static mesh under it, internal children too; not skinned ones).
 static func meshes_of(parts: Node) -> Array[MeshInstance3D]:
 	var out: Array[MeshInstance3D] = []
-	for c in parts.get_children():
-		if c is MeshInstance3D and c.mesh != null and c.visible:
+	var deep := parts.has_meta(&"prop_batch_deep")
+	for c in parts.get_children(deep):
+		if c is MeshInstance3D and c.mesh != null and c.visible and (c as MeshInstance3D).skin == null:
 			out.append(c)
+		elif deep and not c is Skeleton3D and not c.is_in_group(GROUP):
+			for m in _deep_meshes(c):
+				out.append(m)
 	return out
+
+
+static func _deep_meshes(n: Node) -> Array[MeshInstance3D]:
+	var out: Array[MeshInstance3D] = []
+	for c in n.get_children(true):
+		if c is MeshInstance3D and c.mesh != null and c.visible and (c as MeshInstance3D).skin == null:
+			out.append(c)
+		elif not c is Skeleton3D and not c.is_in_group(GROUP):
+			out.append_array(_deep_meshes(c))
+	return out
+
+
+## Batches the static prop nodes under `zone` (AUTO_GROUP) that haven't batched their own parts.
+static func add_auto(zone: Node) -> void:
+	if Engine.is_editor_hint() or not zone.is_inside_tree():
+		return
+	for n: Node in zone.get_tree().get_nodes_in_group(AUTO_GROUP):
+		if not zone.is_ancestor_of(n) or n.has_meta(&"prop_batch_deep"):
+			continue
+		var own := false
+		for c in n.get_children(true):
+			if c.is_in_group(GROUP):
+				own = true  # (it batches its own parts)
+		if own:
+			continue
+		n.set_meta(&"prop_batch_deep", true)
+		add(n)
 
 
 ## The merged meshes (world space, not in the tree) standing in for `mis`.

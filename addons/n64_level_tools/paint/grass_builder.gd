@@ -9,9 +9,12 @@ class_name GrassBuilder
 ##   filled inside corners, frayed edges), raised `height` +- lumps, with a skirt down to
 ##   the ground in a darker shade. Plus a GrassField node (where the carpet is, for the
 ##   player's wading effect).
-##   Tufts: scattered over all the open grass (mat or bare), thicker along edges and walls.
+##   Tufts: in clumps on the ground, where an unmown lawn grows them (GrassSettings.tufts):
+##   wall feet and the carpet's fringe, a few through the carpet, hardly any in the open.
 
 const TILE := 16.0
+## Far tuft cards go in tiles this many TILEs across (fewer draws; they're far anyway).
+const CARD_TILES := 3
 const MAT_SHADER := preload("res://addons/n64_runtime/shaders/n64_grass_mat.gdshader")
 const TUFT_SHADER := preload("res://addons/n64_runtime/shaders/n64_grass_tuft.gdshader")
 const BIN := 4.0
@@ -284,6 +287,8 @@ static func build(root: LevelRoot, s: GrassSettings) -> Array[Node3D]:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = s.seed
 	var dark := s.color * (1.0 - s.edge_dark)
+	var fringe_rng := RandomNumberGenerator.new()  # (its own: tufts lay out the same either way)
+	fringe_rng.seed = s.seed + 29
 	var sub := maxi(s.detail, 1)
 	# The carpet per tile (tiles aligned to the cells): its outline traced as loops on a
 	# grid `sub` times finer than the cells (marching squares: the field on outline cells,
@@ -395,19 +400,30 @@ static func build(root: LevelRoot, s: GrassSettings) -> Array[Node3D]:
 					var tb := Vector3(b.x, top_at.call(b.x, b.y), b.y)
 					var ga: float = ground_at.call(a.x, a.y) - 0.02
 					var gb: float = ground_at.call(b.x, b.y) - 0.02
-					var u: float = (a.x + a.y) / s.tile
-					var du := a.distance_to(b) / s.tile
 					var oa: Vector2 = outs[j]
 					var ob: Vector2 = outs[(j + 1) % loop.size()]
+					var ca := _tint(s, patches, ta)
+					var cb := _tint(s, patches, tb)
+					# The style painted just inside this edge (else the level's).
+					var in_pt := (a + b) * 0.5 - (ways[1][j] as Vector2) * 0.3
+					var style := s.style_at(in_pt.x, in_pt.y)
+					if style == GrassSettings.EdgeStyle.MOUND:
+						_bank(buf, s, ta, tb, oa, ob, ca, cb, dark, ground_at)
+						continue
+					if style == GrassSettings.EdgeStyle.RIM:
+						var tr: Dictionary = tiles[key]
+						if not tr.has("rim"):
+							tr.rim = _MatBuf.new()
+						_rim(tr.rim, s, ta, tb, ga, gb, dark, fringe_rng)
+						continue
+					var u: float = (a.x + a.y) / s.tile
+					var du := a.distance_to(b) / s.tile
 					# The round's radius: no more than a third of the carpet's height there.
 					var ra := minf(s.edge_round, (ta.y - ga) * 0.33)
 					var rb := minf(s.edge_round, (tb.y - gb) * 0.33)
-					var ca := _tint(s, patches, ta)
-					var cb := _tint(s, patches, tb)
 					var prev := [buf.add(ta, Vector2(ta.x, ta.z) / s.tile, ca, 1.0, 0.0), buf.add(tb, Vector2(tb.x, tb.z) / s.tile, cb, 1.0, 0.0)]
 					var pa := ta
 					var pb := tb
-					var v := 0.0
 					var steps := ROUND_STEPS if s.edge_round > 0.0 else 0
 					for k in range(1, steps + 1):
 						var t := float(k) / steps
@@ -424,6 +440,13 @@ static func build(root: LevelRoot, s: GrassSettings) -> Array[Node3D]:
 						prev = row
 						pa = qa
 						pb = qb
+					if style == GrassSettings.EdgeStyle.LEDGE:
+						var td: Dictionary = tiles[key]
+						if not td.has("side"):
+							td.side = _MatBuf.new()
+							td.fringe = _MatBuf.new()
+						_ledge_side(td.side, td.fringe, s, pa, pb, ga, gb, oa, ob, ca.lerp(dark, 0.35), cb.lerp(dark, 0.35), fringe_rng)
+						continue
 					# Then straight down to the ground (its texture hung down the side).
 					var vh := (pa.y - ga) / s.tile
 					var e0 := buf.add(pa, Vector2(u, 0.0), dark, 1.0, 0.0)
@@ -444,7 +467,7 @@ static func build(root: LevelRoot, s: GrassSettings) -> Array[Node3D]:
 			var x := lo.x + (qx + 0.5) * qh
 			var z := lo.y + (qz + 0.5) * qh
 			var on: bool = kind_at.call(qx / 2, qz / 2) == 2 or (kind_at.call(qx / 2, qz / 2) == 1 and field.call(x, z) >= 0.0)
-			tops[qz * qn.x + qx] = top_at.call(x, z) if on else -1e9
+			tops[qz * qn.x + qx] = top_at.call(x, z) if on and not GrassSettings.style_solid(s.style_at(x, z)) else -1e9
 	var gf: Node3D = (load(FIELD_SCRIPT) as Script).new()
 	gf.name = "GrassField"
 	gf.set(&"origin", lo)
@@ -474,55 +497,144 @@ static func build(root: LevelRoot, s: GrassSettings) -> Array[Node3D]:
 	var mat_mat := ShaderMaterial.new()
 	mat_mat.shader = MAT_SHADER
 	mat_mat.set_shader_parameter(&"tex", s.top_texture)
-	# Tufts over the open grass (on the carpet or on the bare ground beside it), thicker
-	# near the carpet's outline and the feet of walls.
+	var any_solid := s.any_solid()
+	var side_mat := ShaderMaterial.new()
+	side_mat.shader = MAT_SHADER
+	side_mat.set_shader_parameter(&"tex", s.side_texture)
+	var rim_mat := ShaderMaterial.new()
+	rim_mat.shader = MAT_SHADER
+	rim_mat.set_shader_parameter(&"tex", s.rim_texture if s.rim_texture else s.top_texture)
+	# Tufts, as an unmown lawn grows them (GrassSettings.tufts): thickest at the feet of
+	# walls and along the carpet's fringe, fading over tuft_reach; a few through the carpet;
+	# hardly any out in the open; none on paths. In clumps, each rooted on the ground.
+	var on_carpet := func(x: float, z: float) -> bool:
+		var k: int = kind_at.call(clampi(floori((x - lo.x) / c), 0, nx - 1), clampi(floori((z - lo.y) / c), 0, nz - 1))
+		return k == 2 or (k == 1 and field.call(x, z) >= 0.0)
+	# Quarters on the carpet, and each quarter's distance (in quarters) from it.
+	var qcarpet := PackedByteArray()
+	qcarpet.resize(qn.x * qn.y)
+	var cdist := PackedInt32Array()
+	cdist.resize(qn.x * qn.y)
+	cdist.fill(1 << 20)
+	front = []
+	for qi in qstat.size():
+		if qstat[qi] == 1 and on_carpet.call(lo.x + (qi % qn.x + 0.5) * qh, lo.y + (qi / qn.x + 0.5) * qh):
+			qcarpet[qi] = 1
+			cdist[qi] = 0
+			front.append(qi)
+	while not front.is_empty():
+		var next: Array[int] = []
+		for i in front:
+			for d in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+				var x2: int = i % qn.x + d.x
+				var z2: int = i / qn.x + d.y
+				if x2 < 0 or z2 < 0 or x2 >= qn.x or z2 >= qn.y:
+					continue
+				var j := z2 * qn.x + x2
+				if cdist[j] > cdist[i] + 1:
+					cdist[j] = cdist[i] + 1
+					next.append(j)
+		front = next
+	var reach_w := func(d: int) -> float:  # 1 right at the edge, 0 by tuft_reach out
+		return clampf(1.0 - (d - 0.5) * qh / maxf(s.tuft_reach, 0.01), 0.0, 1.0)
+	var clump := maxi(s.tuft_clump, 1)
+	var taken := {}  # 0.5 m cell -> a clump there (clumps keep apart)
 	for qi in qstat.size():
 		if qstat[qi] != 1 or (qgrass[qi] == 0 and qkeep[qi] == 0):
 			continue
-		var qx := qi % qn.x
-		var qz := qi / qn.x
-		var ix := qx / 2
-		var iz := qz / 2
-		var mx := lo.x + (qx + 0.5) * qh
-		var mz := lo.y + (qz + 0.5) * qh
-		var fv: float = field.call(mx, mz) if kind_at.call(ix, iz) == 1 else (0.5 if kind_at.call(ix, iz) == 2 else -0.5)
-		var edge: bool = qdist[qi] <= 1 or absf(fv) < 0.3
-		var want := qh * qh * s.tufts * (s.edge_tufts if edge else 1.0)
+		var density := s.tufts * s.carpet_tufts
+		if qcarpet[qi] == 0:
+			density = s.tufts * (s.edge_tufts * maxf(reach_w.call(qdist[qi]), reach_w.call(cdist[qi])) + s.open_tufts)
+		var want := qh * qh * density
 		var count := int(want) + (1 if rng.randf() < want - int(want) else 0)
 		for k in count:
-			var x := mx + rng.randf_range(-0.5, 0.5) * qh
-			var z := mz + rng.randf_range(-0.5, 0.5) * qh
-			var on: bool = kind_at.call(ix, iz) == 2 or (kind_at.call(ix, iz) == 1 and field.call(x, z) >= 0.0)
-			var p := Vector3(x, (top_at.call(x, z) if on else ground_at.call(x, z)) - 0.02, z)
-			var key := Vector2i(clampi(floori((p.x - lo.x) / c), 0, nx - 1) / tc, clampi(floori((p.z - lo.y) / c), 0, nz - 1) / tc)
-			if not tiles.has(key):
-				tiles[key] = {mat = _MatBuf.new(), near = [], far = []}
-			var t: Dictionary = tiles[key]
-			var size := s.tuft_size * (1.0 + rng.randf_range(-s.tuft_size_var, s.tuft_size_var))
-			var basis := Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(size * 1.1, size, size * 1.1))
-			var tint := _tint(s, patches, p) * s.tuft_color * rng.randf_range(0.85, 1.12)
-			t.near.append([Transform3D(basis, p), tint])
-			t.far.append([Transform3D(Basis().scaled(Vector3(size * 1.1, size, 1.0)), p), tint])
+			var mx := lo.x + (qi % qn.x + rng.randf()) * qh
+			var mz := lo.y + (qi / qn.x + rng.randf()) * qh
+			var cell := Vector2i(floori(mx / 0.5), floori(mz / 0.5))
+			if taken.has(cell) or taken.has(cell + Vector2i(1, 0)) or taken.has(cell - Vector2i(1, 0)) \
+					or taken.has(cell + Vector2i(0, 1)) or taken.has(cell - Vector2i(0, 1)):
+				continue
+			taken[cell] = true
+			var n := rng.randi_range(1, clump)
+			for m in n:
+				# The middle one biggest; the rest round it, smaller.
+				var off := Vector2.ZERO if m == 0 else Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(0.1, 0.25)
+				var x := mx + off.x
+				var z := mz + off.y
+				var g: float = ground_at.call(x, z)
+				var size := s.tuft_size * (1.0 + rng.randf_range(-s.tuft_size_var, s.tuft_size_var)) * (1.0 if m == 0 else rng.randf_range(0.6, 0.85))
+				# Through the carpet: as tall again as the carpet there, so it shows over it.
+				var tall := size
+				if on_carpet.call(x, z):
+					if GrassSettings.style_solid(s.style_at(x, z)):
+						g = top_at.call(x, z)  # (stood on: rooted on the top)
+					else:
+						tall += top_at.call(x, z) - g
+				var p := Vector3(x, g - 0.02, z)
+				var key := Vector2i(clampi(floori((p.x - lo.x) / c), 0, nx - 1) / tc, clampi(floori((p.z - lo.y) / c), 0, nz - 1) / tc)
+				if not tiles.has(key):
+					tiles[key] = {mat = _MatBuf.new(), near = [], far = []}
+				var t: Dictionary = tiles[key]
+				var basis := Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(size * 1.1, tall, size * 1.1))
+				var tint := _tint(s, patches, p) * s.tuft_color * rng.randf_range(0.85, 1.12)
+				t.near.append([Transform3D(basis, p), tint])
+				t.far.append([Transform3D(Basis().scaled(Vector3(size * 1.1, tall, 1.0)), p), tint])
 	var near_mat := _tuft_material(s, 0)
 	var far_mat := _tuft_material(s, 1)
 	var near_mesh := _tuft_mesh(true)
 	var far_mesh := _tuft_mesh(false)
 	var layers := root.level_layers()
+	var cards := {}  # bigger tile -> far cards
 	for key in tiles:
 		var t: Dictionary = tiles[key]
 		if not (t.mat as _MatBuf).index.is_empty():
 			var mi := MeshInstance3D.new()
 			mi.name = "Grass_%d_%d" % [key.x, key.y]
-			mi.mesh = (t.mat as _MatBuf).mesh(mat_mat)
+			var mesh := (t.mat as _MatBuf).mesh(mat_mat)
+			if t.has("side"):
+				(t.side as _MatBuf).add_to(mesh, side_mat)
+				(t.fringe as _MatBuf).add_to(mesh, mat_mat)
+			if t.has("rim"):
+				(t.rim as _MatBuf).add_to(mesh, rim_mat)
+			mi.mesh = mesh
 			mi.layers = layers
 			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			mi.extra_cull_margin = 0.2
 			out.append(mi)
+			# Stood on where the style is solid (ledges, rim beds): those parts of the top
+			# and round, a ledge's side and a rim's border (not the fringe). Carpets and
+			# mounds are waded through.
+			var faces := PackedVector3Array()
+			if any_solid:
+				var mb: _MatBuf = t.mat
+				for k in range(0, mb.index.size(), 3):
+					var p0 := mb.verts[mb.index[k]]
+					var p1 := mb.verts[mb.index[k + 1]]
+					var p2 := mb.verts[mb.index[k + 2]]
+					var cen := (p0 + p1 + p2) / 3.0
+					if GrassSettings.style_solid(s.style_at(cen.x, cen.z)):
+						faces.append_array([p0, p1, p2])
+				for part in ["side", "rim"]:
+					if t.has(part):
+						faces.append_array((t[part] as _MatBuf).faces())
+			if not faces.is_empty():
+				var shape := ConcavePolygonShape3D.new()
+				shape.set_faces(faces)
+				shape.backface_collision = true  # (the mat's winding isn't kept consistent)
+				for body in Surface.build_bodies([shape], PackedInt32Array([Surface.Sound.GRASS])):
+					body.name = "GrassCollision_%d_%d" % [key.x, key.y]
+					out.append(body)
 		if t.near.is_empty():
 			continue
 		var half := TILE * 0.75  # visibility ranges measure to the tile's middle
 		out.append(_tufts("Tufts_%d_%d" % [key.x, key.y], near_mesh, near_mat, t.near, layers, 0.0, s.near_distance + half))
-		out.append(_tufts("TuftCards_%d_%d" % [key.x, key.y], far_mesh, far_mat, t.far, layers, maxf(s.near_distance - s.fade - half, 0.0), s.far_distance + half))
+		var big: Vector2i = Vector2i(floori(key.x / float(CARD_TILES)), floori(key.y / float(CARD_TILES)))
+		cards[big] = cards.get(big, []) + t.far
+	# Far cards (two triangles each) in bigger tiles: one draw for CARD_TILES x CARD_TILES tiles.
+	var big_half := TILE * CARD_TILES * 0.75
+	for big in cards:
+		out.append(_tufts("TuftCards_%d_%d" % [big.x, big.y], far_mesh, far_mat, cards[big], layers,
+			maxf(s.near_distance - s.fade - big_half, 0.0), s.far_distance + big_half))
 	return out
 
 
@@ -726,6 +838,8 @@ static func _fill(buf: _MatBuf, loops: Array[PackedVector2Array], s: GrassSettin
 				if Geometry2D.is_point_in_polygon(c, outer) and not mine.any(func(hh): return Geometry2D.is_point_in_polygon(c, hh)):
 					ok.append_array([tri[t], tri[t + 1], tri[t + 2]])
 			tri = ok
+		if OS.get_environment("GRASS_NO_FLIP") == "":  # (tests compare)
+			tri = PolyUtil.delaunay_flips(poly, tri)
 		var ids := PackedInt32Array()
 		for p in poly:
 			var y: float = top_at.call(p.x, p.y)
@@ -810,6 +924,8 @@ static func _is_grass(data: LevelData, brush: LevelBrush, f: int, s: GrassSettin
 	if ti < 0 or ti >= data.textures.size() or data.textures[ti] == null:
 		return false
 	var tex := data.textures[ti]
+	if tex.has_meta(&"grade_source"):
+		tex = tex.get_meta(&"grade_source")  # (a build's graded copy: GradeBake)
 	if s.grass_textures.is_empty():
 		return tex.resource_path.begins_with("res://textures/grass/")
 	return tex in s.grass_textures
@@ -965,6 +1081,103 @@ const WALL_PROBE := 0.08
 const WALL_SHADE := 0.62
 
 
+## Segments in a mound's bank.
+const BANK_STEPS := 6
+## Ledge fringe: about this wide a tooth of grass hanging over the side (metres), standing
+## this far out of it (no z-fighting).
+const FRINGE_TOOTH := 0.3
+const FRINGE_OUT := 0.015
+
+
+## A mound's bank along one outline edge (ta -> tb, corners going out along oa / ob): an
+## S-curve from the top out `mound_width` and down to the ground there, grass all the way,
+## darkening a little as it turns away. No skirt.
+static func _bank(buf: _MatBuf, s: GrassSettings, ta: Vector3, tb: Vector3, oa: Vector2, ob: Vector2,
+		ca: Color, cb: Color, dark: Color, ground_at: Callable) -> void:
+	var w := s.mound_width
+	var prev := [buf.add(ta, Vector2(ta.x, ta.z) / s.tile, ca, 1.0, 0.0), buf.add(tb, Vector2(tb.x, tb.z) / s.tile, cb, 1.0, 0.0)]
+	for k in range(1, BANK_STEPS + 1):
+		var t := float(k) / BANK_STEPS
+		var drop := smoothstep(0.0, 1.0, t)
+		var pa2 := Vector2(ta.x, ta.z) + oa * w * t
+		var pb2 := Vector2(tb.x, tb.z) + ob * w * t
+		var qa := Vector3(pa2.x, lerpf(ta.y, ground_at.call(pa2.x, pa2.y) - 0.02, drop), pa2.y)
+		var qb := Vector3(pb2.x, lerpf(tb.y, ground_at.call(pb2.x, pb2.y) - 0.02, drop), pb2.y)
+		# Darkest mid-bank, where it faces away most; back up a little at its foot.
+		var shade := sin(t * PI) * 0.5 + drop * 0.25
+		var row := [buf.add(qa, pa2 / s.tile, ca.lerp(dark, shade), 1.0 - t, 0.0),
+			buf.add(qb, pb2 / s.tile, cb.lerp(dark, shade), 1.0 - t, 0.0)]
+		buf.quad(prev[0], prev[1], row[1], row[0])
+		prev = row
+
+
+## A rim's border along one outline edge (ta -> tb on the top, ground ga / gb): a wall from
+## the ground up past the top by rim_height, leaves rows laid from its upper edge down, and
+## along that edge leafy teeth up to `fringe` taller. Drawn both sides (the bed sees its
+## inside). Darker towards the ground.
+static func _rim(side: _MatBuf, s: GrassSettings, ta: Vector3, tb: Vector3, ga: float, gb: float,
+		dark: Color, rng: RandomNumberGenerator) -> void:
+	var ra := ta + Vector3(0.0, s.rim_height, 0.0)
+	var rb := tb + Vector3(0.0, s.rim_height, 0.0)
+	var len := Vector2(ta.x, ta.z).distance_to(Vector2(tb.x, tb.z))
+	var u := (ta.x + ta.z) / s.side_tile
+	var du := len / s.side_tile
+	var e0 := side.add(ra, Vector2(u, 0.0), s.color, 0.0, 0.0)
+	var e1 := side.add(rb, Vector2(u + du, 0.0), s.color, 0.0, 0.0)
+	var e2 := side.add(Vector3(tb.x, gb, tb.z), Vector2(u + du, (rb.y - gb) / s.side_tile), dark * 0.7, 0.0, 0.0)
+	var e3 := side.add(Vector3(ta.x, ga, ta.z), Vector2(u, (ra.y - ga) / s.side_tile), dark * 0.7, 0.0, 0.0)
+	side.quad(e0, e1, e2, e3)
+	if s.fringe <= 0.0:
+		return
+	var n := maxi(1, roundi(len / FRINGE_TOOTH))
+	for i in n:
+		var t0 := float(i) / n
+		var t1 := float(i + 1) / n
+		var p0 := ra.lerp(rb, t0)
+		var p1 := ra.lerp(rb, t1)
+		var tip := p0.lerp(p1, rng.randf_range(0.3, 0.7))
+		tip.y += s.fringe * rng.randf_range(0.5, 1.2)
+		var i0 := side.add(p0, Vector2((p0.x + p0.z) / s.side_tile, 0.0), s.color, 0.0, 0.0)
+		var i1 := side.add(p1, Vector2((p1.x + p1.z) / s.side_tile, 0.0), s.color, 0.0, 0.0)
+		var i2 := side.add(tip, Vector2((tip.x + tip.z) / s.side_tile, (p0.y - tip.y) / s.side_tile), s.color, 0.0, 0.0)
+		side.index.append_array([i0, i1, i2])
+
+
+## A ledge's side along one outline edge (pa -> pb at its top, ground ga / gb): an earth
+## wall in side_texture (rows level, from the top down), and over its top edge a jagged
+## fringe of grass teeth hanging `fringe` down (a little out from the wall).
+static func _ledge_side(side: _MatBuf, fringe: _MatBuf, s: GrassSettings, pa: Vector3, pb: Vector3,
+		ga: float, gb: float, oa: Vector2, ob: Vector2, ca: Color, cb: Color, rng: RandomNumberGenerator) -> void:
+	var u := (pa.x + pa.z) / s.side_tile
+	var du := Vector2(pa.x, pa.z).distance_to(Vector2(pb.x, pb.z)) / s.side_tile
+	var low := s.side_color * Color(0.7, 0.7, 0.7, 1.0)
+	var e0 := side.add(pa, Vector2(u, 0.0), s.side_color, 0.0, 0.0)
+	var e1 := side.add(pb, Vector2(u + du, 0.0), s.side_color, 0.0, 0.0)
+	var e2 := side.add(Vector3(pb.x, gb, pb.z), Vector2(u + du, (pb.y - gb) / s.side_tile), low, 0.0, 0.0)
+	var e3 := side.add(Vector3(pa.x, ga, pa.z), Vector2(u, (pa.y - ga) / s.side_tile), low, 0.0, 0.0)
+	side.quad(e0, e1, e2, e3)
+	if s.fringe <= 0.0:
+		return
+	var len := Vector2(pa.x, pa.z).distance_to(Vector2(pb.x, pb.z))
+	var n := maxi(1, roundi(len / FRINGE_TOOTH))
+	var oa3 := Vector3(oa.x, 0.0, oa.y) * FRINGE_OUT
+	var ob3 := Vector3(ob.x, 0.0, ob.y) * FRINGE_OUT
+	for i in n:
+		var t0 := float(i) / n
+		var t1 := float(i + 1) / n
+		var p0 := pa.lerp(pb, t0) + oa3.lerp(ob3, t0)
+		var p1 := pa.lerp(pb, t1) + oa3.lerp(ob3, t1)
+		var c := ca.lerp(cb, (t0 + t1) * 0.5)
+		# The tooth's point: somewhere along its width, its own length (seeded: stable).
+		var tip := p0.lerp(p1, rng.randf_range(0.3, 0.7))
+		tip.y -= minf(s.fringe * rng.randf_range(0.55, 1.25), maxf(minf(p0.y - ga, p1.y - gb) - 0.05, 0.0))
+		# Texture laid from the side, so the blades run down the tooth.
+		var i0 := fringe.add(p0, Vector2((p0.x + p0.z) / s.tile, 0.0), c, 0.0, 0.0)
+		var i1 := fringe.add(p1, Vector2((p1.x + p1.z) / s.tile, 0.0), c, 0.0, 0.0)
+		var i2 := fringe.add(tip, Vector2((tip.x + tip.z) / s.tile, (p0.y - tip.y) / s.tile), c * Color(0.8, 0.8, 0.8, 1.0), 0.0, 0.0)
+		fringe.index.append_array([i0, i1, i2])
+
+
 ## Each corner of `loop`'s way out of the carpet (XZ, unit): the average of its two edges'
 ## outward normals, an edge's outside being the side away from the carpet (`loops`: all the
 ## tile's outline loops, holes too, the carpet inside them by even-odd).
@@ -1017,6 +1230,14 @@ class _MatBuf:
 		index.append_array([a, b, c, a, c, d])
 
 	func mesh(material: Material) -> ArrayMesh:
+		var m := ArrayMesh.new()
+		add_to(m, material)
+		return m
+
+	## Appends these triangles to `m` as a surface drawn with `material`.
+	func add_to(m: ArrayMesh, material: Material) -> void:
+		if index.is_empty():
+			return
 		var a := []
 		a.resize(Mesh.ARRAY_MAX)
 		a[Mesh.ARRAY_VERTEX] = verts
@@ -1024,7 +1245,12 @@ class _MatBuf:
 		a[Mesh.ARRAY_TEX_UV2] = uv2
 		a[Mesh.ARRAY_COLOR] = colors
 		a[Mesh.ARRAY_INDEX] = index
-		var m := ArrayMesh.new()
 		m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, a)
-		m.surface_set_material(0, material)
-		return m
+		m.surface_set_material(m.get_surface_count() - 1, material)
+
+	## Its triangles as a flat list (3 points each), for collision.
+	func faces() -> PackedVector3Array:
+		var out := PackedVector3Array()
+		for i in index:
+			out.append(verts[i])
+		return out

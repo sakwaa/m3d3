@@ -70,6 +70,10 @@ const FenceBuilder := preload("res://addons/n64_level_tools/fence_builder.gd")
 const FenceEditor := preload("res://addons/n64_level_tools/fence_editor.gd")
 const RopeTexture := preload("res://addons/n64_level_tools/textures/rope_texture_generator.gd")
 const ZoneLinks := preload("res://addons/n64_level_tools/zone_links.gd")
+const BuildCache := preload("res://addons/n64_level_tools/export/build_cache.gd")
+const WORKER := "res://addons/n64_level_tools/export/build_worker.tscn"
+## The build worker under way (Build & Play / Build All Zones): {pid, out, done, t, polled}.
+var _job := {}
 ## Dragging / adding / removing the selected Fence's points in the 3D view.
 var fence_edit
 const FENCE_STYLE_PATH := "res://game/world/fence_default_style.tres"
@@ -144,6 +148,7 @@ var drag_start_verts := PackedVector3Array()
 var drag_geom_before := {}
 var drag_extruded := false
 var drag_xforms: Array[Transform3D] = []
+var drag_mounts: Array[Vector3] = []  # (house fixtures' wall spots at the drag's start)
 var drag_resize := {}
 var box_from := Vector2.ZERO
 
@@ -198,15 +203,24 @@ func _process(delta: float) -> void:
 		RenderingServer.global_shader_parameter_set(TIME_PARAM, _anim_time)
 
 
+var _cube_importer: EditorImportPlugin
+
+
 func _enter_tree() -> void:
 	fence_edit = FenceEditor.new(self)
 	_export_plugin = preload("res://addons/n64_level_tools/export/n64_export_plugin.gd").new()
 	_texture_inspector = preload("res://addons/n64_level_tools/ui/n64_texture_inspector.gd").new()
 	add_inspector_plugin(_texture_inspector)
+	_cube_importer = preload("res://addons/n64_level_tools/textures/cube_lut_importer.gd").new()
+	add_import_plugin(_cube_importer)
 	Engine.set_meta(&"n64_fence_rebuild", _rebuild_fence)
 	EditorInterface.get_resource_filesystem().resources_reimported.connect(_on_resources_reimported)
 	Engine.set_meta(&"n64_passage_changed", _on_passage_changed)
 	Engine.set_meta(&"n64_door_changed", _on_door_changed)
+	# The Grade screen's time switcher sets the same preview hour; it paints through this
+	# plugin (grade_paint_input & co.: one paint tool, panel and undo for both screens).
+	Engine.set_meta(&"n64_preview_hour", _set_preview_hour)
+	Engine.set_meta(&"n64_level_plugin", self)
 	add_export_plugin(_export_plugin)
 	var world_menu := PopupMenu.new()
 	world_menu.add_item("New Outdoor Zone…", 0)
@@ -361,7 +375,13 @@ func _enter_tree() -> void:
 	pp.layer_selected.connect(func(i): paint.layer = i)
 	pp.base_texture_selected.connect(func(t):
 		paint.base_texture = t
-		paint.look = {})
+		paint.look = {}
+		_refresh_colour_adjust())
+	pp.colour_adjust_changed.connect(_on_colour_adjust)
+	pp.colour_adjust_target_changed.connect(func(_t): _refresh_colour_adjust())
+	pp.zone_grey_toggled.connect(_set_zone_grey)
+	pp.value_view_toggled.connect(_set_value_view)
+	pp.value_measure_requested.connect(_measure_values)
 	pp.scatter_cover_requested.connect(_make_scatter_cover)
 	pp.base_pick_requested.connect(func():
 		_picking = true
@@ -371,6 +391,7 @@ func _enter_tree() -> void:
 	pp.layer_clear_requested.connect(_clear_paint_layer)
 	pp.faces_reset_requested.connect(_reset_mask_faces)
 	pp.faces_merge_requested.connect(_merge_mask_faces)
+	pp.uv_anchor_requested.connect(_set_uv_anchor)
 	pp.layer_add_requested.connect(_add_paint_layer)
 	pp.layer_set_selected.connect(_select_layer_set)
 	pp.layer_set_add_requested.connect(_add_layer_set)
@@ -411,6 +432,17 @@ func _enter_tree() -> void:
 
 
 func _exit_tree() -> void:
+	BuildProgress.end()
+	if Engine.has_meta(&"n64_preview_hour"):
+		Engine.remove_meta(&"n64_preview_hour")
+	if Engine.has_meta(&"n64_level_plugin"):
+		Engine.remove_meta(&"n64_level_plugin")
+	_set_value_view(0)
+	if _cube_importer:
+		remove_import_plugin(_cube_importer)
+		_cube_importer = null
+	if get_tree().process_frame.is_connected(_poll_build):
+		get_tree().process_frame.disconnect(_poll_build)
 	if is_instance_valid(_sticky_mi):
 		_sticky_mi.queue_free()
 	for w in _wires.values():
@@ -464,6 +496,8 @@ func _handles(object: Object) -> bool:
 
 ## Writes LevelData stored in its own file whenever the scene is saved.
 func _save_external_data() -> void:
+	if DisplayServer.get_name() == "headless":
+		return  # no renderer: the build's texture arrays would save empty
 	for root in _scene_level_roots():
 		if root.data and _is_external(root.data):
 			ResourceSaver.save(root.data)
@@ -498,6 +532,9 @@ func _is_character_scene(root: Node) -> bool:
 ## the brushes stay as they are, only the stored bake is the build's (the next Bake
 ## replaces it).
 func _play_here(build := false) -> void:
+	if not _job.is_empty():
+		push_warning("N64 Level Tools: a build is still running.")
+		return
 	var scene := EditorInterface.get_edited_scene_root()
 	if scene == null or not scene is Zone:
 		push_warning("N64 Level Tools: Play here needs an open zone scene (root with zone.gd).")
@@ -505,21 +542,40 @@ func _play_here(build := false) -> void:
 	if scene.scene_file_path.is_empty():
 		push_warning("N64 Level Tools: save the zone scene once before using Play here.")
 		return
-	var t := Time.get_ticks_msec()
-	print("[N64 Level Tools] %s: baking %s…" % ["Build & Play" if build else "Quick Play", scene.scene_file_path])
+	var path := scene.scene_file_path
+	# Where to start, from the view as it is now (the build may take a while).
+	_write_spawn(scene)
 	if build:
-		EditorInterface.save_scene()
-		if not _build_bake(scene):
-			push_warning("N64 Level Tools: Build & Play: nothing baked, not starting.")
-			return
-	else:
-		_bake_all()
+		# Every open zone saved (the worker reads them from disk), then this zone and the zones
+		# its exits lead to built in the background, each only if it changed since its last build.
+		EditorInterface.save_all_scenes()
+		var zones := PackedStringArray([path])
+		for next in ZoneLinks.targets(path):
+			if BuildCache.has_levels(next):
+				zones.append(next)
+		_start_build("Build & Play: %s" % path.get_file().get_basename(), zones, false, func(built: Dictionary):
+			if not built.get(path, false):
+				push_warning("N64 Level Tools: Build & Play: %s didn't build, not starting." % path)
+				return
+			_start_play(path, true))
+		return
+	var t := Time.get_ticks_msec()
+	print("[N64 Level Tools] Quick Play: baking %s…" % path)
+	BuildProgress.begin("Quick Play: %s" % path.get_file().get_basename())
+	await _bake_all()
+	BuildProgress.where = ""
+	BuildProgress.step("saving")
 	print("[N64 Level Tools] Baked in %.1f s; saving…" % ((Time.get_ticks_msec() - t) / 1000.0))
 	for root in _scene_level_roots():
 		if root.data and _is_external(root.data):
 			ResourceSaver.save(root.data)
 	EditorInterface.save_scene()
+	BuildProgress.end()
+	_start_play(path, false)
 
+
+## Play Here's start: the editor's camera target (or the reference character) in `scene`.
+func _write_spawn(scene: Node) -> void:
 	var pos = null
 	var yaw := 0.0
 	var hit_root: Node = null
@@ -539,17 +595,22 @@ func _play_here(build := false) -> void:
 			yaw = atan2(-fwd.x, -fwd.z)
 	if pos == null:
 		PlayHere.clear()
-	else:
-		var room_path := ""
-		var n := hit_root
-		while n and n != scene and not n is Room:
-			n = n.get_parent()
-		if n is Room:
-			room_path = String(scene.get_path_to(n))
-		var hour := float(EditorInterface.get_editor_settings().get_project_metadata(SETTINGS_SECTION, "preview_hour", 12.0))
-		PlayHere.write(scene.scene_file_path, scene.global_transform.affine_inverse() * pos, yaw, room_path, hour)
-	print("[N64 Level Tools] Starting %s%s." % [scene.scene_file_path, (" at %s" % str(pos)) if pos != null else " at its default spawn"])
-	EditorInterface.play_current_scene()
+		print("[N64 Level Tools] Starting %s at its default spawn." % scene.scene_file_path)
+		return
+	var room_path := ""
+	var n := hit_root
+	while n and n != scene and not n is Room:
+		n = n.get_parent()
+	if n is Room:
+		room_path = String(scene.get_path_to(n))
+	var hour := float(EditorInterface.get_editor_settings().get_project_metadata(SETTINGS_SECTION, "preview_hour", 12.0))
+	PlayHere.write(scene.scene_file_path, scene.global_transform.affine_inverse() * pos, yaw, room_path, hour)
+	print("[N64 Level Tools] Starting %s at %s." % [scene.scene_file_path, str(pos)])
+
+
+func _start_play(path: String, build: bool) -> void:
+	PlayHere.mark_build_run(build)
+	EditorInterface.play_custom_scene(path)
 
 
 ## Build report (one-off): the open zone built as the export does, measured
@@ -592,27 +653,138 @@ func _build_bake(scene: Node, store := true, report := false) -> bool:
 		var twin := copy.get_node_or_null(scene.get_path_to(root)) as LevelRoot
 		if twin == null or twin.data == null or not twin.data.has_bake():
 			continue
-		var data := root.data
-		var built := twin.data
-		data.baked_mesh = built.baked_mesh
-		data.baked_chunks = built.baked_chunks
-		data.baked_collision = null
-		data.baked_collision_parts = built.baked_collision_parts
-		data.baked_collision_surfaces = built.baked_collision_surfaces
-		data.bake_hash = root.compute_hash()
-		var tris := 0
-		for m in built.baked_meshes():
-			tris += m.get_faces().size() / 3
-		data.bake_summary = "build: %d tris in %d chunks" % [tris, maxi(built.baked_chunks.size(), 1)]
+		_store_build(root, twin.data, BuildCache.level_key(root, scene.scene_file_path))
 		root._apply_bake()
 		stored += 1
-		print("[N64 Level Tools] Build bake %s: %d tris, %d chunks" % [root.name, tris, maxi(built.baked_chunks.size(), 1)])
 	copy.free()
 	holder.queue_free()
 	for f in result.failed:
 		push_warning("N64 Level Tools: build bake skipped %s." % f)
 	print("[N64 Level Tools] Build bake done in %.1f s." % ((Time.get_ticks_msec() - t) / 1000.0))
 	return stored > 0 or result.failed.is_empty()
+
+
+## `built` (a built copy of `root`'s level) as `root`'s bake, with the build key it was made from
+## and the level hash (`bake_hash`: of the level as built, when that's not what's open now).
+func _store_build(root: LevelRoot, built: LevelData, key: int, bake_hash = null) -> void:
+	var data := root.data
+	data.baked_mesh = built.baked_mesh
+	data.baked_chunks = built.baked_chunks
+	data.baked_collision = null
+	data.baked_collision_parts = built.baked_collision_parts
+	data.baked_collision_surfaces = built.baked_collision_surfaces
+	data.bake_hash = root.compute_hash() if bake_hash == null else bake_hash
+	data.build_key = key
+	var tris := 0
+	for m in built.baked_meshes():
+		tris += m.get_faces().size() / 3
+	data.bake_summary = "build: %d tris in %d chunks" % [tris, maxi(built.baked_chunks.size(), 1)]
+	print("[N64 Level Tools] Build bake %s: %d tris, %d chunks" % [root.name, tris, maxi(built.baked_chunks.size(), 1)])
+
+
+## Builds every zone of the game whose build isn't current (Build All Zones), in the background.
+func _build_all_zones() -> void:
+	if not _job.is_empty():
+		push_warning("N64 Level Tools: a build is still running.")
+		return
+	EditorInterface.save_all_scenes()
+	var zones := PackedStringArray()
+	for path in ZoneLinks.game_scenes():
+		if BuildCache.has_levels(path):
+			zones.append(path)
+	_start_build("Build All Zones", zones, false, func(built: Dictionary):
+		print("[N64 Level Tools] Build All Zones: %d of %d zone(s) current." % [built.values().count(true), zones.size()]))
+
+
+## The build worker (build_worker.gd) started on `zones` in its own Godot process, the editor
+## left free. Its steps show mid-screen (BuildProgress); when it's done its builds are stored
+## (`_store_worker_builds`) and `done` gets {zone path: built and stored}.
+func _start_build(title: String, zones: PackedStringArray, force: bool, done: Callable) -> void:
+	var out := ProjectSettings.globalize_path(BuildCache.DIR.path_join("worker"))
+	DirAccess.make_dir_recursive_absolute(out)
+	for f in DirAccess.get_files_at(out):
+		DirAccess.remove_absolute(out.path_join(f))
+	var job := out.path_join("job.json")
+	var f := FileAccess.open(job, FileAccess.WRITE)
+	f.store_string(JSON.stringify({zones = Array(zones), force = force, out = out}))
+	f.close()
+	var pid := OS.create_process(OS.get_executable_path(), ["--path", ProjectSettings.globalize_path("res://"),
+		"--resolution", "320x180", WORKER, "--", job])
+	if pid <= 0:
+		push_warning("N64 Level Tools: couldn't start the build worker.")
+		return
+	print("[N64 Level Tools] %s: building in the background (%s)…" % [title, ", ".join(Array(zones).map(func(z): return z.get_file().get_basename()))])
+	_job = {pid = pid, out = out, done = done, t = Time.get_ticks_msec(), polled = 0, up = false}
+	BuildProgress.begin(title)
+	get_tree().process_frame.connect(_poll_build)
+
+
+func _poll_build() -> void:
+	var now := Time.get_ticks_msec()
+	if now - int(_job.polled) < 150:
+		return
+	_job.polled = now
+	BuildProgress.show_file(String(_job.out).path_join("progress.txt"))
+	if not _job.up and FileAccess.file_exists(String(_job.out).path_join("pid.txt")):
+		# The worker is up and has moved its window off-screen: focus back to the editor.
+		_job.up = true
+		DisplayServer.window_move_to_foreground()
+	if OS.is_process_running(_job.pid):
+		return
+	get_tree().process_frame.disconnect(_poll_build)
+	var job := _job
+	_job = {}
+	BuildProgress.where = ""
+	BuildProgress.step("storing")
+	var built := _store_worker_builds(job.out)
+	BuildProgress.end()
+	if built.is_empty():
+		push_warning("N64 Level Tools: the build worker stopped (exit code %d) without a result; its errors are in the Output above." % OS.get_process_exit_code(job.pid))
+	print("[N64 Level Tools] Built in %.1f s." % ((Time.get_ticks_msec() - int(job.t)) / 1000.0))
+	(job.done as Callable).call(built)
+
+
+## The worker's builds (its manifest) stored into the levels they were made from: the open
+## zone's levels (and shown), other zones' level files (saved). Returns {zone path: ok}.
+func _store_worker_builds(out: String) -> Dictionary:
+	var manifest = JSON.parse_string(FileAccess.get_file_as_string(out.path_join("manifest.json")))
+	if not manifest is Dictionary:
+		return {}
+	var edited := EditorInterface.get_edited_scene_root()
+	var result := {}
+	for zone: Dictionary in manifest.zones:
+		var path: String = zone.path
+		var ok := (zone.failed as Array).is_empty()
+		for f in zone.failed:
+			push_warning("N64 Level Tools: build bake skipped %s." % f)
+		var open: Node = edited if edited and edited.scene_file_path == path else null
+		var dst: Node = open
+		if dst == null:
+			dst = (load(path) as PackedScene).instantiate(PackedScene.GEN_EDIT_STATE_DISABLED)
+		var embedded := false
+		for l: Dictionary in zone.get("levels", []):
+			var root := dst.get_node_or_null(NodePath(l.node)) as LevelRoot
+			var built := ResourceLoader.load(l.file, "", ResourceLoader.CACHE_MODE_IGNORE) as LevelData
+			if root == null or root.data == null or built == null:
+				ok = false
+				continue
+			if not _is_external(root.data):
+				if open == null:
+					push_warning("N64 Level Tools: %s in %s keeps its level inside the scene; open it and use Build & Play there." % [root.name, path])
+					ok = false
+					continue
+				embedded = true
+			_store_build(root, built, String(l.key).to_int(), String(l.hash).to_int())
+			if open:
+				root._apply_bake()
+			if _is_external(root.data):
+				ResourceSaver.save(root.data)
+		if embedded:
+			EditorInterface.save_scene()
+		if open == null:
+			dst.free()
+		result[path] = ok
+	return result
 
 
 ## Bakes ambient occlusion into the vertex AO channel of the active level (replacing the
@@ -812,6 +984,7 @@ func _on_action(action: StringName) -> void:
 		&"prop": _place_prop()
 		&"sign": _place_sign()
 		&"tree": _place_tree()
+		&"ladder": _place_prop(PropSpec.Kind.LADDER)
 		&"drips": _add_roof_drips()
 		&"house": _place_house()
 		&"shop": _place_house(true)
@@ -820,11 +993,13 @@ func _on_action(action: StringName) -> void:
 		&"stall_cart": _place_stall(MarketStall.Kind.CART)
 		&"stall_goods": _place_stall(MarketStall.Kind.GOODS)
 		&"window": _place_window()
+		&"house_windows": _add_house_windows()
 		&"ramp": _ramp()
 		&"move_dialog": _open_move_dialog()
 		&"grid_resize": _open_grid_resize_dialog()
 		&"play_here": _play_here()
 		&"build_play": _play_here(true)
+		&"build_all_zones": _build_all_zones()
 		&"build_report": _build_report()
 		&"bake_vertex_ao":
 			_bake_vertex_ao(panel.paint_panel.ao_add.button_pressed)
@@ -1539,10 +1714,13 @@ func _begin_drag(camera: Camera3D, handle: Drag, ctrl: bool) -> void:
 	drag_origin = _gizmo_center()
 	drag_axis = AXES[handle - Drag.AXIS_X] if handle <= Drag.AXIS_Z else Vector3.ZERO
 	if mode == Mode.OBJECT:
+		HouseFixtures.adopt(level.data)
 		_take_house_openings()
 		drag_xforms.clear()
+		drag_mounts.clear()
 		for b in sel_brushes:
 			drag_xforms.append(b.transform)
+			drag_mounts.append(b.mount)
 	else:
 		var b := _active()
 		drag_geom_before = b.snapshot()
@@ -1581,7 +1759,13 @@ func _update_drag(camera: Camera3D) -> void:
 		for i in sel_brushes.size():
 			var t := drag_xforms[i]
 			t.origin += local
-			sel_brushes[i].transform = t
+			var b := sel_brushes[i]
+			var h := _house_of(b)
+			if h and not h in sel_brushes:
+				# A door / window / sign on a house slides along its wall.
+				b.mount = HouseFixtures.slide(h, b, t.origin, snap)
+				t = HouseFixtures.transform_for(h, b, b.mount)
+			b.transform = t
 		return
 	var b := _active()
 	var local_delta := _bxf(b).basis.inverse() * world_delta
@@ -1603,6 +1787,9 @@ func _end_drag() -> void:
 		for i in sel_brushes.size():
 			ur.add_do_property(sel_brushes[i], &"transform", sel_brushes[i].transform)
 			ur.add_undo_property(sel_brushes[i], &"transform", drag_xforms[i])
+			if sel_brushes[i].mount != drag_mounts[i]:
+				ur.add_do_property(sel_brushes[i], &"mount", sel_brushes[i].mount)
+				ur.add_undo_property(sel_brushes[i], &"mount", drag_mounts[i])
 		for b: LevelBrush in sel_brushes:
 			if b.opening_spec():
 				_refresh_cut_surroundings(ur, _recarve_passage(ur, level, b))
@@ -1617,13 +1804,26 @@ func _end_drag() -> void:
 	_commit_geometry(b, drag_geom_before, "Extrude" if drag_extruded else "Move Brush Vertices")
 
 
-## A house moves with the doors / windows in its walls: they join the selection.
+## The house `b` (a door, window or sign) is tied to (LevelBrush.host), or null.
+func _house_of(b: LevelBrush) -> LevelBrush:
+	if b == null or b.host == &"" or level == null:
+		return null
+	for h: LevelBrush in level.data.brushes:
+		if h and h.tag == b.host and h.is_house():
+			return h
+	return null
+
+
+## A house moves with the doors / windows in its walls and its signs: they join the selection.
 func _take_house_openings() -> void:
 	if level == null or level.data == null:
 		return
 	for h: LevelBrush in sel_brushes.duplicate():
 		if h == null or not h.is_house():
 			continue
+		for f in HouseFixtures.of(level.data, h):
+			if not f in sel_brushes:
+				sel_brushes.append(f)
 		var inv := h.transform.affine_inverse()
 		var reach := Vector3(h.house.width * 0.5, 0, h.house.depth * 0.5) + Vector3(0.1, 0, 0.1)
 		for o: LevelBrush in level.data.brushes:
@@ -1674,6 +1874,8 @@ func _resize_at(camera: Camera3D, pos: Vector2) -> int:
 
 
 func _begin_resize(camera: Camera3D, id: int) -> void:
+	if level and level.data:
+		HouseFixtures.adopt(level.data)
 	var b := _active()
 	for h in _resize_handles():
 		if h.id != id:
@@ -2648,11 +2850,7 @@ func _place_house(shop := false) -> void:
 		spots.append([Vector3(hw - t * 0.5, sill, 0), PI / 2.0])
 		spots.append([Vector3(-hw + t * 0.5, sill, 0), -PI / 2.0])
 		for s in spots:
-			var w := WindowSpec.new()
-			w.wall_depth = t
-			w.wall_texture = wall_tex
-			w.wall_color = spec.wall_color
-			w.dressing = WindowSpec.default_dressing()
+			var w := HouseFixtures.house_window(spec, wall_tex)
 			_add_opening(root, b.transform * Transform3D(Basis(Vector3.UP, s[1]), s[0]), w, &"window", added, carved)
 	var ur := get_undo_redo()
 	ur.create_action("Add House", UndoRedo.MERGE_DISABLE, root)
@@ -2675,10 +2873,47 @@ func _place_house(shop := false) -> void:
 		ur.add_do_reference(sb)
 		ur.add_undo_method(root.data, &"remove_brush", sb)
 	ur.commit_action(false)
+	HouseFixtures.adopt(root.data)  # (its door, windows and sign belong to it)
 	if mode != Mode.OBJECT:
 		_set_mode(Mode.OBJECT)
 	sel_brushes = [b]
 	_inspect_active()
+
+
+## Fills the selected houses' walls (every house in the level when none is selected) with
+## windows the way the House tool lays them out, skipping spots a door, window, sign or the
+## shop opening already has; one undo step. Drag them along their walls after.
+func _add_house_windows() -> void:
+	if not _ensure_paint_level():
+		push_warning("N64 Level Tools: open a scene with a level first.")
+		return
+	var root := level
+	HouseFixtures.adopt(root.data)
+	var houses := sel_brushes.filter(func(b): return b and b.is_house())
+	if houses.is_empty():
+		houses = root.data.brushes.filter(func(b): return b and b.is_house())
+	var carved := {}
+	var added: Array[LevelBrush] = []
+	for h: LevelBrush in houses:
+		added.append_array(HouseFixtures.add_windows(root, h, carved))
+	if added.is_empty():
+		push_warning("N64 Level Tools: no free window spots on %d house(s)." % houses.size())
+		return
+	for ob in added:
+		_passage_seen[ob] = _passage_key(ob)
+	var ur := get_undo_redo()
+	ur.create_action("Add House Windows", UndoRedo.MERGE_DISABLE, root)
+	for nb in added:
+		ur.add_do_method(root.data, &"add_brush", nb)
+		ur.add_do_reference(nb)
+		ur.add_undo_method(root.data, &"remove_brush", nb)
+	for ob: LevelBrush in carved:
+		var after := ob.snapshot()
+		for key in after:
+			ur.add_do_property(ob, key, after[key])
+			ur.add_undo_property(ob, key, carved[ob][key])
+	ur.commit_action(false)
+	print("N64 Level Tools: added %d windows to %d house(s)." % [added.size(), houses.size()])
 
 
 ## Drops a MarketStall of `kind` where the view centre looks, facing the camera (45°
@@ -2716,7 +2951,7 @@ func _place_window() -> void:
 	spec.wall_depth = depth
 	var wall: LevelBrush = hit.brush
 	spec.wall_texture = wall.get_face_texture(hit.face)
-	var wuv := wall.get_face_uv(hit.face)
+	var wuv := wall.get_face_uv_uniform(hit.face)
 	spec.wall_uv = Vector4(wuv.x, wuv.y, wuv.z, fposmod(wuv.w, 360.0))
 	spec.wall_color = PassageBuilder.face_color(wall, hit.face)
 	spec.dressing = WindowSpec.default_dressing()
@@ -2761,7 +2996,7 @@ func _add_opening(root: LevelRoot, xf: Transform3D, spec: OpeningSpec, kind: Str
 		if other and not other in added and not carved.has(other):
 			snaps[other] = other.snapshot()
 	var cuts := PassageBuilder.carve_opening(root, root.global_transform * oxf, spec.opening_size().x, spec.opening_size().y,
-		spec.carve_depth(), ob.tag, spec.trim(), spec.shape())
+		spec.carve_depth(), ob.tag, spec.cut_trim(), spec.shape())
 	for c in cuts:
 		if not c.brush in added and not carved.has(c.brush):
 			carved[c.brush] = snaps.get(c.brush, c.before)
@@ -3346,18 +3581,22 @@ func _paint_input(camera: Camera3D, event: InputEvent) -> int:
 				if paint.layer <= 0 or paint.layer > hit.root.data.active_layers().size():
 					push_warning("N64 Level Tools: Border paints an overlay layer: select (or add) one, e.g. bricks.")
 					return AFTER_GUI_INPUT_STOP
-				var region := _border_region(hit)
+				var region := _border_region(hit, event.alt_pressed)
 				if region.is_empty():
 					push_warning("N64 Level Tools: Border: click a face inside the face mask.")
 					return AFTER_GUI_INPUT_STOP
 				if event.alt_pressed:
-					# Alt+click an edge of the area: leave that side out (again: back in).
+					# Alt+click an edge of the area: leave that side out (again: back in). A border
+					# already painted there is redone at its width straight away.
 					var side := _side_near(camera, _border_outline(hit.root, region))
 					if not side.is_empty():
 						if paint.border_off.has(side.key):
 							paint.border_off.erase(side.key)
 						else:
 							paint.border_off[side.key] = true
+						var painted: float = hit.root.data.border_widths.get(paint.border_key(hit.root, region, paint.layer - 1), 0.0)
+						if painted > 0.0:
+							paint.border_fill(hit.root, region, painted)
 					update_overlays()
 					return AFTER_GUI_INPUT_STOP
 				var t0 := Time.get_ticks_msec()
@@ -3376,6 +3615,69 @@ func _paint_input(camera: Camera3D, event: InputEvent) -> int:
 		update_overlays()
 		return AFTER_GUI_INPUT_STOP
 	return AFTER_GUI_INPUT_PASS
+
+
+# --- Painting from the Grade screen --------------------------------------------------
+# The Grade screen (addons/n64_grade) paints with this plugin's paint tool: its own camera
+# and viewport events go through _paint_input like the 3D editor's, so tools, Paint panel
+# settings, the face mask and undo are shared.
+
+## Paints with `camera` / `event` from another viewport on `root`. True when it took the event.
+func grade_paint_input(camera: Camera3D, event: InputEvent, root: LevelRoot) -> bool:
+	if root == null or root.data == null:
+		return false
+	if level != root:
+		_set_level(root)
+	if mode != Mode.PAINT:
+		_set_mode(Mode.PAINT)
+	if event is InputEventMouse:
+		mouse_pos = event.position
+		input_camera = camera
+	return _paint_input(camera, event) == AFTER_GUI_INPUT_STOP
+
+
+## The brush cursor / mask previews on another viewport's overlay.
+func grade_draw_paint(overlay: Control, camera: Camera3D) -> void:
+	if mode == Mode.PAINT and camera == input_camera:
+		_draw_paint_cursor(overlay, camera)
+
+
+## What the brush paints on `root`: LevelPaintTool.VERTEX_LAYER (painted colour) or
+## overlay n (1..).
+func grade_set_paint_layer(layer: int, root: LevelRoot) -> void:
+	if root and level != root:
+		_set_level(root)
+	if mode != Mode.PAINT:
+		_set_mode(Mode.PAINT)
+	if paint.tool in [LevelPaintTool.Tool.SCATTER, LevelPaintTool.Tool.PLACE, LevelPaintTool.Tool.GRASS, LevelPaintTool.Tool.TREES, LevelPaintTool.Tool.FILL_SAME]:
+		paint.tool = LevelPaintTool.Tool.BRUSH
+	_sync_paint_panel()
+	panel.paint_panel.set_tool_state(paint)
+	paint.layer = layer  # (after the panel sync, which may pick its own row)
+	_refresh_status()
+
+
+## The brush paints painted AO layer `id` on `root` (brush, erase, paint face).
+func grade_set_ao_layer(id: int, root: LevelRoot) -> void:
+	grade_set_paint_layer(LevelPaintTool.AO_LAYER, root)
+	paint.ao_layer_id = id
+	if not paint.tool in [LevelPaintTool.Tool.BRUSH, LevelPaintTool.Tool.ERASE, LevelPaintTool.Tool.FACE]:
+		paint.tool = LevelPaintTool.Tool.BRUSH
+		panel.paint_panel.set_tool_state(paint)
+
+
+func grade_paint_layer() -> int:
+	return paint.layer
+
+
+## The face mask's faces get their own variant of their texture (TextureLook); returns how
+## many variants that made / reused (0: mask empty).
+func grade_mask_variants() -> int:
+	return _mask_variants().size() if _level_ok() else 0
+
+
+func grade_mask_size() -> int:
+	return paint.face_mask.size()
 
 
 ## Turns the overlay textures of the face-mask faces a quarter turn (one undo step).
@@ -3423,11 +3725,12 @@ func _show_all_brushes() -> void:
 
 
 ## Border tool region for a hit: the face mask (this level's part of it) when the hit face
-## is in it, else nothing while a mask exists, else the hit face's flat surface.
-func _border_region(hit: Dictionary) -> Array:
+## is in it, else nothing while a mask exists, else the hit face's flat surface. `edge`: the
+## mask even when the hit face is just outside it (an Alt+click on its outline).
+func _border_region(hit: Dictionary, edge := false) -> Array:
 	if paint.face_mask.is_empty():
 		return LevelPaintTool.coplanar_region(hit.brush, hit.face)
-	if not paint.face_mask.has([hit.brush, hit.face]):
+	if not edge and not paint.face_mask.has([hit.brush, hit.face]):
 		return []
 	var out := []
 	for key in paint.face_mask:
@@ -3588,8 +3891,9 @@ func _pick_face_texture(hit: Dictionary) -> void:
 	var bits := PackedStringArray([name])
 	if paint.rotation != 0.0:
 		bits.append("%d°" % roundi(paint.rotation))
-	if not is_equal_approx(absf(uv.z), 1.0):
-		bits.append("×%s" % snappedf(absf(uv.z), 0.01))
+	var xy := paint.picked_scale
+	if not xy.is_equal_approx(Vector2.ONE):
+		bits.append(("×%s" % snappedf(xy.x, 0.01)) if is_equal_approx(xy.x, xy.y) else ("×%s / %s" % [snappedf(xy.x, 0.01), snappedf(xy.y, 0.01)]))
 	if LevelBrush.uv_follows_slope(uv):
 		bits.append("follows slope")
 	if not Vector2(uv.x, uv.y).is_zero_approx():
@@ -3597,6 +3901,7 @@ func _pick_face_texture(hit: Dictionary) -> void:
 	if face_set != 0:
 		bits.append("set %s" % level.data.layer_set_name(face_set))
 	_pick_note = ["Picked " + " · ".join(bits), Time.get_ticks_msec()]
+	_refresh_colour_adjust()
 	update_overlays()
 
 
@@ -3638,8 +3943,9 @@ func _align_base_to_edge(hit: Dictionary, flip: bool) -> void:
 	for t in targets:
 		var b: LevelBrush = t.brush
 		var inv := root.brush_global_transform(b).affine_inverse()
-		var aligned = LevelBrush.uv_aligned_to_edge(b.get_face_uv(t.face), b.get_face_normal(t.face), inv * wa, inv * wb,
-			inv * foot, inv * (foot + inward), flip)
+		var at := b.uv_anchor()  # (points where the texture is laid: World-anchored brushes shift)
+		var aligned = LevelBrush.uv_aligned_to_edge(b.get_face_uv(t.face), b.get_face_normal(t.face), inv * wa + at, inv * wb + at,
+			inv * foot + at, inv * (foot + inward) + at, flip, b.get_face_uv_stretch(t.face))
 		if aligned == null:
 			continue  # the edge runs along this face's normal: nothing to line up
 		if not by_brush.has(b):
@@ -3751,6 +4057,9 @@ func _on_paint_brush_changed(property: StringName, value: Variant) -> void:
 	if property == &"grass_height":
 		paint.grass.height = value
 		return
+	if property == &"grass_style":
+		paint.grass.style = value
+		return
 	if String(property).begins_with("trees_"):
 		var key := String(property).trim_prefix("trees_")
 		if key == "species":
@@ -3794,6 +4103,306 @@ func _on_paint_brush_changed(property: StringName, value: Variant) -> void:
 
 
 ## Paint panel actions with no active level: use the edited scene's level.
+# --- Colour adjust (Paint panel) ------------------------------------------------------
+
+var _value_view: Compositor
+
+
+## Value view: the editor's 3D viewports in greyscale (1) or value groups (3 / 5),
+## N64VideoOut's grade on their cameras; never saved into a scene. 0 = off.
+func _set_value_view(mode: int) -> void:
+	var on := mode > 0
+	if on and _value_view == null:
+		var e: CompositorEffect = load("res://addons/n64_runtime/post/n64_video_out.gd").new()
+		e.set(&"color_16bit", false)
+		e.set(&"horizontal_soft", 0.0)
+		e.set(&"grade", 1.0)
+		_value_view = Compositor.new()
+		_value_view.compositor_effects = [e]
+	if _value_view:
+		_value_view.compositor_effects[0].set(&"value_steps", mode if mode > 1 else 0)
+	for i in 4:
+		var vp := EditorInterface.get_editor_viewport_3d(i)
+		var cam := vp.get_camera_3d() if vp else null
+		if cam:
+			cam.compositor = _value_view if on else null
+
+
+## Value readout: the first 3D view's values (as shown, value view or not) beside a reference.
+func _measure_values(reference: String) -> void:
+	var vp := EditorInterface.get_editor_viewport_3d(0)
+	if vp == null:
+		return
+	var view := ValueStats.of(vp.get_texture().get_image())
+	var ref := {}
+	if reference != "":
+		ref = ValueStats.of(Image.load_from_file(reference))
+	panel.paint_panel.show_value_stats(view, ref)
+
+
+var _variant_mask_key := 0
+var _variant_looks: Array[TextureLook] = []
+
+
+## Shows the colour adjust of what the panel targets: the texture to apply (zone-wide) or
+## the masked faces' first variant.
+func _refresh_colour_adjust() -> void:
+	var pp = panel.paint_panel if panel else null
+	if pp == null or not _level_ok():
+		return
+	var groups := _texture_groups()
+	var gnames := PackedStringArray(groups.keys())
+	gnames.sort()
+	pp.set_colour_groups(gnames, _zone_is_grey())
+	if pp.colour_adjust_target() == 2:
+		var g: String = pp.colour_adjust_group()
+		var members: Array = groups.get(g, [])
+		if members.is_empty():
+			pp.set_colour_adjust({}, "No textures in this zone.")
+			return
+		var first: ColourAdjust = level.data.base_adjusts.get(members[0])
+		var faces := 0
+		for m in members:
+			faces += _faces_using(m)
+		pp.set_colour_adjust(first.to_dict() if first else {}, "%s: %d texture%s, %d faces (%s)%s" % [g, members.size(), "" if members.size() == 1 else "s", faces,
+			", ".join(members.map(func(m): return m.resource_path.get_file().get_basename())),
+			"; they get these settings on the first change" if members.size() > 1 else ""])
+		return
+	if pp.colour_adjust_target() == 0:
+		var base := TextureLook.source_of(paint.base_texture) if paint.base_texture else null
+		if base == null:
+			pp.set_colour_adjust({}, "Pick a texture (Texture to apply, or I on a face).")
+			return
+		var a: ColourAdjust = level.data.base_adjusts.get(base)
+		pp.set_colour_adjust(a.to_dict() if a else {}, "%s: every face in this zone (%d)" % [base.resource_path.get_file().get_basename(), _faces_using(base)])
+		return
+	var targets := _mask_targets()
+	if targets.is_empty():
+		pp.set_colour_adjust({}, "Mask some faces first (Face mask), then adjust.")
+		return
+	var ids := {}
+	var first: ColourAdjust = null
+	for t in targets:
+		var id: int = t.brush.get_face_texture(t.face)
+		if id >= 0:
+			ids[id] = true
+			var e: Texture2D = level.data.textures[id]
+			if first == null and e is TextureLook and e.adjust:
+				first = e.adjust
+	pp.set_colour_adjust(first.to_dict() if first else {}, "%d masked faces, %d texture%s (they get their own variant on the first change)" % [
+		targets.size(), ids.size(), "" if ids.size() == 1 else "s"])
+
+
+## Faces in the level showing `base` (itself or a look of it).
+func _faces_using(base: Texture2D) -> int:
+	var ids := {}
+	for i in level.data.textures.size():
+		if level.data.textures[i] and TextureLook.source_of(level.data.textures[i]) == base:
+			ids[i] = true
+	var n := 0
+	for b: LevelBrush in level.data.brushes:
+		if b:
+			for f in b.get_face_count():
+				if ids.has(b.get_face_texture(f)):
+					n += 1
+	return n
+
+
+## The zone's base textures (the ones its texture list shows) by kind: group name ->
+## [Texture2D]. Kind: an N64Texture's grade category (its folder, or Grade As), else folder.
+func _texture_groups() -> Dictionary:
+	var groups := {}
+	for base in _zone_bases():
+		var g := ""
+		if base is N64Texture:
+			g = String((base as N64Texture).grade_category())
+		if g == "":
+			g = base.resource_path.get_base_dir().get_file()
+		if g == "":
+			g = "other"
+		if not groups.has(g):
+			groups[g] = []
+		groups[g].append(base)
+	return groups
+
+
+## Base textures of the level's texture list (looks give their source), once each.
+func _zone_bases() -> Array[Texture2D]:
+	var out: Array[Texture2D] = []
+	for t: Texture2D in level.data.textures:
+		if t == null or t is N64StairTexture:
+			continue
+		var b := TextureLook.source_of(t)
+		if b and not b in out:
+			out.append(b)
+	return out
+
+
+func _zone_is_grey() -> bool:
+	var bases := _zone_bases()
+	if bases.is_empty():
+		return false
+	for b in bases:
+		var a: ColourAdjust = level.data.base_adjusts.get(b)
+		if a == null or not a.from_grey:
+			return false
+	return true
+
+
+## Zone in grey: every base texture's zone-wide adjust (and masked variants') starts from
+## grey, or stops; their other settings stay. One undo step.
+func _set_zone_grey(on: bool) -> void:
+	if not _ensure_paint_level():
+		return
+	var data := level.data
+	var adjusts := data.base_adjusts.duplicate()
+	for b in _zone_bases():
+		var a: ColourAdjust = adjusts.get(b)
+		a = a.duplicate() if a else ColourAdjust.new()
+		a.from_grey = on
+		if a.is_identity():
+			adjusts.erase(b)
+		else:
+			adjusts[b] = a
+	var ur := get_undo_redo()
+	ur.create_action("Zone In Grey" if on else "Zone In Colour", UndoRedo.MERGE_DISABLE, level)
+	ur.add_do_property(data, &"base_adjusts", adjusts)
+	ur.add_undo_property(data, &"base_adjusts", data.base_adjusts)
+	for t in data.textures:
+		if t is TextureLook and (t as TextureLook).adjust:
+			var la := (t as TextureLook).adjust.duplicate() as ColourAdjust
+			la.from_grey = on
+			ur.add_do_property(t, &"adjust", la)
+			ur.add_undo_property(t, &"adjust", (t as TextureLook).adjust)
+	ur.add_do_method(data, &"emit_signal", &"materials_changed")
+	ur.add_undo_method(data, &"emit_signal", &"materials_changed")
+	ur.add_do_method(self, &"_refresh_colour_adjust")
+	ur.add_undo_method(self, &"_refresh_colour_adjust")
+	ur.commit_action()
+
+
+func _on_colour_adjust(target: int, values: Dictionary) -> void:
+	if not _ensure_paint_level():
+		return
+	if target == 2:
+		var members: Array = _texture_groups().get(panel.paint_panel.colour_adjust_group(), [])
+		if members.is_empty():
+			return
+		var adjusts := level.data.base_adjusts.duplicate()
+		for m in members:
+			var a := ColourAdjust.from_dict(values) if not values.is_empty() else null
+			if a == null or a.is_identity():
+				adjusts.erase(m)
+			else:
+				adjusts[m] = a
+		_set_paint_level_property(&"base_adjusts", adjusts)
+		return
+	if target == 0:
+		var base := TextureLook.source_of(paint.base_texture) if paint.base_texture else null
+		if base == null:
+			return
+		var adjusts := level.data.base_adjusts.duplicate()
+		var a := ColourAdjust.from_dict(values) if not values.is_empty() else null
+		if a == null or a.is_identity():
+			adjusts.erase(base)
+		else:
+			adjusts[base] = a
+		_set_paint_level_property(&"base_adjusts", adjusts)
+		return
+	var looks := _mask_variants()
+	if looks.is_empty():
+		return
+	var ur := get_undo_redo()
+	ur.create_action("Colour Adjust Masked Faces", UndoRedo.MERGE_ENDS, level)
+	for look in looks:
+		var a := ColourAdjust.from_dict(values) if not values.is_empty() else ColourAdjust.new()
+		ur.add_do_property(look, &"adjust", a)
+		ur.add_undo_property(look, &"adjust", look.adjust)
+	ur.add_do_method(level.data, &"emit_signal", &"materials_changed")
+	ur.add_undo_method(level.data, &"emit_signal", &"materials_changed")
+	ur.commit_action()
+
+
+## The masked faces' colour variants (TextureLooks of their own), made on first use: per
+## texture the masked faces show, a copy of it with an adjust, those faces moved onto it
+## (one undo step). A variant only masked faces use is reused.
+func _mask_variants() -> Array[TextureLook]:
+	var targets := _mask_targets()
+	if targets.is_empty():
+		return [] as Array[TextureLook]
+	var key := hash(targets.map(func(t): return [t.brush.get_instance_id(), t.face]))
+	if key == _variant_mask_key and _variant_looks.all(func(l): return l in level.data.textures):
+		return _variant_looks
+	var data := level.data
+	var by_tex := {}  # texture id -> {brush: [faces]}
+	for t in targets:
+		var id: int = t.brush.get_face_texture(t.face)
+		if id < 0 or data.textures[id] is N64StairTexture:
+			continue
+		if not by_tex.has(id):
+			by_tex[id] = {}
+		if not by_tex[id].has(t.brush):
+			by_tex[id][t.brush] = []
+		by_tex[id][t.brush].append(t.face)
+	var masked := {}
+	for t in targets:
+		masked[[t.brush, t.face]] = true
+	var textures := data.textures.duplicate()
+	var face_tex := {}  # brush -> new face_textures
+	var looks: Array[TextureLook] = []
+	for id in by_tex:
+		var entry: Texture2D = data.textures[id]
+		var only_masked := entry is TextureLook and (entry as TextureLook).adjust != null
+		if only_masked:
+			for b: LevelBrush in data.brushes:
+				if b == null:
+					continue
+				for f in b.get_face_count():
+					if b.get_face_texture(f) == id and not masked.has([b, f]):
+						only_masked = false
+						break
+				if not only_masked:
+					break
+		if only_masked:
+			looks.append(entry)
+			continue
+		var v := TextureLook.new()
+		if entry is TextureLook:
+			var src := entry as TextureLook
+			v.texture = src.texture
+			v.palette = src.palette
+			v.color = src.color
+			v.variation = src.variation
+			v.tile = src.tile
+			v.recolour = src.recolour
+			v.adjust = src.adjust.duplicate() if src.adjust else null
+		else:
+			v.texture = entry
+		if v.adjust == null:
+			var lvl: ColourAdjust = data.base_adjusts.get(v.texture)
+			v.adjust = lvl.duplicate() if lvl else ColourAdjust.new()
+		textures.append(v)
+		var new_id := textures.size() - 1
+		for b: LevelBrush in by_tex[id]:
+			var cur: PackedInt32Array = face_tex.get(b, b.with_face_textures([], -1))
+			for f in by_tex[id][b]:
+				cur[f] = new_id
+			face_tex[b] = cur
+		looks.append(v)
+	if not face_tex.is_empty():
+		var ur := get_undo_redo()
+		ur.create_action("Colour Variant For Masked Faces", UndoRedo.MERGE_DISABLE, level)
+		ur.add_do_property(data, &"textures", textures)
+		ur.add_undo_property(data, &"textures", data.textures)
+		for b: LevelBrush in face_tex:
+			ur.add_do_property(b, &"face_textures", face_tex[b])
+			ur.add_undo_property(b, &"face_textures", b.face_textures)
+		ur.commit_action()
+	_variant_mask_key = key
+	_variant_looks = looks
+	return looks
+
+
 func _ensure_paint_level() -> bool:
 	if not _level_ok():
 		var root := _target_level_root()
@@ -4124,6 +4733,35 @@ func _reset_mask_faces() -> void:
 
 ## "Merge faces": joins the face-mask faces that touch, lie in one plane and match (one
 ## undo step; the brushes are recorded whole). Blender set pieces are left alone.
+## Texture anchor (LevelBrush.uv_world) for the brushes of the face-mask faces, or every
+## plain brush of the level without a mask (houses, doors, windows, passages, props, fences,
+## ropes and Blender pieces keep theirs: they're objects). Faces placed by hand keep their
+## look. One undo step.
+func _set_uv_anchor(world: bool) -> void:
+	if not _ensure_paint_level():
+		return
+	var brushes := {}
+	if paint.face_mask.is_empty():
+		for b: LevelBrush in level.data.brushes:
+			if b and b.blend_file == "" and not (b.is_house() or b.is_prop() or b.is_fence() or b.is_rope() or b.door or b.window or b.passage):
+				brushes[b] = true
+	else:
+		for key in paint.face_mask:
+			if is_instance_valid(key[0]) and level.has_brush(key[0]):
+				brushes[key[0]] = true
+	var change := brushes.keys().filter(func(b): return b.uv_world != world)
+	if change.is_empty():
+		print("[N64 Level Tools] Texture anchor: already %s." % ("World" if world else "Brush"))
+		return
+	var ur := get_undo_redo()
+	ur.create_action("Texture Anchor: %s" % ("World" if world else "Brush"), UndoRedo.MERGE_DISABLE, level)
+	for b: LevelBrush in change:
+		ur.add_do_property(b, &"uv_world", world)
+		ur.add_undo_property(b, &"uv_world", not world)
+	ur.commit_action()
+	print("[N64 Level Tools] Texture anchor: %d brush(es) now %s." % [change.size(), "World" if world else "Brush"])
+
+
 func _merge_mask_faces() -> void:
 	if not _ensure_paint_level():
 		return
@@ -4385,7 +5023,7 @@ func _draw_paint_cursor(overlay: Control, camera: Camera3D) -> void:
 		LevelPaintTool.Tool.GRADIENT:
 			_draw_gradient_cursor(overlay, camera, color)
 		LevelPaintTool.Tool.BORDER:
-			var region := _border_region(paint_hit)
+			var region := _border_region(paint_hit, Input.is_key_pressed(KEY_ALT))
 			_show_fill_preview(paint_hit.root, region, color)
 			_draw_border_sides(overlay, camera, _border_outline(paint_hit.root, region))
 		LevelPaintTool.Tool.GRASS, LevelPaintTool.Tool.TREES:
@@ -5143,7 +5781,7 @@ func _door_surfaces(spec: DoorSpec, lining: bool) -> void:
 	if wall:
 		var face: int = ghost_door.face
 		spec.wall_texture = wall.get_face_texture(face)
-		var wuv := wall.get_face_uv(face)
+		var wuv := wall.get_face_uv_uniform(face)
 		spec.wall_uv = Vector4(wuv.x, wuv.y, wuv.z, fposmod(wuv.w, 360.0))
 		spec.wall_color = PassageBuilder.face_color(wall, face)
 	var floor_info: Dictionary = ghost_door.get("floor", {})
@@ -5151,7 +5789,7 @@ func _door_surfaces(spec: DoorSpec, lining: bool) -> void:
 	if fb:
 		var ff: int = floor_info.get("face", 0)
 		spec.floor_texture = fb.get_face_texture(ff)
-		var fuv := fb.get_face_uv(ff)
+		var fuv := fb.get_face_uv_uniform(ff)
 		spec.floor_uv = Vector4(fuv.x, fuv.y, fuv.z, fposmod(fuv.w, 360.0))
 		spec.floor_source_xf = fb.transform
 		spec.floor_color = PassageBuilder.face_color(fb, ff)
@@ -5186,7 +5824,7 @@ func _add_door_brush(root: LevelRoot, world_xf: Transform3D, spec: DoorSpec, cut
 	if cut:
 		var oxf := spec.opening_xf(b.transform)
 		carved = PassageBuilder.carve_opening(root, root.global_transform * oxf, spec.width, spec.height,
-			spec.carve_depth(), b.tag, spec.trim(), spec.shape())
+			spec.carve_depth(), b.tag, spec.cut_trim(), spec.shape())
 		spec.mark_carved(oxf)
 	for e in extra:
 		spec.extra_hashes[e.tag] = _shape_hash(e)
@@ -5313,7 +5951,7 @@ func _place_passage() -> void:
 	if not ghost_floor.is_empty():
 		var src: LevelBrush = ghost_floor.brush
 		spec.floor_texture = src.get_face_texture(ghost_floor.face)
-		var fuv := src.get_face_uv(ghost_floor.face)
+		var fuv := src.get_face_uv_uniform(ghost_floor.face)
 		spec.floor_uv = Vector4(fuv.x, fuv.y, fuv.z, fposmod(fuv.w, 360.0))
 		spec.floor_source_xf = src.transform
 		spec.floor_color = PassageBuilder.face_color(src, ghost_floor.face)
@@ -5329,14 +5967,14 @@ func _place_passage() -> void:
 		# Read the wall's texture before carving: cutting renumbers the wall's faces.
 		spec.shell = true
 		spec.wall_texture = ghost_wall.brush.get_face_texture(ghost_wall.face)
-		var wuv: Vector4 = ghost_wall.brush.get_face_uv(ghost_wall.face)
+		var wuv: Vector4 = ghost_wall.brush.get_face_uv_uniform(ghost_wall.face)
 		spec.wall_uv = Vector4(wuv.x, wuv.y, wuv.z, fposmod(wuv.w, 360.0))
 		spec.wall_color = PassageBuilder.face_color(ghost_wall.brush, ghost_wall.face)
-		carved = PassageBuilder.carve_opening(root, world_xf, spec.width, spec.height, 2.0, b.tag, spec.trim(), spec.shape())
+		carved = PassageBuilder.carve_opening(root, world_xf, spec.width, spec.height, 2.0, b.tag, spec.cut_trim(), spec.shape())
 		spec.carved = true
 		spec.carved_width = spec.width
 		spec.carved_height = spec.height
-		spec.carved_trim = spec.trim()
+		spec.carved_trim = spec.cut_trim()
 		spec.carved_version = PassageBuilder.CARVE_VERSION
 		spec.carved_xf = b.transform
 	b.passage = spec
@@ -5390,7 +6028,7 @@ var _passage_seen := {}
 
 func _passage_key(b: LevelBrush) -> Array:
 	var spec := b.opening_spec()
-	return [spec.opening_size(), spec.opening_xf(b.transform), spec.trim(), spec.shape()]
+	return [spec.opening_size(), spec.opening_xf(b.transform), spec.cut_trim(), spec.shape()]
 
 
 ## A passage's / door's wall opening cut again where / as big as it is now (fill the old
@@ -5405,7 +6043,7 @@ func _recarve_passage(ur: EditorUndoRedoManager, root: LevelRoot, b: LevelBrush)
 	var gx := root.global_transform
 	var size := p.opening_size()
 	var cuts: Array = PassageBuilder.fill_opening(root, gx * p.carved_xf, p.carved_width, p.carved_height, [b], b.tag, p.carved_shape) \
-			+ PassageBuilder.carve_opening(root, gx * oxf, size.x, size.y, p.carve_depth(), b.tag, p.trim(), p.shape())
+			+ PassageBuilder.carve_opening(root, gx * oxf, size.x, size.y, p.carve_depth(), b.tag, p.cut_trim(), p.shape())
 	if b.is_passage():
 		cuts += _cut_room_floor(root, b, gx * oxf, size.x)
 	var changes := {}  # brush -> [before, after]
@@ -5440,7 +6078,7 @@ func _on_passage_changed(root: LevelRoot, b: LevelBrush) -> void:
 	var seen = _passage_seen.get(b)
 	_passage_seen[b] = key
 	# First sight (scene opened): only a trim the wall wasn't cut for yet (older passages).
-	if seen == null and p.carved and (not p.carved_trim.is_equal_approx(p.trim()) or p.stale_cut()
+	if seen == null and p.carved and (not p.carved_trim.is_equal_approx(p.cut_trim()) or p.stale_cut()
 			or not p.carved_shape.is_equal_approx(p.shape())):
 		seen = []
 	if seen == null or seen == key or drag != Drag.NONE:
@@ -5841,6 +6479,7 @@ func _place_brush() -> void:
 		parent_xf = root.global_transform
 
 	var b := LevelBrush.new()
+	b.uv_world = true  # (new brushes tile on from their neighbours)
 	b.shape = place_shape as BrushShapes.Shape
 	b.size = BrushShapes.default_size(place_shape)
 	b.segments = BrushShapes.default_segments(place_shape)
@@ -5952,6 +6591,7 @@ func _bake_all() -> void:
 			push_warning("N64 Level Tools: %s uses the same level data as %s, so it was baked once. Two LevelRoots on one data draw everything twice; delete the extra one unless that's intended." % [root.name, baked[root.data].name])
 			continue
 		baked[root.data] = root
+		BuildProgress.where = root.name if roots.size() > 1 else ""
 		var not_ready := LevelBaker.not_ready_reason(root.data)
 		if not not_ready.is_empty():
 			push_error("N64 Level Tools: not baking %s: %s. Wait a moment (or restart the editor) and bake again." % [root.name, not_ready])
@@ -5965,6 +6605,9 @@ func _bake_all() -> void:
 		if dropped > 0:
 			print("N64 Level Tools: %s: dropped %d unused vertices." % [root.name, dropped])
 		var relit := {}
+		# (A frame between steps: the editor redraws and the progress panel shows.)
+		BuildProgress.step("lighting")
+		await get_tree().process_frame
 		if LevelData.mode_is_timed(root.data.lighting_mode):
 			# Timed levels re-light per key before baking (applied directly; part of this bake).
 			var schedule := LightingSchedule.load_project()
@@ -5987,6 +6630,8 @@ func _bake_all() -> void:
 				brush.set_block_signals(false)
 		# The light rain catches around the lamps (every lamp, baked or live).
 		LevelLighting.bake_rain_light(root, roots + _dressing_occluders(), lights)
+		BuildProgress.step("bake")
+		await get_tree().process_frame
 		var result := LevelBaker.bake(root.data, root.merge_coplanar)
 		var s: Dictionary = result.stats
 		var summary := "%d tris, %d surfaces in %d chunks (from %d tris, %d brushes)" % [s.baked_tris, s.surfaces, s.chunks, s.source_tris, s.brushes]
@@ -5996,7 +6641,7 @@ func _bake_all() -> void:
 			ur.add_undo_property(brush, &"corner_lighting", relit[brush][0])
 		for prop in [[&"baked_mesh", result.mesh], [&"baked_chunks", result.chunks], [&"baked_collision", null],
 				[&"baked_collision_parts", result.collision_parts], [&"baked_collision_surfaces", result.collision_surfaces],
-				[&"bake_hash", root.compute_hash()], [&"bake_summary", summary]]:
+				[&"bake_hash", root.compute_hash()], [&"bake_summary", summary], [&"build_key", 0]]:
 			ur.add_do_property(root.data, prop[0], prop[1])
 			ur.add_undo_property(root.data, prop[0], root.data.get(prop[0]))
 		ur.commit_action()
@@ -6005,6 +6650,7 @@ func _bake_all() -> void:
 			s.degenerate_tris, s.baked_verts, s.surfaces, s.chunks, s.collision_tris])
 		# What's past the walls: the zones the passages lead to, low and flat (and a painted
 		# ring of what's further off).
+		BuildProgress.step("backdrop")
 		var zones: Array[String] = await NeighbourBackdrop.bake(root, EditorInterface.get_base_control())
 		if not zones.is_empty():
 			root._apply_bake()

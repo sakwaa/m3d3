@@ -9,6 +9,9 @@ enum Tool { BRUSH, ERASE, FILL_FACE, FILL_NORMAL, FACE, FILL_SAME, SCATTER, PLAC
 const VERTEX_LAYER := -1
 ## Paints per-face Surface overrides (footstep sound | gameplay flags), whole faces.
 const SURFACE_LAYER := -2
+## Paints a painted AO layer (`ao_layer_id`; Grade screen): darkness per vertex, erase back
+## to none. Folded into the time keys' light by the layer's settings (GradeAOLayer).
+const AO_LAYER := -3
 ## AUTO: whatever the clicked face is (floor -> facing up, wall -> walls, ceiling -> down).
 enum Direction { UP, DOWN, WALLS, ALL, AUTO }
 const TOOL_NAMES := ["Brush", "Erase", "Fill Face", "Fill by Normal", "Paint Face", "Fill Same Texture",
@@ -22,6 +25,8 @@ var base_texture: Texture2D
 var vertex_color := Color(0.45, 0.4, 0.38)
 ## SURFACE_LAYER: the override painted (Surface sound | flags; 0 = none).
 var surface_value := 0
+## AO_LAYER: the painted AO layer's id (LevelBrush.ao_paint key).
+var ao_layer_id := 0
 ## Brush radius in metres.
 var size := 1.0
 ## Max opacity a stroke reaches (Photoshop-style: repeated stamps in one stroke don't exceed it).
@@ -62,6 +67,11 @@ var rotation := 0.0
 ## Base texture "Follow slope" (LevelBrush.uv_follows_slope) given to the faces it's
 ## painted on, like `rotation`.
 var follow_slope := false
+## Base texture scale across / up (X, Y; 2 = twice as big) given to the faces it's painted
+## on, like `rotation` (picking a face takes its scale).
+var texture_scale := Vector2.ONE
+## The picked face's X / Y scale (with picked_uv).
+var picked_scale := Vector2.ONE
 ## Face UV (offset u, offset v, scale) picked along with `base_texture` (pick_face):
 ## while that texture is the one selected, painted faces get it too (rotation stays
 ## `rotation`). null = faces keep their own offset / scale.
@@ -207,11 +217,14 @@ func end_stroke() -> void:
 	if _stroke.is_empty():
 		return
 	var root: LevelRoot = _stroke.root
-	undo.create_action("Paint Vertex Colours" if layer == VERTEX_LAYER else "Paint Surface" if layer == SURFACE_LAYER
+	undo.create_action("Paint Vertex Colours" if layer == VERTEX_LAYER else "Paint AO" if layer == AO_LAYER else "Paint Surface" if layer == SURFACE_LAYER
 		else ("Paint" if layer > 0 else "Paint Base Texture"), UndoRedo.MERGE_DISABLE, root)
 	for brush in _stroke.get("surf_before", {}):
 		undo.add_do_property(brush, &"face_surfaces", brush.face_surfaces)
 		undo.add_undo_property(brush, &"face_surfaces", _stroke.surf_before[brush])
+	for brush in _stroke.get("ao", {}):
+		undo.add_do_property(brush, &"ao_paint", brush.ao_paint)
+		undo.add_undo_property(brush, &"ao_paint", _stroke.ao[brush].before)
 	for brush in _stroke.get("vcolors", {}):
 		var entry: Dictionary = _stroke.vcolors[brush]
 		undo.add_do_property(brush, &"vertex_colors", brush.vertex_colors)
@@ -227,7 +240,9 @@ func end_stroke() -> void:
 		undo.add_undo_property(brush, &"face_textures", _stroke.base_before[brush])
 	for brush in _stroke.get("uv_before", {}):
 		undo.add_do_property(brush, &"face_uv", brush.face_uv)
-		undo.add_undo_property(brush, &"face_uv", _stroke.uv_before[brush])
+		undo.add_undo_property(brush, &"face_uv", _stroke.uv_before[brush][0])
+		undo.add_do_property(brush, &"face_uv_scale", brush.face_uv_scale)
+		undo.add_undo_property(brush, &"face_uv_scale", _stroke.uv_before[brush][1])
 	# Only when the stroke added a texture: setting the palette rebuilds the whole level.
 	if layer == 0 and _stroke.has("textures_before") and _stroke.textures_before != root.data.textures:
 		undo.add_do_property(root.data, &"textures", root.data.textures)
@@ -255,6 +270,16 @@ func paint_face(root: LevelRoot, brush: LevelBrush, face: int) -> void:
 		return
 	_stroke.faces[[brush, face]] = true
 	var erase: bool = _stroke.erase
+	if layer == AO_LAYER:
+		# Its vertices, whole (AO is per vertex: neighbours sharing them darken a little too).
+		var e := _ao_entry(brush)
+		var arr: PackedFloat32Array = e.arr
+		for v in brush.get_face_vertex_ids(face):
+			if v < arr.size():
+				arr[v] = lerpf(arr[v], 0.0 if erase else 1.0, strength)
+		e.arr = arr
+		_set_ao(brush, arr)
+		return
 	if layer == VERTEX_LAYER:
 		# This face's own corners only: neighbours sharing its vertices keep their colour.
 		_vertex_entry(brush)
@@ -291,6 +316,9 @@ func _stamp(point: Vector3) -> void:
 	_stamp_angle = randf() * TAU if shape and scatter_rotation else 0.0
 	if layer == VERTEX_LAYER:
 		_paint_vertices(root, point)
+		return
+	if layer == AO_LAYER:
+		_paint_ao(root, point)
 		return
 	for hit in faces_near(root, point, size):
 		if layer == SURFACE_LAYER:
@@ -417,6 +445,69 @@ func _paint_vertices(root: LevelRoot, point: Vector3) -> void:
 			brush.set_corner_paint(colors)
 
 
+## AO stroke state for a brush (made on first touch): ao_paint before, the layer's darkness
+## the stroke started from, how strongly each vertex is covered so far, the allowed ones.
+func _ao_entry(brush: LevelBrush) -> Dictionary:
+	if not _stroke.has("ao"):
+		_stroke.ao = {}
+	if not _stroke.ao.has(brush):
+		var arr: PackedFloat32Array = brush.ao_paint.get(ao_layer_id, PackedFloat32Array())
+		if arr.size() != brush.vertices.size():
+			arr = PackedFloat32Array()
+			arr.resize(brush.vertices.size())
+		else:
+			arr = arr.duplicate()
+		var cover := PackedFloat32Array()
+		cover.resize(arr.size())
+		var allowed = null
+		var corners = _mask_corners(brush)
+		if corners != null:
+			allowed = {}
+			for c in corners:
+				allowed[brush.face_indices[c]] = true
+		_stroke.ao[brush] = {before = brush.ao_paint, start = arr.duplicate(), arr = arr, cover = cover, allowed = allowed}
+	return _stroke.ao[brush]
+
+
+func _set_ao(brush: LevelBrush, arr: PackedFloat32Array) -> void:
+	var d := brush.ao_paint.duplicate()
+	d[ao_layer_id] = arr
+	brush.ao_paint = d
+
+
+## Darkness painted into the AO layer around `point` (erase: back to none), soft brush.
+func _paint_ao(root: LevelRoot, point: Vector3) -> void:
+	var target := 0.0 if _stroke.erase else 1.0
+	for brush in root.data.brushes:
+		if brush == null or (_only and brush != _only) or root.is_brush_hidden(brush):
+			continue
+		var xf := root.brush_global_transform(brush)
+		var lp := xf.affine_inverse() * point
+		var r := size / maxf(xf.basis.get_scale().x, 0.001)
+		if not brush.local_aabb().grow(r).has_point(lp):
+			continue
+		var e := _ao_entry(brush)
+		var start: PackedFloat32Array = e.start
+		var arr: PackedFloat32Array = e.arr
+		var cover: PackedFloat32Array = e.cover
+		var changed := false
+		var normals := brush.get_vertex_normals()
+		for i in brush.vertices.size():
+			var offset := brush.vertices[i] - lp
+			if offset.length() >= r or (e.allowed != null and not e.allowed.has(i)):
+				continue
+			var w := _brush_weight(offset, normals[i], r)
+			if w <= cover[i]:
+				continue
+			cover[i] = w
+			arr[i] = lerpf(start[i], target, w * strength)
+			changed = true
+		e.cover = cover
+		e.arr = arr
+		if changed:
+			_set_ao(brush, arr)
+
+
 ## Vertex colours of whole faces set towards the colour (white when erasing): their own
 ## corners, so faces next to them keep their colour.
 func fill_vertex_colors(root: LevelRoot, targets: Array, erase := false) -> void:
@@ -509,24 +600,31 @@ func _assign_base(root: LevelRoot, brush: LevelBrush, faces: Array) -> void:
 	if color_mode != ColorMode.TEXTURE and (look.has("color") or color_mode == ColorMode.RECOLOUR):
 		_tint_faces(brush, faces, look.get("color", Color.WHITE))
 	var uv := brush.face_uv.duplicate()
+	var scales := brush.face_uv_scale.duplicate()
 	var rotated := false
 	var pick: Variant = picked_uv if picked_uv != null and base_texture == _picked_texture else null
+	# Scale as X / Y (face_uv_scale), face_uv's own scale 1.
+	var xy := texture_scale
 	for f in faces:
 		while uv.size() <= f:
 			uv.append(LevelBrush.DEFAULT_UV)
+		while scales.size() <= f:
+			scales.append(Vector2.ONE)
 		# Keep the face's overlay turns (whole extra turns of the stored rotation).
 		var w := rotation + 360.0 * LevelBrush.uv_overlay_code(uv[f])
-		var z: float = absf(pick.z if pick != null else uv[f].z) * (-1.0 if follow_slope else 1.0)
+		var z := -1.0 if follow_slope else 1.0
 		var want: Vector4 = Vector4(pick.x, pick.y, z, w) if pick != null else Vector4(uv[f].x, uv[f].y, z, w)
-		if uv[f] != want:
+		if uv[f] != want or scales[f] != xy:
 			uv[f] = want
+			scales[f] = xy
 			rotated = true
 	if rotated:
 		if not _stroke.has("uv_before"):
 			_stroke.uv_before = {}
 		if not _stroke.uv_before.has(brush):
-			_stroke.uv_before[brush] = brush.face_uv
+			_stroke.uv_before[brush] = [brush.face_uv, brush.face_uv_scale]
 		brush.face_uv = uv
+		brush.face_uv_scale = scales
 
 
 ## Sets the Surface override of `faces` (erase: clears it), recording the stroke's undo.
@@ -566,6 +664,8 @@ func pick_face(root: LevelRoot, brush: LevelBrush, face: int) -> bool:
 	rotation = fposmod(uv.w, 360.0)
 	follow_slope = LevelBrush.uv_follows_slope(uv)
 	picked_uv = uv
+	picked_scale = brush.get_face_scale(face)
+	texture_scale = picked_scale
 	_picked_texture = base_texture
 	return true
 
@@ -822,6 +922,8 @@ func border_fill(root: LevelRoot, region: Array, width: float, erase := false) -
 		var bases := root.data.overlay_bases.duplicate()
 		var stairs := root.data.overlay_stairs.duplicate()
 		for m: Dictionary in masks:
+			if m.cleared:
+				continue
 			m.code = m.turns + 4 * LevelData.overlay_frame_index(offsets, angles, m.offset, m.angle, bases,
 				m.get("basis", LevelData.IDENTITY_BASIS), stairs, m.get("stair"))
 		if stairs != root.data.overlay_stairs:
@@ -844,7 +946,7 @@ func border_fill(root: LevelRoot, region: Array, width: float, erase := false) -
 	for m: Dictionary in masks:
 		if cut.has(m.brush):
 			m.brush.set_face_mask(m.face, overlay, m.image, false)
-			if not follow:
+			if not follow or m.cleared:
 				continue
 			if not cut_codes.has(m.brush):
 				cut_codes[m.brush] = [[], []]
@@ -877,7 +979,7 @@ func border_fill(root: LevelRoot, region: Array, width: float, erase := false) -
 			continue
 		undo.add_do_method(m.brush, &"set_face_mask", m.face, overlay, m.image)
 		undo.add_undo_method(m.brush, &"set_face_mask", m.face, overlay, m.before)
-		if follow and m.code != m.brush.get_face_overlay_code(m.face):
+		if follow and not m.cleared and m.code != m.brush.get_face_overlay_code(m.face):
 			if not turned.has(m.brush):
 				turned[m.brush] = [[], []]
 			turned[m.brush][0].append(m.face)
@@ -1158,6 +1260,7 @@ func border_key(root: LevelRoot, region: Array, overlay: int) -> int:
 
 ## `reach` (>= width): texels this far from the edge are rewritten: the band up to `width`,
 ## cleared beyond it (a narrower border replacing a wider one); erasing clears all of it.
+## Sides left out (border_off) are cleared out to `reach` (a band painted there before).
 func border_masks(root: LevelRoot, region: Array, width: float, overlay: int, erase := false, reach := 0.0) -> Array:
 	reach = maxf(reach, width)
 	var density: float = root.data.mask_density
@@ -1171,8 +1274,15 @@ func border_masks(root: LevelRoot, region: Array, width: float, overlay: int, er
 	# Border segments bucketed on a grid so each face only checks the ones near it.
 	var cell := maxf(reach, 1.0)
 	var grid := {}
-	var segs := []
-	for seg: Array in active_border_segments(root, region):
+	var segs := border_segments(root, region)
+	var off := {}  # segs index -> on a side left out (only cleared)
+	if not border_off.is_empty():
+		for side in border_sides(segs):
+			if border_off.has(side.key):
+				for i in side.segs:
+					off[i] = true
+	for si in segs.size():
+		var seg: Array = segs[si]
 		var box := AABB(seg[0], Vector3.ZERO).expand(seg[1]).grow(reach)
 		var lo := Vector3i((box.position / cell).floor())
 		var hi := Vector3i((box.end / cell).floor())
@@ -1182,11 +1292,12 @@ func border_masks(root: LevelRoot, region: Array, width: float, overlay: int, er
 					var c := Vector3i(x, y, z)
 					if not grid.has(c):
 						grid[c] = []
-					grid[c].append(segs.size())
-		segs.append(seg)
+					grid[c].append(si)
 	var out := []
 	if segs.is_empty():
 		return out
+	if erase:
+		off.clear()  # every side goes
 	var px := 1.0 / density
 	var butt := border_follow and border_corner == Corner.BUTT
 	# The overlay texture's height in metres (one repeat across the band).
@@ -1227,10 +1338,10 @@ func border_masks(root: LevelRoot, region: Array, width: float, overlay: int, er
 		var along_u := {}
 		var inv := xf.basis.inverse()
 		var face_tweak := brush.get_face_uv(face)
-		var uv_origin := LevelBrush.tweaked_uv(Vector3.ZERO, n, face_tweak)
+		var uv_origin := brush.face_uv_at(Vector3.ZERO, face)
 		for i in near:
 			var seg: Array = segs[i]
-			var dir := LevelBrush.tweaked_uv(inv * (seg[1] - seg[0]), n, face_tweak) - uv_origin
+			var dir := brush.face_uv_at(inv * (seg[1] - seg[0]), face) - uv_origin
 			along_u[i] = absf(dir.x) >= absf(dir.y)
 		var votes := {}  # border segment -> texels of this face nearest it
 		# Only texels inside the face vote (a mitre half's mask spans its whole bounding rect).
@@ -1244,10 +1355,14 @@ func border_masks(root: LevelRoot, region: Array, width: float, overlay: int, er
 				var dist := INF
 				var nearest := -1
 				var tie := -INF
+				var off_dist := INF
 				for i in near:
 					var seg: Array = segs[i]
 					var cp := Geometry3D.get_closest_point_to_segment(q, seg[0], seg[1])
 					var di := q.distance_to(cp)
+					if off.has(i):
+						off_dist = minf(off_dist, di)
+						continue
 					if di > dist + 1e-4:
 						continue
 					# Equally near (around an inside corner both edges are nearest at the shared
@@ -1261,6 +1376,9 @@ func border_masks(root: LevelRoot, region: Array, width: float, overlay: int, er
 				# Hard edge, antialiased over one mask pixel. Erasing clears that rim pixel too
 				# (scaling a half-covered rim down would leave a faint outline).
 				if dist > reach + px:
+					if off_dist <= reach + px and img.get_pixel(x, y).r > 0.0:
+						img.set_pixel(x, y, Color.BLACK)  # a side left out
+						any = true
 					continue
 				var w := 1.0 if erase \
 					else clampf((width - dist) / maxf(border_soft, px) + (0.0 if border_soft > px else 0.5), 0.0, 1.0)
@@ -1296,7 +1414,8 @@ func border_masks(root: LevelRoot, region: Array, width: float, overlay: int, er
 			elif best >= 0:
 				frame = _edge_frame(brush, face, xf, segs[best], repeat, repeat_u, LAY_TURNS[border_direction])
 			out.append({brush = brush, face = face, before = before, image = img, turns = frame.turns, angle = frame.angle,
-				offset = frame.offset, basis = frame.get("basis", LevelData.IDENTITY_BASIS), stair = frame.get("stair")})
+				offset = frame.offset, basis = frame.get("basis", LevelData.IDENTITY_BASIS), stair = frame.get("stair"),
+				cleared = best < 0})
 	return out
 
 
@@ -1353,7 +1472,7 @@ func _continue_frame(root: LevelRoot, brush: LevelBrush, face: int, xf: Transfor
 		var foot := a + e * (p - a).dot(e)
 		return ninv * (foot - w_n * (p - foot).dot(w_s))
 	var target := func(p: Vector3) -> Vector2:
-		return LevelBrush.tweaked_uv(fold.call(p), nn, ntweak) * (l_tile / maxf(base_tile, 0.001))
+		return nbrush.face_uv_at(fold.call(p), nface) * (l_tile / maxf(base_tile, 0.001))
 	var stair_target := func(p: Vector3) -> Vector2:
 		var q: Vector3 = fold.call(p)
 		var q4 := Vector4(q.x, q.y, q.z, 1.0)
@@ -1362,7 +1481,7 @@ func _continue_frame(root: LevelRoot, brush: LevelBrush, face: int, xf: Transfor
 	var sn := brush.get_face_normal(face)
 	var stweak := brush.get_face_uv(face)
 	var uv_at := func(p: Vector3) -> Vector2:
-		return LevelBrush.tweaked_uv(inv * p, sn, stweak)
+		return brush.face_uv_at(inv * p, face)
 	# The affine map from this face's UV to a target, through three points on the face.
 	var u0: Vector2 = uv_at.call(c_s)
 	var s1: Vector2 = uv_at.call(c_s + e) - u0
@@ -1444,7 +1563,7 @@ static func _edge_frame(brush: LevelBrush, face: int, xf: Transform3D, seg: Arra
 	var inv := xf.affine_inverse()
 	var inward: Vector3 = seg[2].cross(seg[1] - seg[0]).normalized()
 	var lin := func(dir: Vector3) -> Vector2:
-		return LevelBrush.tweaked_uv(inv.basis * dir, n, tweak) - LevelBrush.tweaked_uv(Vector3.ZERO, n, tweak)
+		return brush.face_uv_at(inv.basis * dir, face) - brush.face_uv_at(Vector3.ZERO, face)
 	var along: Vector2 = lin.call(seg[1] - seg[0])
 	var into: Vector2 = lin.call(inward)
 	var turns := 0
@@ -1463,7 +1582,7 @@ static func _edge_frame(brush: LevelBrush, face: int, xf: Transform3D, seg: Arra
 		angle = 0.0
 	# Quarter turns commute with the free rotation: the extra turns keep the edge on an axis.
 	turns = (turns + extra) % 4
-	var p0 := _turn(LevelBrush.tweaked_uv(inv * seg[0], n, tweak), turns).rotated(angle)
+	var p0 := _turn(brush.face_uv_at(inv * seg[0], face), turns).rotated(angle)
 	if extra % 2 == 1:
 		return {turns = turns, angle = angle, offset = Vector2(fposmod(-p0.x, maxf(repeat_u, 0.001)), 0.0)}
 	return {turns = turns, angle = angle, offset = Vector2(0.0, fposmod(-p0.y, maxf(repeat, 0.001)))}

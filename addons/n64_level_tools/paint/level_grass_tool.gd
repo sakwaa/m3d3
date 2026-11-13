@@ -8,6 +8,9 @@ extends RefCounted
 ## Carpet height painted (metres; Majora's Mask carpets are about a quarter to a third of the
 ## player's height).
 var height := 0.45
+## Edge style painted with the carpet: -1 the level's own (GrassSettings.edge_style), else
+## a GrassSettings.EdgeStyle.
+var style := -1
 var undo: EditorUndoRedoManager
 var _stroke := {}
 
@@ -26,10 +29,18 @@ func begin(root: LevelRoot, point: Vector3, radius: float, erase: bool) -> void:
 		made = true
 	var s := data.grass
 	_stroke = {root = root, radius = radius, erase = erase, settings = s, made = made,
-		before_map = s.paint_map, before_origin = s.paint_origin, last = point}
+		before_map = s.paint_map, before_origin = s.paint_origin, before_styles = s.style_map,
+		before_max = s.paint_max, last = point}
+	if height > s.paint_max + 0.001 or (s.paint_map == null and s.paint_max < GrassSettings.MAX_PAINT_HEIGHT):
+		# Taller than this map's range (a ledge): re-encoded for the full range first.
+		s.set_block_signals(true)
+		s.rescale_paint(GrassSettings.MAX_PAINT_HEIGHT)
 	if s.paint_map:
 		s.set_block_signals(true)
 		s.paint_map = s.paint_map.duplicate()  # painted from here on; the old one is the undo
+	if s.style_map:
+		s.set_block_signals(true)
+		s.style_map = s.style_map.duplicate()
 	s.set_block_signals(true)  # (rebuilt once, when the stroke ends)
 	_stamp(point)
 
@@ -68,6 +79,10 @@ func end() -> void:
 	undo.add_undo_property(s, &"paint_origin", _stroke.before_origin)
 	undo.add_do_property(s, &"paint_map", after_map)
 	undo.add_undo_property(s, &"paint_map", _stroke.before_map)
+	undo.add_do_property(s, &"paint_max", s.paint_max)
+	undo.add_undo_property(s, &"paint_max", _stroke.before_max)
+	undo.add_do_property(s, &"style_map", s.style_map)
+	undo.add_undo_property(s, &"style_map", _stroke.before_styles)
 	undo.commit_action(false)  # (already painted)
 	if _stroke.made:
 		root.data.grass_changed.emit()
@@ -84,7 +99,12 @@ func _stamp(point: Vector3) -> void:
 	var cell := GrassSettings.PAINT_CELL
 	_cover(s, Rect2(c.x - r, c.z - r, r * 2.0, r * 2.0))
 	var img := s.paint_map  # (the stroke's own: the one before it was copied for undo)
-	var value := GrassSettings.ERASED if _stroke.erase else GrassSettings.value_of(height)
+	var value := GrassSettings.ERASED if _stroke.erase else s.value_of(height)
+	# The style goes with the carpet (erasing clears it back to the level's).
+	var styles := s.style_map
+	var style_v := 0 if _stroke.erase or style < 0 else style + 1
+	if styles == null and style_v > 0:
+		styles = Image.create(img.get_width(), img.get_height(), false, Image.FORMAT_L8)
 	var x0 := floori((c.x - r - s.paint_origin.x) / cell)
 	var z0 := floori((c.z - r - s.paint_origin.y) / cell)
 	var x1 := ceili((c.x + r - s.paint_origin.x) / cell)
@@ -95,7 +115,11 @@ func _stamp(point: Vector3) -> void:
 			var wz := s.paint_origin.y + (pz + 0.5) * cell
 			if Vector2(wx - c.x, wz - c.z).length() <= r:
 				img.set_pixel(px, pz, Color(value / 255.0, 0, 0))
+				if styles:
+					styles.set_pixel(px, pz, Color(style_v / 255.0, 0, 0))
 	s.paint_map = img
+	if styles:
+		s.style_map = styles
 
 
 ## Grows the paint map (keeping what's painted) to cover `rect` (level x, z).
@@ -110,8 +134,13 @@ static func _cover(s: GrassSettings, rect: Rect2) -> void:
 	var origin := ((rect.position - Vector2.ONE * margin) / cell).floor() * cell
 	var size := Vector2i(((rect.end + Vector2.ONE * margin - origin) / cell).ceil())
 	var img := Image.create(size.x, size.y, false, Image.FORMAT_L8)
+	var off := Vector2i(((s.paint_origin - origin) / cell).round())
 	if s.paint_map != null:
-		var off := Vector2i(((s.paint_origin - origin) / cell).round())
 		img.blit_rect(s.paint_map, Rect2i(Vector2i.ZERO, s.paint_map.get_size()), off)
+	if s.style_map != null:
+		# (Kept cell for cell with the paint map.)
+		var styles := Image.create(size.x, size.y, false, Image.FORMAT_L8)
+		styles.blit_rect(s.style_map, Rect2i(Vector2i.ZERO, s.style_map.get_size()), off)
+		s.style_map = styles
 	s.paint_origin = origin
 	s.paint_map = img

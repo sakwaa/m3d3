@@ -28,6 +28,19 @@ uniform sampler2D reflect_tex : source_color, filter_nearest_mipmap, repeat_enab
 uniform float reflect_strength : hint_range(0.0, 1.0) = 0.6;
 uniform float reflect_distortion = 0.025;
 
+// Underwater wobble (as Hail to the Dongo's N64 water: pixels tagged as water shift in a
+// wave): what's seen through the water is read from the screen a little to the side,
+// swaying. The tag here is depth: a shifted read that lands on something in front of the
+// water (a leg, the bank) takes the unshifted pixel, so nothing above the surface smears in.
+uniform bool wobble_on = true;
+// Sway at 5 m away, in screen widths (nearer sways more, farther less).
+uniform float wobble_strength = 0.004;
+// Waves per metre across the water, and their speed.
+uniform float wobble_scale = 1.6;
+uniform float wobble_speed = 1.4;
+uniform sampler2D screen_tex : hint_screen_texture, filter_nearest, repeat_disable;
+uniform sampler2D depth_tex : hint_depth_texture, filter_nearest, repeat_disable;
+
 varying vec2 n64_fogv;
 varying vec3 n64_fog_tintv;
 varying vec2 world_xz;
@@ -66,8 +79,26 @@ void fragment() {
 		glow += refl * k;
 		alpha = mix(alpha, 1.0, k);
 	}
-	EMISSION = glow;
-	ALBEDO = albedo;
-	ALPHA = alpha;
-	FOG = n64_fog_out(n64_fogv, n64_fog_tintv, VERTEX, INV_VIEW_MATRIX);
+	vec4 fog = n64_fog_out(n64_fogv, n64_fog_tintv, VERTEX, INV_VIEW_MATRIX);
+	if (wobble_on && alpha < 0.999) {
+		float t = TIME * wobble_speed;
+		vec2 sway = vec2(sin(world_xz.y * wobble_scale + t), cos(world_xz.x * wobble_scale * 1.3 + t * 1.1));
+		vec2 suv = SCREEN_UV + sway * wobble_strength * 5.0 / max(length(VERTEX), 5.0);
+		// Reversed depth (nearer = larger): a read in front of the water stays put.
+		if (texture(depth_tex, suv).r > FRAGCOORD.z || any(lessThan(suv, vec2(0.0))) || any(greaterThan(suv, vec2(1.0)))) {
+			suv = SCREEN_UV;
+		}
+		vec3 behind = texture(screen_tex, suv).rgb;
+		// Drawn opaque: the water's own part as before, the scene behind (already lit and
+		// fogged) mixed in as it would have blended.
+		ALBEDO = albedo * alpha;
+		EMISSION = glow * alpha + behind * (1.0 - alpha);
+		ALPHA = 1.0;
+		FOG = vec4(fog.rgb, fog.a * alpha);
+	} else {
+		EMISSION = glow;
+		ALBEDO = albedo;
+		ALPHA = alpha;
+		FOG = fog;
+	}
 }

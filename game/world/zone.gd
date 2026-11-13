@@ -33,6 +33,12 @@ signal room_changed(room: Room)
 ## the fog is fully opaque at its end; off = keep the camera's own far clip.
 @export var clip_at_fog_end := true
 @export_range(0.0, 50.0, 0.5, "suffix:m") var clip_margin := 2.0
+## World height of the ground the weather's ground-hugging fog lies on (WeatherPreset
+## fog_height counts up from here).
+@export var fog_floor := 0.0
+## Screen look for the whole zone (ScreenLook: gradient map, palette or LUT); a room's or
+## the weather's wins.
+@export var screen_look: ScreenLook
 @export_group("Intro")
 ## The first time the player arrives (Majora's Mask style): a camera pan over the area and
 ## its name as a title card. Plays once (its cutscene's "seen" flag).
@@ -65,6 +71,7 @@ func _ready() -> void:
 	_collect(self)
 	# Baked Vertex / Timed Dynamic levels: lights baked into them skip them live (before rooms unload).
 	LevelLights.apply(self)
+	PropBatch.add_auto(self)  # (static props without their own batching)
 	for room in rooms:
 		room.setup()
 	for portal in portals:
@@ -82,6 +89,7 @@ func _notification(what: int) -> void:
 
 func _process(delta: float) -> void:
 	_update_fog(delta)
+	RenderScale.set_scene_mix(_screen_mix())
 	_update_key_light(delta)
 
 
@@ -135,10 +143,12 @@ func fog_target() -> Dictionary:
 	var s: FogSettings = current_room.fog_override if current_room and current_room.fog_override else fog
 	var w: Dictionary = GameState.weather_now
 	var outdoor := _sky() != null and w.has("fog_end")
+	if outdoor and s == fog and float(w.get("fog_override", 0.0)) > 0.5:
+		s = null  # (the weather's fog takes over: below)
 	if s == null:
 		if outdoor:
 			var d := outdoor_fog_distance()
-			return {color = w.horizon, start = w.fog_begin * d, end = w.fog_end * d, amount = w.fog_amount,
+			return {color = _weather_fog_color(w), start = w.fog_begin * d, end = w.fog_end * d, amount = w.fog_amount,
 				curve = FogSettings.FogCurve.N64_DEPTH, sampling = FogSettings.Sampling.SOFT_GRID, grid = 3.0, center = FogSettings.Center.CAMERA, tint = 0.3, halos = 0.6, lights = 4, light_sampling = FogSettings.LightSampling.FOLLOW_FOG, blend = 1.0}
 		return {color = Color.BLACK, start = 10.0, end = 60.0, amount = 0.0, curve = FogSettings.FogCurve.N64_DEPTH,
 			sampling = FogSettings.Sampling.SOFT_GRID, grid = 3.0, center = FogSettings.Center.CAMERA, tint = 0.3, halos = 0.6, lights = 4, light_sampling = FogSettings.LightSampling.FOLLOW_FOG, blend = 1.0}
@@ -147,7 +157,7 @@ func fog_target() -> Dictionary:
 			blend = s.blend_time}
 	if s.from_weather and outdoor:
 		var d := outdoor_fog_distance() if s == fog else 1.0
-		return {color = w.horizon, start = w.fog_begin * d, end = w.fog_end * d, amount = w.fog_amount * s.amount,
+		return {color = _weather_fog_color(w), start = w.fog_begin * d, end = w.fog_end * d, amount = w.fog_amount * s.amount,
 			curve = s.curve, sampling = s.sampling, grid = s.grid_size, center = s.center, tint = s.light_tint, halos = s.light_halos, lights = s.max_fog_lights, light_sampling = s.light_sampling, blend = s.blend_time}
 	# A fixed colour under the open sky is lit like the level: dark and blue at night.
 	# ... and closes in when the keys say so (night hides the distance).
@@ -180,15 +190,66 @@ func outdoor_light() -> Color:
 	return GameState.lighting_schedule.light_at(GameState.time_of_day)
 
 
+## The screen looks wanted here, {ScreenLook: weight}: the current room's; else outdoors
+## the weather's look for the time of day (its SkyKeys' looks blended by the hour like the
+## sky, then its own screen_look, then the zone's), both weathers while the weather changes;
+## else the zone's.
+func _screen_mix() -> Dictionary:
+	if current_room and current_room.screen_look:
+		return {current_room.screen_look: 1.0}
+	var out := {}
+	var add := func(look: ScreenLook, w: float) -> void:
+		if look and w > 0.0:
+			out[look] = out.get(look, 0.0) + w
+	if _sky() != null and GameState.weather_table and not (current_room and current_room.fog_override):
+		var sched := GameState.lighting_schedule
+		var b := sched.blend_for(GameState.time_of_day) if sched else Vector3.ZERO
+		var tb := smoothstep(0.0, 1.0, GameState.weather_blend)
+		for pair in [[GameState.weather_from, 1.0 - tb], [GameState.weather, tb]]:
+			if pair[1] <= 0.0:
+				continue
+			var p: WeatherPreset = GameState.weather_table.find(pair[0])
+			if p == null:
+				add.call(screen_look, pair[1])
+				continue
+			for k in [[int(b.x), 1.0 - b.z], [int(b.y), b.z]]:
+				var key_look: ScreenLook = p.get_key(k[0]).screen_look if not p.keys.is_empty() else null
+				add.call(key_look if key_look else (p.screen_look if p.screen_look else screen_look), pair[1] * k[1])
+		return out
+	add.call(screen_look, 1.0)
+	return out
+
+
+## The weather's fog colour: its horizon shaded by fog_shade by day, fog_night_shade once
+## the sky is dark (night fog glows paler than the sky).
+static func _weather_fog_color(w: Dictionary) -> Color:
+	var h: Color = w.horizon
+	var day := smoothstep(0.12, 0.4, h.get_luminance())
+	return h * lerpf(float(w.get("fog_night_shade", 1.0)), float(w.get("fog_shade", 1.0)), day)
+
+
+## The weather's fog look (WeatherPreset "Fog look") when the fog comes from the weather,
+## else none: {height, thin, drift, drift_size, glow}.
+func _fog_look() -> Dictionary:
+	var none := {height = 0.0, thin = 0.0, drift = 0.0, drift_size = 14.0, glow = 0.0}
+	var s: FogSettings = current_room.fog_override if current_room and current_room.fog_override else fog
+	var w: Dictionary = GameState.weather_now
+	var takes_over := s == fog and float(w.get("fog_override", 0.0)) > 0.5
+	if _sky() == null or not w.has("fog_height") or (s != null and not takes_over and not (s.enabled and s.from_weather)):
+		return none
+	return {height = w.fog_height, thin = w.fog_height_thin, drift = w.fog_drift, drift_size = w.fog_drift_size, glow = w.fog_glow}
+
+
 func _update_fog(delta: float) -> void:
 	var t := fog_target()
+	t.merge(_fog_look())
 	if fog_now.is_empty():
 		fog_now = t.duplicate()
 	else:
 		var k := clampf(delta / maxf(t.blend, 0.001), 0.0, 1.0)
 		fog_now.color = (fog_now.color as Color).lerp(t.color, k)
-		for key in [&"start", &"end", &"amount", &"tint", &"halos"]:
-			fog_now[key] = lerpf(fog_now[key], t[key], k)
+		for key in [&"start", &"end", &"amount", &"tint", &"halos", &"height", &"thin", &"drift", &"drift_size", &"glow"]:
+			fog_now[key] = lerpf(fog_now.get(key, t[key]), t[key], k)
 		fog_now.curve = t.curve
 		fog_now.sampling = t.sampling
 		fog_now.grid = t.grid
@@ -216,6 +277,15 @@ func _update_fog(delta: float) -> void:
 	if fog_now.center == FogSettings.Center.PLAYER and is_instance_valid(player):
 		origin = player.global_position + Vector3.UP * 1.0  # around chest height
 	RenderingServer.global_shader_parameter_set(&"n64_fog_origin", origin)
+	RenderingServer.global_shader_parameter_set(&"n64_fog_height",
+		Vector4(fog_floor, fog_now.get("height", 0.0), fog_now.get("thin", 0.0), 0.0))
+	# Banks drift with the wind (the zone's, scaled by the weather's, as DynamicSky's n64_wind),
+	# at a slow walk.
+	var a := deg_to_rad(wind_direction)
+	var strength: float = wind_strength * float(GameState.weather_now.get("wind", 1.0))
+	var drift_v := Vector2(cos(a), -sin(a)) * (0.4 + 0.8 * strength)
+	RenderingServer.global_shader_parameter_set(&"n64_fog_drift",
+		Vector4(fog_now.get("drift", 0.0), fog_now.get("drift_size", 14.0), drift_v.x, drift_v.y))
 	_update_fog_lights(cam, end, amount)
 	# Plain Godot materials (doors, labels…) get Godot's own depth fog matched to it; the
 	# N64 shaders write their own fog and ignore this.
@@ -282,9 +352,11 @@ func _update_fog_lights(cam: Camera3D, fog_end: float, amount: float) -> void:
 		RenderingServer.global_shader_parameter_set(StringName("n64_fog_light_col%d" % i), col)
 	var follow := 1.0 if fog_now.get("light_sampling", 0) == FogSettings.LightSampling.FOLLOW_FOG else 0.0
 	# Rain outdoors: lights glow wider and haze the wet air around them more.
-	var tint: float = fog_now.get("tint", 0.0) + rain * RAIN_TINT
-	var halos: float = fog_now.get("halos", 0.0) * (1.0 + rain) + rain * RAIN_HALOS
-	RenderingServer.global_shader_parameter_set(&"n64_fog_lights", Vector4(tint, halos, follow, 0.0))
+	# Thick fog (the weather's fog_glow): light hangs in the air, a wider, brighter glow.
+	var glow: float = fog_now.get("glow", 0.0)
+	var tint: float = fog_now.get("tint", 0.0) + rain * RAIN_TINT + glow * 0.6
+	var halos: float = fog_now.get("halos", 0.0) * (1.0 + rain + glow) + rain * RAIN_HALOS
+	RenderingServer.global_shader_parameter_set(&"n64_fog_lights", Vector4(tint, halos, follow, 1.0 + glow * 1.5))
 	if _coronas == null:
 		_coronas = _make_coronas()
 		add_child(_coronas, false, INTERNAL_MODE_BACK)

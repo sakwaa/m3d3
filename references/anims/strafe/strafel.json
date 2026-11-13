@@ -1,0 +1,201 @@
+{
+ "name": "StrafeL",
+ "fps": 30,
+ "length": 16,
+ "loop": true,
+ "root": "auto",
+ "source": "OoT remake vs original short 6qNOIcnL8P8 (24 fps, read by eye; timing ours)",
+ "measured": false,
+ "keys": [
+  {
+   "lean": 12,
+   "twist": 15,
+   "head": -8,
+   "upper_arm_L": [
+    55,
+    25
+   ],
+   "forearm_L": [
+    100,
+    25
+   ],
+   "upper_arm_R": [
+    25,
+    22
+   ],
+   "forearm_R": [
+    55,
+    10
+   ],
+   "blade_R": [
+    65,
+    -15
+   ],
+   "thigh_R": [
+    14,
+    4
+   ],
+   "shin_R": -20,
+   "thigh_L": [
+    14,
+    4
+   ],
+   "shin_L": -20,
+   "frame": 0,
+   "ease": "smooth",
+   "lift": 0.0
+  },
+  {
+   "lean": 12,
+   "twist": 15,
+   "head": -8,
+   "upper_arm_L": [
+    55,
+    25
+   ],
+   "forearm_L": [
+    100,
+    25
+   ],
+   "upper_arm_R": [
+    25,
+    22
+   ],
+   "forearm_R": [
+    55,
+    10
+   ],
+   "blade_R": [
+    65,
+    -15
+   ],
+   "thigh_R": [
+    14,
+    2
+   ],
+   "shin_R": -22,
+   "thigh_L": [
+    30,
+    26
+   ],
+   "shin_L": -10,
+   "frame": 4,
+   "ease": "smooth",
+   "lift": 0.03
+  },
+  {
+   "lean": 12,
+   "twist": 15,
+   "head": -8,
+   "upper_arm_L": [
+    55,
+    25
+   ],
+   "forearm_L": [
+    100,
+    25
+   ],
+   "upper_arm_R": [
+    25,
+    22
+   ],
+   "forearm_R": [
+    55,
+    10
+   ],
+   "blade_R": [
+    65,
+    -15
+   ],
+   "thigh_R": [
+    12,
+    14
+   ],
+   "shin_R": -16,
+   "thigh_L": [
+    12,
+    16
+   ],
+   "shin_L": -16,
+   "frame": 8,
+   "ease": "smooth",
+   "lift": -0.02
+  },
+  {
+   "lean": 12,
+   "twist": 15,
+   "head": -8,
+   "upper_arm_L": [
+    55,
+    25
+   ],
+   "forearm_L": [
+    100,
+    25
+   ],
+   "upper_arm_R": [
+    25,
+    22
+   ],
+   "forearm_R": [
+    55,
+    10
+   ],
+   "blade_R": [
+    65,
+    -15
+   ],
+   "thigh_R": [
+    32,
+    4
+   ],
+   "shin_R": -8,
+   "thigh_L": [
+    12,
+    10
+   ],
+   "shin_L": -20,
+   "frame": 12,
+   "ease": "smooth",
+   "lift": 0.03
+  },
+  {
+   "lean": 12,
+   "twist": 15,
+   "head": -8,
+   "upper_arm_L": [
+    55,
+    25
+   ],
+   "forearm_L": [
+    100,
+    25
+   ],
+   "upper_arm_R": [
+    25,
+    22
+   ],
+   "forearm_R": [
+    55,
+    10
+   ],
+   "blade_R": [
+    65,
+    -15
+   ],
+   "thigh_R": [
+    14,
+    4
+   ],
+   "shin_R": -20,
+   "thigh_L": [
+    14,
+    4
+   ],
+   "shin_L": -20,
+   "frame": 16,
+   "ease": "smooth",
+   "lift": 0.0
+  }
+ ]
+}

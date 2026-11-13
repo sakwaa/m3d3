@@ -1729,6 +1729,508 @@ windows = {
 "opening": Vector2i(8, 20)
 }
 
+[sub_resource type="Resource" id="Resource_5goyo"]
+script = ExtResource("2_5goyo")
+name = "BattleIdle"
+fps = 30
+length = 40
+loop = true
+keys = [{
+&"ease": 0,
+&"frame": 0,
+&"pose": {
+&"chest": Quaternion(-1.0567788e-09, -0.12767388, -0.027137924, 0.9914449),
+&"forearm_L": Quaternion(0.21508029, -4.842882e-08, 0.2720861, 0.9379284),
+&"forearm_R": Quaternion(0.25297275, 2.998184e-09, 0.08998296, 0.9632797),
+&"hand_R": Quaternion(-0.57189566, -0.25484487, 7.491517e-09, 0.77973676),
+&"head": Quaternion(0.10773597, -3.5143613e-10, -0.028605727, 0.9937679),
+&"neck": Quaternion(0.064197294, 8.166399e-09, 0.010851737, 0.99787825),
+&"shin_L": Quaternion(-0.33901006, 4.656613e-09, -0.03548606, 0.94011325),
+&"shin_R": Quaternion(-0.20850247, -3.7252903e-09, 0.02174861, 0.97778004),
+&"spine": Quaternion(-0.10452847, 0, 0, 0.9945219),
+&"thigh_L": Quaternion(0.18896477, 3.7252903e-09, 0.028804544, 0.98156136),
+&"thigh_R": Quaternion(-0.03457044, 1.1641532e-10, -0.025181636, 0.999085),
+&"upper_arm_L": Quaternion(0.39914346, 0, 0.2573172, 0.8800412),
+&"upper_arm_R": Quaternion(0.34020835, -4.4703484e-08, -0.012884147, 0.9402619)
+},
+&"root": Vector3(0, -0.04660428, 0)
+}, {
+&"ease": 0,
+&"frame": 20,
+&"pose": {
+&"chest": Quaternion(-1.0567788e-09, -0.12767388, -0.027137924, 0.9914449),
+&"forearm_L": Quaternion(0.21508029, -4.842882e-08, 0.2720861, 0.9379284),
+&"forearm_R": Quaternion(0.25297275, 2.998184e-09, 0.08998296, 0.9632797),
+&"hand_R": Quaternion(-0.57189566, -0.25484487, 7.491517e-09, 0.77973676),
+&"head": Quaternion(0.10773597, -3.5143613e-10, -0.028605727, 0.9937679),
+&"neck": Quaternion(0.064197294, 8.166399e-09, 0.010851737, 0.99787825),
+&"shin_L": Quaternion(-0.33901006, 4.656613e-09, -0.03548606, 0.94011325),
+&"shin_R": Quaternion(-0.20850247, -3.7252903e-09, 0.02174861, 0.97778004),
+&"spine": Quaternion(-0.10452847, 0, 0, 0.9945219),
+&"thigh_L": Quaternion(0.18896477, 3.7252903e-09, 0.028804544, 0.98156136),
+&"thigh_R": Quaternion(-0.03457044, 1.1641532e-10, -0.025181636, 0.999085),
+&"upper_arm_L": Quaternion(0.39914346, 0, 0.2573172, 0.8800412),
+&"upper_arm_R": Quaternion(0.34020835, -4.4703484e-08, -0.012884147, 0.9402619)
+},
+&"root": Vector3(0, -0.07160428, 0)
+}, {
+&"ease": 0,
+&"frame": 40,
+&"pose": {
+&"chest": Quaternion(-1.0567788e-09, -0.12767388, -0.027137924, 0.9914449),
+&"forearm_L": Quaternion(0.21508029, -4.842882e-08, 0.2720861, 0.9379284),
+&"forearm_R": Quaternion(0.25297275, 2.998184e-09, 0.08998296, 0.9632797),
+&"hand_R": Quaternion(-0.57189566, -0.25484487, 7.491517e-09, 0.77973676),
+&"head": Quaternion(0.10773597, -3.5143613e-10, -0.028605727, 0.9937679),
+&"neck": Quaternion(0.064197294, 8.166399e-09, 0.010851737, 0.99787825),
+&"shin_L": Quaternion(-0.33901006, 4.656613e-09, -0.03548606, 0.94011325),
+&"shin_R": Quaternion(-0.20850247, -3.7252903e-09, 0.02174861, 0.97778004),
+&"spine": Quaternion(-0.10452847, 0, 0, 0.9945219),
+&"thigh_L": Quaternion(0.18896477, 3.7252903e-09, 0.028804544, 0.98156136),
+&"thigh_R": Quaternion(-0.03457044, 1.1641532e-10, -0.025181636, 0.999085),
+&"upper_arm_L": Quaternion(0.39914346, 0, 0.2573172, 0.8800412),
+&"upper_arm_R": Quaternion(0.34020835, -4.4703484e-08, -0.012884147, 0.9402619)
+},
+&"root": Vector3(0, -0.04660428, 0)
+}]
+
+[sub_resource type="Resource" id="Resource_kkgud"]
+script = ExtResource("2_5goyo")
+name = "StrafeR"
+fps = 30
+length = 16
+loop = true
+keys = [{
+&"ease": 0,
+&"frame": 0,
+&"pose": {
+&"chest": Quaternion(-1.0567788e-09, -0.12767388, -0.027137924, 0.9914449),
+&"forearm_L": Quaternion(0.21508029, -4.842882e-08, 0.2720861, 0.9379284),
+&"forearm_R": Quaternion(0.25297275, 2.998184e-09, 0.08998296, 0.9632797),
+&"hand_R": Quaternion(-0.57189566, -0.25484487, 7.491517e-09, 0.77973676),
+&"head": Quaternion(0.10773597, -3.5143613e-10, -0.028605727, 0.9937679),
+&"neck": Quaternion(0.064197294, 8.166399e-09, 0.010851737, 0.99787825),
+&"shin_L": Quaternion(-0.29166013, -2.7939677e-09, 0.0028495453, 0.95651776),
+&"shin_R": Quaternion(-0.29166013, 2.7939677e-09, -0.0028495453, 0.95651776),
+&"spine": Quaternion(-0.10452847, 0, 0, 0.9945219),
+&"thigh_L": Quaternion(0.121572584, 9.313226e-10, -0.0085843615, 0.9925454),
+&"thigh_R": Quaternion(0.121572584, -9.313226e-10, 0.0085843615, 0.9925454),
+&"upper_arm_L": Quaternion(0.39914346, 0, 0.2573172, 0.8800412),
+&"upper_arm_R": Quaternion(0.34020835, -4.4703484e-08, -0.012884147, 0.9402619)
+},
+&"root": Vector3(0, -0.0351511, 0)
+}, {
+&"ease": 0,
+&"frame": 4,
+&"pose": {
+&"chest": Quaternion(-1.0567788e-09, -0.12767388, -0.027137924, 0.9914449),
+&"forearm_L": Quaternion(0.21508029, -4.842882e-08, 0.2720861, 0.9379284),
+&"forearm_R": Quaternion(0.25297275, 2.998184e-09, 0.08998296, 0.9632797),
+&"hand_R": Quaternion(-0.57189566, -0.25484487, 7.491517e-09, 0.77973676),
+&"head": Quaternion(0.10773597, -3.5143613e-10, -0.028605727, 0.9937679),
+&"neck": Quaternion(0.064197294, 8.166399e-09, 0.010851737, 0.99787825),
+&"shin_L": Quaternion(-0.30878875, 9.313226e-10, 0.018513849, 0.95095044),
+&"shin_R": Quaternion(-0.31620145, -1.21071935e-08, 0.19521795, 0.9283893),
+&"spine": Quaternion(-0.10452847, 0, 0, 0.9945219),
+&"thigh_L": Quaternion(0.12183697, 0, -0.02616224, 0.99220526),
+&"thigh_R": Quaternion(0.23590827, -3.7252903e-09, -0.19267625, 0.95248264),
+&"upper_arm_L": Quaternion(0.39914346, 0, 0.2573172, 0.8800412),
+&"upper_arm_R": Quaternion(0.34020835, -4.4703484e-08, -0.012884147, 0.9402619)
+},
+&"root": Vector3(0, -0.010029522, 0)
+}, {
+&"ease": 0,
+&"frame": 8,
+&"pose": {
+&"chest": Quaternion(-1.0567788e-09, -0.12767388, -0.027137924, 0.9914449),
+&"forearm_L": Quaternion(0.21508029, -4.842882e-08, 0.2720861, 0.9379284),
+&"forearm_R": Quaternion(0.25297275, 2.998184e-09, 0.08998296, 0.9632797),
+&"hand_R": Quaternion(-0.57189566, -0.25484487, 7.491517e-09, 0.77973676),
+&"head": Quaternion(0.10773597, -3.5143613e-10, -0.028605727, 0.9937679),
+&"neck": Quaternion(0.064197294, 8.166399e-09, 0.010851737, 0.99787825),
+&"shin_L": Quaternion(-0.23849612, -5.5879354e-09, -0.078732006, 0.96794677),
+&"shin_R": Quaternion(-0.23778826, 1.8626449e-09, 0.095408805, 0.9666198),
+&"spine": Quaternion(-0.10452847, 0, 0, 0.9945219),
+&"thigh_L": Quaternion(0.101712644, -9.313226e-10, 0.07871348, 0.99169487),
+&"thigh_R": Quaternion(0.100914225, -1.3969839e-09, -0.0961842, 0.99023485),
+&"upper_arm_L": Quaternion(0.39914346, 0, 0.2573172, 0.8800412),
+&"upper_arm_R": Quaternion(0.34020835, -4.4703484e-08, -0.012884147, 0.9402619)
+},
+&"root": Vector3(0, -0.043664627, 0)
+}, {
+&"ease": 0,
+&"frame": 12,
+&"pose": {
+&"chest": Quaternion(-1.0567788e-09, -0.12767388, -0.027137924, 0.9914449),
+&"forearm_L": Quaternion(0.21508029, -4.842882e-08, 0.2720861, 0.9379284),
+&"forearm_R": Quaternion(0.25297275, 2.998184e-09, 0.08998296, 0.9632797),
+&"hand_R": Quaternion(-0.57189566, -0.25484487, 7.491517e-09, 0.77973676),
+&"head": Quaternion(0.10773597, -3.5143613e-10, -0.028605727, 0.9937679),
+&"neck": Quaternion(0.064197294, 8.166399e-09, 0.010851737, 0.99787825),
+&"shin_L": Quaternion(-0.34012973, 4.656613e-09, -0.0074781515, 0.9403488),
+&"shin_R": Quaternion(-0.27354077, -2.7939682e-09, 0.04505636, 0.96080464),
+&"spine": Quaternion(-0.10452847, 0, 0, 0.9945219),
+&"thigh_L": Quaternion(0.27490765, 3.7252903e-09, -0.0031932183, 0.96146536),
+&"thigh_R": Quaternion(0.103023656, -9.313226e-10, -0.043699645, 0.9937185),
+&"upper_arm_L": Quaternion(0.39914346, 0, 0.2573172, 0.8800412),
+&"upper_arm_R": Quaternion(0.34020835, -4.4703484e-08, -0.012884147, 0.9402619)
+},
+&"root": Vector3(0, -0.0020765637, 0)
+}, {
+&"ease": 0,
+&"frame": 16,
+&"pose": {
+&"chest": Quaternion(-1.0567788e-09, -0.12767388, -0.027137924, 0.9914449),
+&"forearm_L": Quaternion(0.21508029, -4.842882e-08, 0.2720861, 0.9379284),
+&"forearm_R": Quaternion(0.25297275, 2.998184e-09, 0.08998296, 0.9632797),
+&"hand_R": Quaternion(-0.57189566, -0.25484487, 7.491517e-09, 0.77973676),
+&"head": Quaternion(0.10773597, -3.5143613e-10, -0.028605727, 0.9937679),
+&"neck": Quaternion(0.064197294, 8.166399e-09, 0.010851737, 0.99787825),
+&"shin_L": Quaternion(-0.29166013, -2.7939677e-09, 0.0028495453, 0.95651776),
+&"shin_R": Quaternion(-0.29166013, 2.7939677e-09, -0.0028495453, 0.95651776),
+&"spine": Quaternion(-0.10452847, 0, 0, 0.9945219),
+&"thigh_L": Quaternion(0.121572584, 9.313226e-10, -0.0085843615, 0.9925454),
+&"thigh_R": Quaternion(0.121572584, -9.313226e-10, 0.0085843615, 0.9925454),
+&"upper_arm_L": Quaternion(0.39914346, 0, 0.2573172, 0.8800412),
+&"upper_arm_R": Quaternion(0.34020835, -4.4703484e-08, -0.012884147, 0.9402619)
+},
+&"root": Vector3(0, -0.0351511, 0)
+}]
+
+[sub_resource type="Resource" id="Resource_pdie2"]
+script = ExtResource("2_5goyo")
+name = "StrafeL"
+fps = 30
+length = 16
+loop = true
+keys = [{
+&"ease": 0,
+&"frame": 0,
+&"pose": {
+&"chest": Quaternion(-1.0567788e-09, -0.12767388, -0.027137924, 0.9914449),
+&"forearm_L": Quaternion(0.21508029, -4.842882e-08, 0.2720861, 0.9379284),
+&"forearm_R": Quaternion(0.25297275, 2.998184e-09, 0.08998296, 0.9632797),
+&"hand_R": Quaternion(-0.57189566, -0.25484487, 7.491517e-09, 0.77973676),
+&"head": Quaternion(0.10773597, -3.5143613e-10, -0.028605727, 0.9937679),
+&"neck": Quaternion(0.064197294, 8.166399e-09, 0.010851737, 0.99787825),
+&"shin_L": Quaternion(-0.29166013, -2.7939677e-09, 0.0028495453, 0.95651776),
+&"shin_R": Quaternion(-0.29166013, 2.7939677e-09, -0.0028495453, 0.95651776),
+&"spine": Quaternion(-0.10452847, 0, 0, 0.9945219),
+&"thigh_L": Quaternion(0.121572584, 9.313226e-10, -0.0085843615, 0.9925454),
+&"thigh_R": Quaternion(0.121572584, -9.313226e-10, 0.0085843615, 0.9925454),
+&"upper_arm_L": Quaternion(0.39914346, 0, 0.2573172, 0.8800412),
+&"upper_arm_R": Quaternion(0.34020835, -4.4703484e-08, -0.012884147, 0.9402619)
+},
+&"root": Vector3(0, -0.0351511, 0)
+}, {
+&"ease": 0,
+&"frame": 4,
+&"pose": {
+&"chest": Quaternion(-1.0567788e-09, -0.12767388, -0.027137924, 0.9914449),
+&"forearm_L": Quaternion(0.21508029, -4.842882e-08, 0.2720861, 0.9379284),
+&"forearm_R": Quaternion(0.25297275, 2.998184e-09, 0.08998296, 0.9632797),
+&"hand_R": Quaternion(-0.57189566, -0.25484487, 7.491517e-09, 0.77973676),
+&"head": Quaternion(0.10773597, -3.5143613e-10, -0.028605727, 0.9937679),
+&"neck": Quaternion(0.064197294, 8.166399e-09, 0.010851737, 0.99787825),
+&"shin_L": Quaternion(-0.31620145, 1.21071935e-08, -0.19521795, 0.9283893),
+&"shin_R": Quaternion(-0.30878875, -9.313226e-10, -0.018513849, 0.95095044),
+&"spine": Quaternion(-0.10452847, 0, 0, 0.9945219),
+&"thigh_L": Quaternion(0.23590827, 3.7252903e-09, 0.19267625, 0.95248264),
+&"thigh_R": Quaternion(0.12183697, 0, 0.02616224, 0.99220526),
+&"upper_arm_L": Quaternion(0.39914346, 0, 0.2573172, 0.8800412),
+&"upper_arm_R": Quaternion(0.34020835, -4.4703484e-08, -0.012884147, 0.9402619)
+},
+&"root": Vector3(0, -0.010029522, 0)
+}, {
+&"ease": 0,
+&"frame": 8,
+&"pose": {
+&"chest": Quaternion(-1.0567788e-09, -0.12767388, -0.027137924, 0.9914449),
+&"forearm_L": Quaternion(0.21508029, -4.842882e-08, 0.2720861, 0.9379284),
+&"forearm_R": Quaternion(0.25297275, 2.998184e-09, 0.08998296, 0.9632797),
+&"hand_R": Quaternion(-0.57189566, -0.25484487, 7.491517e-09, 0.77973676),
+&"head": Quaternion(0.10773597, -3.5143613e-10, -0.028605727, 0.9937679),
+&"neck": Quaternion(0.064197294, 8.166399e-09, 0.010851737, 0.99787825),
+&"shin_L": Quaternion(-0.23778826, -1.8626449e-09, -0.095408805, 0.9666198),
+&"shin_R": Quaternion(-0.23849612, 5.5879354e-09, 0.078732006, 0.96794677),
+&"spine": Quaternion(-0.10452847, 0, 0, 0.9945219),
+&"thigh_L": Quaternion(0.100914225, 1.3969839e-09, 0.0961842, 0.99023485),
+&"thigh_R": Quaternion(0.101712644, 9.313226e-10, -0.07871348, 0.99169487),
+&"upper_arm_L": Quaternion(0.39914346, 0, 0.2573172, 0.8800412),
+&"upper_arm_R": Quaternion(0.34020835, -4.4703484e-08, -0.012884147, 0.9402619)
+},
+&"root": Vector3(0, -0.043664627, 0)
+}, {
+&"ease": 0,
+&"frame": 12,
+&"pose": {
+&"chest": Quaternion(-1.0567788e-09, -0.12767388, -0.027137924, 0.9914449),
+&"forearm_L": Quaternion(0.21508029, -4.842882e-08, 0.2720861, 0.9379284),
+&"forearm_R": Quaternion(0.25297275, 2.998184e-09, 0.08998296, 0.9632797),
+&"hand_R": Quaternion(-0.57189566, -0.25484487, 7.491517e-09, 0.77973676),
+&"head": Quaternion(0.10773597, -3.5143613e-10, -0.028605727, 0.9937679),
+&"neck": Quaternion(0.064197294, 8.166399e-09, 0.010851737, 0.99787825),
+&"shin_L": Quaternion(-0.27354077, 2.7939682e-09, -0.04505636, 0.96080464),
+&"shin_R": Quaternion(-0.34012973, -4.656613e-09, 0.0074781515, 0.9403488),
+&"spine": Quaternion(-0.10452847, 0, 0, 0.9945219),
+&"thigh_L": Quaternion(0.103023656, 9.313226e-10, 0.043699645, 0.9937185),
+&"thigh_R": Quaternion(0.27490765, -3.7252903e-09, 0.0031932183, 0.96146536),
+&"upper_arm_L": Quaternion(0.39914346, 0, 0.2573172, 0.8800412),
+&"upper_arm_R": Quaternion(0.34020835, -4.4703484e-08, -0.012884147, 0.9402619)
+},
+&"root": Vector3(0, -0.0020765637, 0)
+}, {
+&"ease": 0,
+&"frame": 16,
+&"pose": {
+&"chest": Quaternion(-1.0567788e-09, -0.12767388, -0.027137924, 0.9914449),
+&"forearm_L": Quaternion(0.21508029, -4.842882e-08, 0.2720861, 0.9379284),
+&"forearm_R": Quaternion(0.25297275, 2.998184e-09, 0.08998296, 0.9632797),
+&"hand_R": Quaternion(-0.57189566, -0.25484487, 7.491517e-09, 0.77973676),
+&"head": Quaternion(0.10773597, -3.5143613e-10, -0.028605727, 0.9937679),
+&"neck": Quaternion(0.064197294, 8.166399e-09, 0.010851737, 0.99787825),
+&"shin_L": Quaternion(-0.29166013, -2.7939677e-09, 0.0028495453, 0.95651776),
+&"shin_R": Quaternion(-0.29166013, 2.7939677e-09, -0.0028495453, 0.95651776),
+&"spine": Quaternion(-0.10452847, 0, 0, 0.9945219),
+&"thigh_L": Quaternion(0.121572584, 9.313226e-10, -0.0085843615, 0.9925454),
+&"thigh_R": Quaternion(0.121572584, -9.313226e-10, 0.0085843615, 0.9925454),
+&"upper_arm_L": Quaternion(0.39914346, 0, 0.2573172, 0.8800412),
+&"upper_arm_R": Quaternion(0.34020835, -4.4703484e-08, -0.012884147, 0.9402619)
+},
+&"root": Vector3(0, -0.0351511, 0)
+}]
+
+[sub_resource type="Resource" id="Resource_0uda1"]
+script = ExtResource("2_5goyo")
+name = "StrafeB"
+fps = 30
+loop = true
+keys = [{
+&"ease": 0,
+&"frame": 0,
+&"pose": {
+&"chest": Quaternion(-1.0567788e-09, -0.12767388, -0.027137924, 0.9914449),
+&"forearm_L": Quaternion(0.21508029, -4.842882e-08, 0.2720861, 0.9379284),
+&"forearm_R": Quaternion(0.25297275, 2.998184e-09, 0.08998296, 0.9632797),
+&"hand_R": Quaternion(-0.57189566, -0.25484487, 7.491517e-09, 0.77973676),
+&"head": Quaternion(0.10773597, -3.5143613e-10, -0.028605727, 0.9937679),
+&"neck": Quaternion(0.064197294, 8.166399e-09, 0.010851737, 0.99787825),
+&"shin_L": Quaternion(-0.33901006, 4.656613e-09, -0.03548606, 0.94011325),
+&"shin_R": Quaternion(-0.20850247, -3.7252903e-09, 0.02174861, 0.97778004),
+&"spine": Quaternion(-0.10452847, 0, 0, 0.9945219),
+&"thigh_L": Quaternion(0.18896477, 3.7252903e-09, 0.028804544, 0.98156136),
+&"thigh_R": Quaternion(-0.03457044, 1.1641532e-10, -0.025181636, 0.999085),
+&"upper_arm_L": Quaternion(0.39914346, 0, 0.2573172, 0.8800412),
+&"upper_arm_R": Quaternion(0.34020835, -4.4703484e-08, -0.012884147, 0.9402619)
+},
+&"root": Vector3(0, -0.04660428, 0)
+}, {
+&"ease": 0,
+&"frame": 5,
+&"pose": {
+&"chest": Quaternion(-1.0567788e-09, -0.12767388, -0.027137924, 0.9914449),
+&"forearm_L": Quaternion(0.21508029, -4.842882e-08, 0.2720861, 0.9379284),
+&"forearm_R": Quaternion(0.25297275, 2.998184e-09, 0.08998296, 0.9632797),
+&"hand_R": Quaternion(-0.57189566, -0.25484487, 7.491517e-09, 0.77973676),
+&"head": Quaternion(0.10773597, -3.5143613e-10, -0.028605727, 0.9937679),
+&"neck": Quaternion(0.064197294, 8.166399e-09, 0.010851737, 0.99787825),
+&"shin_L": Quaternion(-0.33868608, 8.381903e-09, -0.036885817, 0.9401761),
+&"shin_R": Quaternion(-0.14237824, -2.3283064e-09, 0.017513946, 0.9896574),
+&"spine": Quaternion(-0.10452847, 0, 0, 0.9945219),
+&"thigh_L": Quaternion(0.20589219, 1.8626451e-09, 0.029522706, 0.97812927),
+&"thigh_R": Quaternion(-0.20589219, 1.8626451e-09, -0.029522706, 0.97812927),
+&"upper_arm_L": Quaternion(0.39914346, 0, 0.2573172, 0.8800412),
+&"upper_arm_R": Quaternion(0.34020835, -4.4703484e-08, -0.012884147, 0.9402619)
+},
+&"root": Vector3(0, -0.02896072, 0)
+}, {
+&"ease": 0,
+&"frame": 10,
+&"pose": {
+&"chest": Quaternion(-1.0567788e-09, -0.12767388, -0.027137924, 0.9914449),
+&"forearm_L": Quaternion(0.21508029, -4.842882e-08, 0.2720861, 0.9379284),
+&"forearm_R": Quaternion(0.25297275, 2.998184e-09, 0.08998296, 0.9632797),
+&"hand_R": Quaternion(-0.57189566, -0.25484487, 7.491517e-09, 0.77973676),
+&"head": Quaternion(0.10773597, -3.5143613e-10, -0.028605727, 0.9937679),
+&"neck": Quaternion(0.064197294, 8.166399e-09, 0.010851737, 0.99787825),
+&"shin_L": Quaternion(-0.33901006, 4.656613e-09, -0.03548606, 0.94011325),
+&"shin_R": Quaternion(-0.20850247, -3.7252903e-09, 0.02174861, 0.97778004),
+&"spine": Quaternion(-0.10452847, 0, 0, 0.9945219),
+&"thigh_L": Quaternion(0.18896477, 3.7252903e-09, 0.028804544, 0.98156136),
+&"thigh_R": Quaternion(-0.03457044, 1.1641532e-10, -0.025181636, 0.999085),
+&"upper_arm_L": Quaternion(0.39914346, 0, 0.2573172, 0.8800412),
+&"upper_arm_R": Quaternion(0.34020835, -4.4703484e-08, -0.012884147, 0.9402619)
+},
+&"root": Vector3(0, -0.05660428, 0)
+}, {
+&"ease": 0,
+&"frame": 15,
+&"pose": {
+&"chest": Quaternion(-1.0567788e-09, -0.12767388, -0.027137924, 0.9914449),
+&"forearm_L": Quaternion(0.21508029, -4.842882e-08, 0.2720861, 0.9379284),
+&"forearm_R": Quaternion(0.25297275, 2.998184e-09, 0.08998296, 0.9632797),
+&"hand_R": Quaternion(-0.57189566, -0.25484487, 7.491517e-09, 0.77973676),
+&"head": Quaternion(0.10773597, -3.5143613e-10, -0.028605727, 0.9937679),
+&"neck": Quaternion(0.064197294, 8.166399e-09, 0.010851737, 0.99787825),
+&"shin_L": Quaternion(-0.15884785, 2.3283062e-09, -0.01844638, 0.9871307),
+&"shin_R": Quaternion(-0.30776805, 0, 0.02745508, 0.9510652),
+&"spine": Quaternion(-0.10452847, 0, 0, 0.9945219),
+&"thigh_L": Quaternion(-0.15493533, -1.8626451e-09, 0.027560282, 0.9875401),
+&"thigh_R": Quaternion(0.08633034, -6.9849193e-10, -0.025828212, 0.99593174),
+&"upper_arm_L": Quaternion(0.39914346, 0, 0.2573172, 0.8800412),
+&"upper_arm_R": Quaternion(0.34020835, -4.4703484e-08, -0.012884147, 0.9402619)
+},
+&"root": Vector3(0, -0.025419112, 0)
+}, {
+&"ease": 0,
+&"frame": 20,
+&"pose": {
+&"chest": Quaternion(-1.0567788e-09, -0.12767388, -0.027137924, 0.9914449),
+&"forearm_L": Quaternion(0.21508029, -4.842882e-08, 0.2720861, 0.9379284),
+&"forearm_R": Quaternion(0.25297275, 2.998184e-09, 0.08998296, 0.9632797),
+&"hand_R": Quaternion(-0.57189566, -0.25484487, 7.491517e-09, 0.77973676),
+&"head": Quaternion(0.10773597, -3.5143613e-10, -0.028605727, 0.9937679),
+&"neck": Quaternion(0.064197294, 8.166399e-09, 0.010851737, 0.99787825),
+&"shin_L": Quaternion(-0.33901006, 4.656613e-09, -0.03548606, 0.94011325),
+&"shin_R": Quaternion(-0.20850247, -3.7252903e-09, 0.02174861, 0.97778004),
+&"spine": Quaternion(-0.10452847, 0, 0, 0.9945219),
+&"thigh_L": Quaternion(0.18896477, 3.7252903e-09, 0.028804544, 0.98156136),
+&"thigh_R": Quaternion(-0.03457044, 1.1641532e-10, -0.025181636, 0.999085),
+&"upper_arm_L": Quaternion(0.39914346, 0, 0.2573172, 0.8800412),
+&"upper_arm_R": Quaternion(0.34020835, -4.4703484e-08, -0.012884147, 0.9402619)
+},
+&"root": Vector3(0, -0.04660428, 0)
+}]
+
+[sub_resource type="Resource" id="Resource_ly1xo"]
+script = ExtResource("2_5goyo")
+name = "SlashVFin"
+fps = 30
+length = 22
+keys = [{
+&"ease": 0,
+&"frame": 0,
+&"pose": {
+&"chest": Quaternion(0, 0, 0, 1),
+&"forearm_L": Quaternion(0.29284036, 3.3891063e-09, -0.03162574, 0.9556382),
+&"forearm_R": Quaternion(0.48704723, -1.4730514e-08, -0.041656997, 0.8723816),
+&"head": Quaternion(0.020942416, 0, 0, 0.9997807),
+&"neck": Quaternion(0.031410754, 0, 0, 0.9995066),
+&"shin_L": Quaternion(-0.20806167, -2.7939682e-09, 0.03883498, 0.9773446),
+&"shin_R": Quaternion(-0.06982423, -2.3283064e-10, -0.04517589, 0.9965359),
+&"spine": Quaternion(-0.05233595, 0, 0, 0.9986295),
+&"thigh_L": Quaternion(0.15658729, 4.1909516e-09, -0.04307666, 0.9867243),
+&"thigh_R": Quaternion(-0.12198964, -4.656613e-10, 0.043733414, 0.99156743),
+&"upper_arm_L": Quaternion(0.08697371, -1.4901161e-08, 0.06388044, 0.9941604),
+&"upper_arm_R": Quaternion(0.1306631, -5.9604645e-08, -0.023280159, 0.99115354)
+},
+&"root": Vector3(0, -0.021301132, 0)
+}, {
+&"ease": 2,
+&"frame": 3,
+&"pose": {
+&"chest": Quaternion(-0.016280148, 0.33869162, 0.04472938, 0.9396926),
+&"forearm_L": Quaternion(0.1342902, 1.369575e-08, -0.26214844, 0.9556383),
+&"forearm_R": Quaternion(0.1758981, 2.580455e-08, 0.05439773, 0.98290426),
+&"hand_R": Quaternion(-0.7659688, -0.22296281, -8.985035e-09, 0.6029754),
+&"head": Quaternion(0.014021399, 3.0862093e-09, 0.02414577, 0.9996101),
+&"hips": Quaternion(0, 0.17364816, 0, 0.9848078),
+&"neck": Quaternion(0.051596902, -1.0594264e-08, -0.00033781174, 0.99866796),
+&"shin_L": Quaternion(-0.35627857, 0, 0.10315307, 0.9286685),
+&"shin_R": Quaternion(-0.24381287, 5.5879354e-09, 0.09465788, 0.96519184),
+&"spine": Quaternion(-0.065549664, -1.4704149e-08, -0.023858126, 0.9975641),
+&"thigh_L": Quaternion(0.22936203, 7.450581e-09, -0.06723892, 0.971016),
+&"thigh_R": Quaternion(-0.066874065, -1.4202669e-08, 0.0130247325, 0.99767643),
+&"upper_arm_L": Quaternion(0.27152523, 8.940695e-08, -0.086544685, 0.9585322),
+&"upper_arm_R": Quaternion(0.50040627, -2.9802322e-08, 0.18588355, 0.84560096)
+},
+&"root": Vector3(0, -0.08473689, 0)
+}, {
+&"ease": 0,
+&"frame": 7,
+&"pose": {
+&"chest": Quaternion(0.00031794343, 0.08710267, -0.0030250293, 0.9961947),
+&"forearm_L": Quaternion(0.26898822, 1.5702907e-08, -0.12000406, 0.9556383),
+&"forearm_R": Quaternion(-0.10963968, 1.4329829e-08, -0.28034458, 0.9536174),
+&"hand_R": Quaternion(-0.6920618, 0.08351454, 3.34797e-08, 0.7169908),
+&"head": Quaternion(-0.0067108986, -7.462131e-09, -0.0019240116, 0.9999756),
+&"hips": Quaternion(0, 0.052335955, 0, 0.9986295),
+&"neck": Quaternion(-0.010646581, -2.1564604e-08, 9.999875e-05, 0.9999433),
+&"shin_L": Quaternion(-0.34242478, -4.656613e-09, -0.06459828, 0.93732196),
+&"shin_R": Quaternion(0.056072075, 3.0267984e-09, 0.040001165, 0.9976251),
+&"spine": Quaternion(0.0173568, 2.3050106e-09, 0.0018242731, 0.9998477),
+&"thigh_L": Quaternion(0.3124409, 0, 0.058055267, 0.94816154),
+&"thigh_R": Quaternion(-0.22998548, 1.8626451e-09, -0.024639454, 0.9728821),
+&"upper_arm_L": Quaternion(0.08083998, 2.9802322e-08, 0.044358477, 0.9957396),
+&"upper_arm_R": Quaternion(0.38602448, 4.4703484e-08, -0.8730471, 0.29794955)
+},
+&"root": Vector3(0, -0.06314883, 0)
+}, {
+&"ease": 3,
+&"frame": 11,
+&"pose": {
+&"chest": Quaternion(-0.043890882, -0.31245095, -0.13200676, 0.93969274),
+&"forearm_L": Quaternion(0.17145202, 2.7893282e-08, 0.2394993, 0.9556382),
+&"forearm_R": Quaternion(-0.044396825, 6.2645222e-09, -0.05817354, 0.9973188),
+&"hand_R": Quaternion(-0.7001225, 0.14168584, -9.559909e-08, 0.69982404),
+&"head": Quaternion(0.04545844, -3.0374512e-08, -0.070253246, 0.99649286),
+&"hips": Quaternion(0.012113085, -0.17322518, -0.06869672, 0.9824088),
+&"neck": Quaternion(0.15364309, -1.6435392e-08, 0.0060785613, 0.98810774),
+&"shin_L": Quaternion(-0.25530195, -2.8871003e-08, -0.20959195, 0.9438709),
+&"shin_R": Quaternion(0.01651437, -1.4901161e-08, 0.055500485, 0.9983221),
+&"spine": Quaternion(-0.19683148, 2.8777083e-09, 0.1364194, 0.9709002),
+&"thigh_L": Quaternion(0.23494157, -9.313226e-10, 0.12082335, 0.964471),
+&"thigh_R": Quaternion(-0.17913361, 1.5832482e-08, -0.18353151, 0.96655434),
+&"upper_arm_L": Quaternion(0.023676217, 7.4505806e-08, 0.05454181, 0.9982308),
+&"upper_arm_R": Quaternion(0.71404797, 2.9802319e-08, 0.10435538, 0.6922756)
+},
+&"root": Vector3(0, -0.103148825, 0)
+}, {
+&"ease": 0,
+&"frame": 16,
+&"pose": {
+&"chest": Quaternion(-0.0033634098, 0.17195827, 0.023931969, 0.98480785),
+&"forearm_L": Quaternion(0.25024256, -2.1184297e-09, -0.15535228, 0.9556383),
+&"forearm_R": Quaternion(0.13404764, -1.4495907e-08, 0.20894656, 0.96869636),
+&"hand_R": Quaternion(-0.6120994, 0.1065165, 7.340743e-09, 0.7835742),
+&"head": Quaternion(0.024670795, -1.1777091e-08, 0.013075519, 0.9996101),
+&"hips": Quaternion(0, 0.069756486, 0, 0.9975641),
+&"neck": Quaternion(0.044455137, -2.0305562e-08, -0.0034016853, 0.9990056),
+&"shin_L": Quaternion(-0.20671877, -1.8626451e-09, 0.06781984, 0.9760471),
+&"shin_R": Quaternion(-0.0692205, 4.656613e-09, -0.03546741, 0.9969707),
+&"spine": Quaternion(-0.069077626, 1.983893e-09, -0.0097082285, 0.9975641),
+&"thigh_L": Quaternion(0.1552167, 1.8626451e-09, -0.06484622, 0.98574984),
+&"thigh_R": Quaternion(-0.12089498, 7.450581e-09, 0.060689595, 0.99080837),
+&"upper_arm_L": Quaternion(0.19926825, 8.940695e-08, 0.018572284, 0.979769),
+&"upper_arm_R": Quaternion(0.8982861, 0, 0.014159337, 0.43918288)
+},
+&"root": Vector3(0, -0.021301132, 0)
+}, {
+&"ease": 0,
+&"frame": 22,
+&"pose": {
+&"chest": Quaternion(0, 0, 0, 1),
+&"forearm_L": Quaternion(0.29284036, 3.3891063e-09, -0.03162574, 0.9556382),
+&"forearm_R": Quaternion(0.48704723, -1.4730514e-08, -0.041656997, 0.8723816),
+&"head": Quaternion(0.020942416, 0, 0, 0.9997807),
+&"neck": Quaternion(0.031410754, 0, 0, 0.9995066),
+&"shin_L": Quaternion(-0.20806167, -2.7939682e-09, 0.03883498, 0.9773446),
+&"shin_R": Quaternion(-0.06982423, -2.3283064e-10, -0.04517589, 0.9965359),
+&"spine": Quaternion(-0.05233595, 0, 0, 0.9986295),
+&"thigh_L": Quaternion(0.15658729, 4.1909516e-09, -0.04307666, 0.9867243),
+&"thigh_R": Quaternion(-0.12198964, -4.656613e-10, 0.043733414, 0.99156743),
+&"upper_arm_L": Quaternion(0.08697371, -1.4901161e-08, 0.06388044, 0.9941604),
+&"upper_arm_R": Quaternion(0.1306631, -5.9604645e-08, -0.023280159, 0.99115354)
+},
+&"root": Vector3(0, -0.021301132, 0)
+}]
+windows = {
+"active": Vector2i(4, 11),
+"cancel": Vector2i(15, 22),
+"opening": Vector2i(16, 22),
+"windup": Vector2i(0, 3)
+}
+
 [sub_resource type="Resource" id="Resource_xibop"]
 script = ExtResource("3_kkgud")
 bone = &"hips"
@@ -1887,7 +2389,7 @@ face_ids = PackedInt32Array()
 [sub_resource type="Resource" id="Resource_w8tv7"]
 script = ExtResource("4_pdie2")
 pieces = Array[ExtResource("3_kkgud")]([SubResource("Resource_xibop"), SubResource("Resource_nof4x"), SubResource("Resource_x5r8r"), SubResource("Resource_dtmg8"), SubResource("Resource_skyhv"), SubResource("Resource_w844p"), SubResource("Resource_t4bg6"), SubResource("Resource_w2clr"), SubResource("Resource_8vinp"), SubResource("Resource_u5eyl"), SubResource("Resource_cpy0l")])
-animations = Array[ExtResource("2_5goyo")]([SubResource("Resource_5ix5s"), SubResource("Resource_2ifco"), SubResource("Resource_oyhvb"), SubResource("Resource_dl4ob"), SubResource("Resource_n3l42"), SubResource("Resource_x21jf"), SubResource("Resource_d8qu4"), SubResource("Resource_2xfat"), SubResource("Resource_s4i16"), SubResource("Resource_1ov8u"), SubResource("Resource_lgqcg"), SubResource("Resource_vbyif"), SubResource("Resource_a6aca"), SubResource("Resource_popbw"), SubResource("Resource_runmm"), SubResource("Resource_sw_slashh"), SubResource("Resource_sw_slashh2"), SubResource("Resource_sw_slashd"), SubResource("Resource_sw_slashv"), SubResource("Resource_sw_stab"), SubResource("Resource_sw_jumpslash"), SubResource("Resource_sw_jumpslashland")])
+animations = Array[ExtResource("2_5goyo")]([SubResource("Resource_5ix5s"), SubResource("Resource_2ifco"), SubResource("Resource_oyhvb"), SubResource("Resource_dl4ob"), SubResource("Resource_n3l42"), SubResource("Resource_x21jf"), SubResource("Resource_d8qu4"), SubResource("Resource_2xfat"), SubResource("Resource_s4i16"), SubResource("Resource_1ov8u"), SubResource("Resource_lgqcg"), SubResource("Resource_vbyif"), SubResource("Resource_a6aca"), SubResource("Resource_popbw"), SubResource("Resource_runmm"), SubResource("Resource_sw_slashh"), SubResource("Resource_sw_slashh2"), SubResource("Resource_sw_slashd"), SubResource("Resource_sw_slashv"), SubResource("Resource_sw_stab"), SubResource("Resource_sw_jumpslash"), SubResource("Resource_sw_jumpslashland"), SubResource("Resource_5goyo"), SubResource("Resource_kkgud"), SubResource("Resource_pdie2"), SubResource("Resource_0uda1"), SubResource("Resource_ly1xo")])
 
 [node name="PlayerModel" type="Node3D" unique_id=1935107297]
 script = ExtResource("1_popbw")

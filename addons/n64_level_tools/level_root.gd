@@ -90,6 +90,15 @@ func _ready() -> void:
 		data.baked_mesh = result.mesh
 		data.baked_chunks = result.chunks
 		data.set_baked_collision(result)
+	elif not Engine.is_editor_hint() and OS.has_feature("editor") and data.has_bake() and FileAccess.file_exists("user://play_build_run"):
+		# A Build & Play run: say when this zone isn't showing a current build (walked into
+		# further than Build & Play reached, or edited since).
+		if data.build_key == 0:
+			push_warning("LevelRoot '%s' (%s) shows an editor bake, not a build: Build & Play here or Build All Zones." % [name,
+				owner.scene_file_path if owner else ""])
+		elif data.bake_hash != compute_hash():
+			push_warning("LevelRoot '%s' (%s) was edited since its build: Build & Play here or Build All Zones." % [name,
+				owner.scene_file_path if owner else ""])
 	_sync_brushes()
 	_apply_bake()
 	_rebuild_scatter()
@@ -498,6 +507,8 @@ static func passage_key(brush: LevelBrush) -> int:
 					var dv = v.get(dp.name)
 					parts.append(dv.resource_path if dv is Resource else dv)
 		elif prop.usage & PROPERTY_USAGE_SCRIPT_VARIABLE and not v is Object:
+			if prop.name == &"outside_only" and not v:
+				continue  # (added later: windows made before it keep their key)
 			parts.append(v)
 	return hash(parts)
 
@@ -629,7 +640,8 @@ func _generate_window(brush: LevelBrush) -> void:
 		uvs.append(uv)
 		colors.append(color)
 	var front := p.front_z()
-	var depth := p.wall_depth
+	# Outside only: the reveal reaches in just past the glass (halfway through the wall).
+	var depth := p.wall_depth * 0.5 + 0.02 if p.outside_only else p.wall_depth
 	var hw := p.width * 0.5
 	# Reveal: sides + top (flat or arched) from the corridor shell, and the bottom.
 	var shell := PassageBuilder.corridor_shell(self, global_transform, p.width, p.height, depth, null, -1, p.shape())
@@ -649,10 +661,10 @@ func _generate_window(brush: LevelBrush) -> void:
 	# glass is stretched across the opening once, mirrored inside so it reads the same way.
 	var glass := _palette_index(p.pane_texture) if p.pane_texture else -1
 	var glass_size := _texture_world_size(p.pane_texture)
-	for side in [1.0, -1.0]:
+	for side in ([1.0] if p.outside_only else [1.0, -1.0]):
 		var pane := []
 		for q in outline:
-			pane.append(Vector3(q.x, q.y, front - depth * 0.5 + side * 0.01))
+			pane.append(Vector3(q.x, q.y, front - p.wall_depth * 0.5 + side * 0.01))
 		pane = _wound(pane, Vector3(0, 0, side))
 		add_face.call(pane, glass, Vector4(0, 0, 1, 0), p.pane_color)
 		if glass >= 0:
@@ -731,7 +743,21 @@ func _generate_house(brush: LevelBrush, houses := []) -> bool:
 	var lods := PackedByteArray()
 	var bake := PackedByteArray()
 	var exact := {}  # face -> its corners' UVs (the shop's cloth), else projected
-	for f in HouseBuilder.build(spec, joins):
+	# Far version: the outside wall panels again, uncut (the doors' and windows' openings cut
+	# only the near ones; far, their flat stand-ins sit on these). Near and far fade into each
+	# other at the LOD distance.
+	var built := HouseBuilder.build(spec, joins)
+	var far := []
+	for f in built:
+		if f.band != "" and f.get("bake", 0) != 2 and f.lod == LevelBrush.LOD_ALWAYS:
+			f.lod = LevelBrush.LOD_NEAR
+			var copy: Dictionary = f.duplicate()
+			copy.pts = (f.pts as Array).duplicate()
+			copy.lod = LevelBrush.LOD_FAR
+			copy.band = f.band + "@far"
+			far.append(copy)
+	built.append_array(far)
+	for f in built:
 		if f.has("uv"):
 			exact[faces.size()] = f.uv
 		var ids := PackedInt32Array()
@@ -749,7 +775,9 @@ func _generate_house(brush: LevelBrush, houses := []) -> bool:
 	brush.face_lod = lods
 	brush.passage_built = key
 	_house_trim(brush, bands)
-	# Doors / windows whose openings lie in these walls: cut them again.
+	# Its doors / windows / signs back on its walls (it may have been resized), then the
+	# openings in these walls cut again.
+	HouseFixtures.place(data, brush)
 	var bxf := brush_global_transform(brush)
 	for other: LevelBrush in data.brushes:
 		var o := other.opening_spec() if other else null
@@ -1545,7 +1573,7 @@ func _build_instance(brush: LevelBrush, force := false) -> void:
 			continue
 		var mi: MeshInstance3D = meshes[i]
 		var built := brush.build_painted_mesh(_atlas, bi, timed, baked, stairs, hybrid, data.vertex_color_scale(),
-			ranges[i].x, ranges[i].y)
+			ranges[i].x, ranges[i].y, _ao_fold(), _cpu_shade())
 		mi.mesh = built.mesh
 		if mi.mesh:
 			for k in built.keys.size():
@@ -1585,7 +1613,7 @@ func _chunk_sig(brush: LevelBrush, r: Vector2i) -> int:
 	var c0 := brush.get_face_start(r.x) if r.x < n else brush.face_indices.size()
 	var c1 := brush.get_face_start(r.y) if r.y < n else brush.face_indices.size()
 	var parts := [r, brush.face_counts.slice(r.x, r.y), brush.face_indices.slice(c0, c1),
-		brush.face_textures.slice(r.x, r.y), brush.face_uv.slice(r.x, r.y), brush.face_layer_sets.slice(r.x, r.y),
+		brush.face_textures.slice(r.x, r.y), brush.face_uv.slice(r.x, r.y), brush.face_uv_scale.slice(r.x, r.y), brush.face_layer_sets.slice(r.x, r.y),
 		brush.corner_uvs.slice(c0, c1), brush.cutout,
 		brush._resolved_corners().slice(c0, c1),
 		brush.corner_lighting.slice(c0, c1)]
@@ -1625,13 +1653,139 @@ func _material_for(key: int, brush: LevelBrush) -> Material:
 	if key == -2:
 		if not _materials.has(brush.material):
 			_materials[brush.material] = PaintAtlas.convert_material(brush.material, data, _mask_textures)
+			_grade_base(_materials[brush.material], null)
 		return _materials[brush.material]
 	if not _materials.has(key):
 		var tex := LevelBrush.key_texture(key)
 		var base: Texture2D = data.textures[tex] if tex >= 0 and tex < data.textures.size() else null
 		_materials[key] = PaintAtlas.make_material(base, data, _mask_textures, LevelBrush.key_set(key), LevelBrush.key_cutout(key))
 		PaintAtlas.set_overlay_code(_materials[key], LevelBrush.key_overlay(key), data)
+		_grade_base(_materials[key], base)
 	return _materials[key]
+
+
+## The Grade screen's painted AO layers to fold into the time keys (ZoneGrade.ao_fold()).
+func _ao_fold() -> Array:
+	if grade_preview_off:
+		return []
+	return data.grade.call(&"ao_fold") if data and data.grade and data.grade.has_method(&"ao_fold") else []
+
+
+## The Grade screen's preview switched off (its Filters toggle): meshes built as authored.
+var grade_preview_off := false
+var _shade_cache: Variant = null
+
+
+## Baked Vertex zones: the Grade's vertex shading (ZoneGrade.cpu_shade), made once per
+## rebuild (invalid Callable: none).
+func _cpu_shade() -> Callable:
+	if grade_preview_off or data == null or data.grade == null or data.lighting_mode != LevelData.LightingMode.BAKED_VERTEX \
+			or not data.grade.has_method(&"cpu_shade"):
+		return Callable()
+	if _shade_cache == null:
+		_shade_cache = data.grade.call(&"cpu_shade")
+	return _shade_cache
+
+
+## Remakes the meshes with the Grade's current vertex layers (AO layers, Baked Vertex
+## shading): they're built into the mesh, unlike the shader-side preview.
+func regrade_meshes(preview_off := grade_preview_off) -> void:
+	grade_preview_off = preview_off
+	_shade_cache = null
+	_on_paint_changed()
+
+
+## Grade screen preview: palette entry (base texture or look) -> its graded texture, shown
+## in its place. Editor only, never saved; the Grade screen sets it (empty = as authored).
+## Entries in `grade_pretinted` have their combiner tint already in the graded texture.
+var grade_textures := {}
+var grade_pretinted := {}
+## Grade screen vertex preview: paint shader parameters (grade_vertex, grade_light_lut, ...;
+## empty = off).
+var grade_vertex := {}
+
+
+func set_grade_vertex(params: Dictionary) -> void:
+	grade_vertex = params
+	_on_materials_changed()
+
+
+func set_grade_textures(textures: Dictionary, pretinted := {}) -> void:
+	grade_textures = textures
+	grade_pretinted = pretinted
+	_on_materials_changed()
+
+
+## Grade screen preview of textures drawn outside the texture list (stairs' bases, overlay
+## layers, grass, scatter): texture -> [graded texture, pretinted (combiner tint in it)].
+var grade_plain := {}
+
+
+func set_grade_plain(textures: Dictionary) -> void:
+	grade_plain = textures
+	_on_materials_changed()
+	_grade_plain_nodes()
+
+
+## Grass and scatter materials (their `tex`), swapped for the graded copies (and back).
+func _grade_plain_nodes() -> void:
+	if not Engine.is_editor_hint():
+		return
+	var nodes: Array = _grass_nodes.duplicate()
+	for list in _scatter_nodes.values():
+		nodes.append_array(list)
+	var seen := {}
+	for n in nodes:
+		if not is_instance_valid(n):
+			continue
+		var all: Array = [n]
+		all.append_array(n.find_children("*", "GeometryInstance3D", true, false))
+		for g in all:
+			if not g is GeometryInstance3D:
+				continue
+			var mats: Array = [g.material_override]
+			var mesh: Mesh = g.mesh if g is MeshInstance3D else (g.multimesh.mesh if g is MultiMeshInstance3D and g.multimesh else null)
+			if mesh:
+				for i in mesh.get_surface_count():
+					mats.append(mesh.surface_get_material(i))
+			if g is MeshInstance3D:
+				for i in g.get_surface_override_material_count():
+					mats.append(g.get_surface_override_material(i))
+			for m in mats:
+				if not m is ShaderMaterial or seen.has(m):
+					continue
+				seen[m] = true
+				var orig = m.get_meta(&"grade_orig_tex") if m.has_meta(&"grade_orig_tex") else m.get_shader_parameter(&"tex")
+				if not orig is Texture2D:
+					continue
+				m.set_meta(&"grade_orig_tex", orig)
+				m.set_shader_parameter(&"tex", grade_plain[orig][0] if grade_plain.has(orig) else orig)
+
+
+func _grade_base(mat: Material, entry: Texture2D) -> void:
+	if mat is ShaderMaterial:
+		var sm := mat as ShaderMaterial
+		sm.set_shader_parameter(&"grade_vertex", not grade_vertex.is_empty())
+		for k in grade_vertex:
+			sm.set_shader_parameter(k, grade_vertex[k])
+		# Overlay layers' textures (and a stair's base: entry null) graded as extras.
+		for i in LevelData.MAX_LAYERS:
+			var lt = sm.get_shader_parameter("layer_tex_%d" % i)
+			if lt is Texture2D and grade_plain.has(lt):
+				sm.set_shader_parameter("layer_tex_%d" % i, grade_plain[lt][0])
+				if grade_plain[lt][1]:
+					var gp: Vector4 = sm.get_shader_parameter("grad_%d" % i)
+					sm.set_shader_parameter("grad_%d" % i, Vector4(0.0, gp.y, gp.z, gp.w))
+		if entry == null:
+			var bt = sm.get_shader_parameter(&"base_tex")
+			if bt is Texture2D and grade_plain.has(bt):
+				sm.set_shader_parameter(&"base_tex", grade_plain[bt][0])
+				if grade_plain[bt][1]:
+					sm.set_shader_parameter(&"base_tint_mode", 0.0)
+	if entry and grade_textures.has(entry) and mat is ShaderMaterial:
+		(mat as ShaderMaterial).set_shader_parameter(&"base_tex", grade_textures[entry])
+		if grade_pretinted.has(entry):
+			(mat as ShaderMaterial).set_shader_parameter(&"base_tint_mode", 0.0)
 
 
 ## Per brush and run: each flight of painted stairs carries its own step frame.
@@ -1639,6 +1793,7 @@ func _stair_material(brush: LevelBrush, key: int, run: Dictionary) -> Material:
 	var stair := data.textures[run.texture] as N64StairTexture
 	var mat := PaintAtlas.make_material(stair, data, _mask_textures, LevelBrush.key_set(key), LevelBrush.key_cutout(key))
 	PaintAtlas.apply_stair(mat, stair, run.frame)
+	_grade_base(mat, null)
 	_materials[[brush.get_instance_id(), key]] = mat
 	_stair_sources[[brush.get_instance_id(), key]] = stair
 	return mat
@@ -1666,11 +1821,15 @@ func _on_materials_changed() -> void:
 			continue
 		if key is int:
 			var tex := LevelBrush.key_texture(key)
-			PaintAtlas.refresh_material(mat, data.textures[tex] if tex >= 0 and tex < data.textures.size() else null, Color.WHITE, data, _mask_textures)
+			var entry: Texture2D = data.textures[tex] if tex >= 0 and tex < data.textures.size() else null
+			PaintAtlas.refresh_material(mat, entry, Color.WHITE, data, _mask_textures)
+			_grade_base(mat, entry)
 		elif key is Array:  # stair run: [brush id, surface key] -> its stair texture
 			PaintAtlas.refresh_material(mat, _stair_sources.get(key), Color.WHITE, data, _mask_textures)
+			_grade_base(mat, null)
 		elif key is BaseMaterial3D:  # brush material converted to the paint shader
 			PaintAtlas.refresh_material(mat, key.albedo_texture, key.albedo_color if key.albedo_texture else Color.WHITE, data, _mask_textures)
+			_grade_base(mat, null)
 
 
 func _on_paint_changed() -> void:
@@ -1734,6 +1893,8 @@ func _rebuild_grass() -> void:
 	_grass_nodes = GrassBuilder.build(self, data.grass)
 	for n in _grass_nodes:
 		add_child(n, false, INTERNAL_MODE_BACK)
+	if not grade_plain.is_empty():
+		_grade_plain_nodes()
 
 
 ## Export: the grass nodes, built fresh (not owned: the caller adds them to the bake).
@@ -1766,6 +1927,8 @@ func _rebuild_scatter() -> void:
 		for node in nodes:
 			add_child(node, false, INTERNAL_MODE_BACK)
 		_scatter_nodes[s] = nodes
+	if not grade_plain.is_empty():
+		_grade_plain_nodes()
 
 
 ## Re-layouts the atlas and rebuilds every brush mesh (new painted faces, layer changes).
@@ -1829,6 +1992,17 @@ static func shop_inset(h: HouseSpec) -> float:
 	if not h.shopfront or h.front_style == HouseSpec.Front.SHUTTERED:
 		return 0.0
 	return h.shop_depth + 0.1
+
+
+## The level's RoomCulling (its Room prop brushes), or null without rooms or a room-split bake.
+static func room_culling(data: LevelData) -> RoomCulling:
+	var list := RoomVis.rooms(data)
+	if list.is_empty() or not data.baked_meshes().any(func(m: Mesh): return m.has_meta(RoomVis.META)):
+		return null
+	var rc := RoomCulling.new()
+	rc.name = "RoomCulling"
+	rc.rooms = list.map(func(r: Dictionary): return {id = r.id, xf = r.xf, size = r.size})
+	return rc
 
 
 ## Occluders for the engine's occlusion culling: a box per house, its walls from the
@@ -1924,6 +2098,11 @@ func _apply_bake() -> void:
 			oi.occluder = occ
 			add_child(oi, false, INTERNAL_MODE_BACK)
 			_baked_occluder = oi
+		# Drawing rooms (a build's bake only; game only).
+		var culling := room_culling(data) if not Engine.is_editor_hint() else null
+		if culling:
+			add_child(culling, false, INTERNAL_MODE_BACK)
+			_backdrop.append(culling)
 		# Where rain lands (and what gets wet).
 		_rain_cover = RainCover.from_build(data.rain_cover_built(), data.rain_light_built())
 		if _rain_cover:

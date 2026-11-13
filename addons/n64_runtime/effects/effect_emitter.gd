@@ -117,6 +117,7 @@ func _ensure_mesh() -> void:
 	mat.set_shader_parameter(&"sprite", effect.texture)
 	mat.set_shader_parameter(&"grid", Vector2(maxi(effect.columns, 1), effect.rows()))
 	mat.set_shader_parameter(&"billboard", effect.facing == N64Effect.Facing.CAMERA)
+	mat.set_shader_parameter(&"intensity", effect.intensity)
 	_mmi.material_override = mat
 
 

@@ -1,7 +1,7 @@
 [gd_resource type="Resource" script_class="N64Effect" format=3]
 
 [ext_resource type="Script" path="res://addons/n64_runtime/effects/n64_effect.gd" id="1_kmye5"]
-[ext_resource type="Texture2D" path="res://game/effects/sprites/puff.png" id="2_02h8l"]
+[ext_resource type="Texture2D" path="res://textures/effects/puff.res" id="2_02h8l"]
 
 [sub_resource type="Gradient" id="Gradient_6vgvd"]
 offsets = PackedFloat32Array(0, 0.15, 1)
@@ -10,6 +10,7 @@ colors = PackedColorArray(0.45, 0.43, 0.42, 0, 0.45, 0.43, 0.42, 0.45, 0.6, 0.6,
 [resource]
 resource_name = "smoke"
 script = ExtResource("1_kmye5")
+intensity = true
 texture = ExtResource("2_02h8l")
 burst = 0
 rate = 2.5

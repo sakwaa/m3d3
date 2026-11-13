@@ -19,6 +19,13 @@ global uniform vec4 n64_fog;
 // Where fog distances are measured from (the player, or the camera): fog lies in a
 // circle around it, so turning the camera doesn't change it.
 global uniform vec3 n64_fog_origin;
+// Ground-hugging fog: x = the fog's floor (world y), y = how high it reaches above it (m,
+// 0 = off), z = how much it thins up there (0..1). Measured halfway along the line of
+// sight, so looking up out of the fog thins it too.
+global uniform vec4 n64_fog_height;
+// Drifting fog banks: x = how much they thin the fog between them (0 = off), y = their size
+// (m), zw = how fast they drift (m/s, world x / z).
+global uniform vec4 n64_fog_drift;
 // Key light for shine glints: xyz = world direction towards the light, w = strength (set by
 // the Zone: the sun outdoors, else the nearest light).
 global uniform vec4 n64_key_light;
@@ -60,7 +67,9 @@ vec3 n64_fog_light_halo(vec4 pos, vec4 col, vec3 world, vec3 cam) {
 	}
 	vec3 seg = world - cam;
 	float t = clamp(dot(pos.xyz - cam, seg) / max(dot(seg, seg), 1e-4), 0.0, 1.0);
-	float pass = 1.0 - clamp(distance(cam + seg * t, pos.xyz) / clamp(pos.w * 0.3, 0.5, 3.0), 0.0, 1.0);
+	// (n64_fog_lights.w: halo size, > 1 in thick fog where light hangs in the air)
+	float size = clamp(pos.w * 0.3, 0.5, 3.0) * max(n64_fog_lights.w, 1.0);
+	float pass = 1.0 - clamp(distance(cam + seg * t, pos.xyz) / size, 0.0, 1.0);
 	return col.rgb * pass * pass * pass;
 }
 
@@ -108,13 +117,44 @@ float n64_fog_amount(float depth) {
 	return clamp(f, 0.0, 1.0);
 }
 
+// Smooth value noise in 0..1 (the drifting banks).
+float n64_fog_noise(vec2 p) {
+	vec2 i = floor(p);
+	vec2 f = p - i;
+	f = f * f * (3.0 - 2.0 * f);
+	vec4 h = fract(sin(vec4(dot(i, vec2(127.1, 311.7)), dot(i + vec2(1.0, 0.0), vec2(127.1, 311.7)),
+		dot(i + vec2(0.0, 1.0), vec2(127.1, 311.7)), dot(i + vec2(1.0), vec2(127.1, 311.7)))) * 43758.5453);
+	return mix(mix(h.x, h.y, f.x), mix(h.z, h.w, f.x), f.y);
+}
+
+// How much of the fog's amount reaches `world` (1 = all of it): thinner up out of a
+// ground-hugging fog, and between drifting banks.
+float n64_fog_density(vec3 world) {
+	float k = 1.0;
+	if (n64_fog_height.y > 0.0) {
+		float h = (world.y + n64_fog_origin.y) * 0.5 - n64_fog_height.x;
+		k *= 1.0 - n64_fog_height.z * smoothstep(0.0, n64_fog_height.y, h);
+	}
+	if (n64_fog_drift.x > 0.0) {
+		vec2 p = (world.xz - n64_fog_drift.zw * n64_time) / max(n64_fog_drift.y, 0.5);
+		float n = n64_fog_noise(p) * 0.65 + n64_fog_noise(p * 2.3 + 17.0) * 0.35;
+		k *= 1.0 - n64_fog_drift.x * smoothstep(0.35, 0.75, n);
+	}
+	return k;
+}
+
+// Fog amount at a world point (distance from the fog origin, then its density there).
+float n64_fog_at(vec3 world) {
+	return n64_fog_amount(distance(world, n64_fog_origin)) * n64_fog_density(world);
+}
+
 // Fog inputs from vertex(), from the vertex's world position: x = fog at this vertex
 // (per-vertex sampling, like the RSP: big triangles show its gradients), y = distance.
 // Store in a varying; read with n64_fog_pixel() and write
 // FOG = vec4(n64_fog_color.rgb, that).
 vec2 n64_fog_vertex(vec3 world) {
 	float d = distance(world, n64_fog_origin);
-	return vec2(n64_fog_amount(d), d);
+	return vec2(n64_fog_at(world), d);
 }
 
 // Soft grid: fog at the corners of a world-space lattice, blended trilinearly, i.e. per-
@@ -128,7 +168,7 @@ float n64_fog_grid(vec3 world, float cell) {
 	for (int k = 0; k < 8; k++) {
 		vec3 o = vec3(float(k & 1), float((k >> 1) & 1), float((k >> 2) & 1));
 		vec3 w3 = mix(1.0 - f, f, o);
-		acc += w3.x * w3.y * w3.z * n64_fog_amount(distance((i + o) * cell, n64_fog_origin));
+		acc += w3.x * w3.y * w3.z * n64_fog_at((i + o) * cell);
 	}
 	return acc;
 }
@@ -142,7 +182,7 @@ float n64_fog_pixel(vec2 v, vec3 view_pos, mat4 inv_view) {
 	} else if (sampling > 0.5) {
 		f = v.x;
 	} else {
-		f = n64_fog_amount(distance((inv_view * vec4(view_pos, 1.0)).xyz, n64_fog_origin));
+		f = n64_fog_at((inv_view * vec4(view_pos, 1.0)).xyz);
 	}
 	return f * n64_fog.w;
 }

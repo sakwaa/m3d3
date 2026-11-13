@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://8yysvqytmkhc"
+path="res://.godot/imported/n64_video_dither.glsl-f6e018da55e13f8c8f9a969b22a5f510.res"
+
+[deps]
+
+source_file="res://addons/n64_runtime/post/n64_video_dither.glsl"
+dest_files=["res://.godot/imported/n64_video_dither.glsl-f6e018da55e13f8c8f9a969b22a5f510.res"]
+
+[params]
+

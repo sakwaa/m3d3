@@ -126,6 +126,30 @@ enum Roof { GABLE, HIP }
 	set(v):
 		trim_texture = v
 		emit_changed()
+## Timber posts standing proud of the walls, per wall: metres along it from its middle, + to
+## the right as seen from outside. Openings cut through them.
+@export var front_posts := PackedFloat32Array():
+	set(v):
+		front_posts = v
+		emit_changed()
+@export var back_posts := PackedFloat32Array():
+	set(v):
+		back_posts = v
+		emit_changed()
+@export var left_posts := PackedFloat32Array():
+	set(v):
+		left_posts = v
+		emit_changed()
+@export var right_posts := PackedFloat32Array():
+	set(v):
+		right_posts = v
+		emit_changed()
+## Timber rails round the whole house, metres above each storey's floor (e.g. a sill rail at
+## 0.9 and a lintel rail at 2.1).
+@export var rails := PackedFloat32Array():
+	set(v):
+		rails = v
+		emit_changed()
 @export_range(0.0, 1.0, 0.01, "suffix:m") var trim_width := 0.15:
 	set(v):
 		trim_width = v
@@ -162,6 +186,12 @@ enum Cover { NONE, AWNING, NOREN, BOTH }
 @export_range(1.0, 20.0, 0.25, "suffix:m") var shop_opening := 3.0:
 	set(v):
 		shop_opening = v
+		emit_changed()
+## Where the opening sits along the front: metres right of the wall's middle (seen from the
+## street; kept inside the wall). The awning, noren and the room behind move with it.
+@export_range(-12.0, 12.0, 0.05, "suffix:m") var shop_offset := 0.0:
+	set(v):
+		shop_offset = v
 		emit_changed()
 @export_range(1.6, 4.0, 0.05, "suffix:m") var shop_height := 2.2:
 	set(v):
@@ -210,6 +240,34 @@ enum Cover { NONE, AWNING, NOREN, BOTH }
 		emit_changed()
 
 
+## The shop opening across the front: Vector2(centre x, half width), kept inside the wall.
+func shop_span() -> Vector2:
+	var hw := width * 0.5
+	var t := minf(wall_thickness, minf(hw, depth * 0.5) - 0.05)
+	var half := clampf(shop_opening * 0.5, 0.3, hw - t - 0.2)
+	var room := maxf(hw - t - 0.2 - half, 0.0)
+	return Vector2(clampf(shop_offset, -room, room), half)
+
+
+## Walls by side: 0 front (+Z), 1 right (+X), 2 back (-Z), 3 left (-X).
+const SIDE_NAMES := ["front", "right", "back", "left"]
+
+
+## A spot on wall `side` (house space): `along` metres from the wall's middle (+ = right seen
+## from outside), `up` metres above the ground floor (the foundation's top), `out` metres out
+## from the wall's outer face (negative: into the wall; - thickness / 2 is its centre line).
+## Facing out of the wall (+Z out).
+func wall_xf(side: int, along: float, up: float, out := 0.0) -> Transform3D:
+	var b := Basis(Vector3.UP, side * PI * 0.5)
+	var half := (depth if side % 2 == 0 else width) * 0.5
+	return Transform3D(b, b * Vector3(along, foundation + up, half + out))
+
+
+## Wall `side`'s length (outside corner to corner).
+func wall_length(side: int) -> float:
+	return width if side % 2 == 0 else depth
+
+
 ## Wall top (height of the eaves line on the walls), from the ground.
 func wall_height() -> float:
 	return foundation + storeys * storey_height
@@ -219,11 +277,18 @@ func wall_height() -> float:
 const NOT_GEOMETRY := [&"someone_home", &"home_flag"]
 
 
+## Settings added after houses were built: left out of key() while unset (0 / empty), so
+## existing houses (and their baked light) aren't rebuilt just because the settings exist.
+const LATER := [&"shop_offset", &"front_posts", &"back_posts", &"left_posts", &"right_posts", &"rails"]
+
+
 ## Everything the faces are built from, for LevelRoot's "unchanged, keep it" check.
 func key() -> int:
 	var parts := [HouseBuilder.VERSION]
 	for prop in get_property_list():
 		if prop.usage & PROPERTY_USAGE_SCRIPT_VARIABLE and not prop.name in NOT_GEOMETRY:
 			var v = get(prop.name)
+			if prop.name in LATER and (v is PackedFloat32Array and v.is_empty() or v is float and v == 0.0):
+				continue
 			parts.append(v.resource_path if v is Resource else v)
 	return hash(parts)

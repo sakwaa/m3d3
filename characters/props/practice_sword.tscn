@@ -1,4 +1,6 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=9 format=3]
+
+[ext_resource type="Script" path="res://game/actors/blade_trigger.gd" id="1_trigger"]
 
 [sub_resource type="StandardMaterial3D" id="grip_mat"]
 albedo_color = Color(0.36, 0.22, 0.12, 1)
@@ -45,3 +47,7 @@ surface_material_override/0 = SubResource("metal_mat")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6125, 0)
 mesh = SubResource("tip")
 surface_material_override/0 = SubResource("metal_mat")
+
+[node name="Trigger" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.48, 0)
+script = ExtResource("1_trigger")

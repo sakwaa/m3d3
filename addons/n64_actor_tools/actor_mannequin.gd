@@ -154,7 +154,8 @@ static func world_entries(model: ActorModel, pieces: Array) -> Array:
 				weights.append([PackedInt32Array([bone, parent, 0, 0]), PackedFloat32Array([1.0 - w, w, 0, 0])])
 			else:
 				weights.append([PackedInt32Array([bone, 0, 0, 0]), PackedFloat32Array([1.0, 0, 0, 0])])
-		entries.append({piece = p, source = entry[1], mirrored = entry[2], bone = bone, side = b.side, pts = pts, weights = weights})
+		entries.append({piece = p, source = entry[1], mirrored = entry[2], bone = bone, side = b.side, pts = pts, weights = weights,
+			parent = parent, shared = shared, sw = sw})
 	# Pass 2: vertex pins take their target's position and weights (twice, for chains).
 	var by_id := by_id_of(entries)
 	for _pass in 2:
@@ -166,7 +167,17 @@ static func world_entries(model: ActorModel, pieces: Array) -> Array:
 					continue
 				var te: Dictionary = entries[target.entry]
 				e.pts[v] = te.pts[target.vertex]
-				e.weights[v] = te.weights[target.vertex]
+				if (e.shared as Dictionary).has(v) and te.bone == e.parent and e.parent >= 0:
+					# A connected joint (ActorPieceOps.connect_to_parent): the shared ring
+					# bends with both bones by the stitch weight (0.5: half the angle, a
+					# mitre, so neither limb flattens; 1: the parent's alone, the N64's one
+					# matrix per vertex), on both pieces' copies of it.
+					var w: float = e.sw * e.shared[v]
+					var blended := [PackedInt32Array([e.bone, e.parent, 0, 0]), PackedFloat32Array([1.0 - w, w, 0, 0])]
+					e.weights[v] = blended
+					te.weights[target.vertex] = blended
+				else:
+					e.weights[v] = te.weights[target.vertex]
 	return entries
 
 

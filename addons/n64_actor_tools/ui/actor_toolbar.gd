@@ -143,8 +143,10 @@ func _init() -> void:
 		[_svg("pin"), "Pin to nearest…: the selected vertices (or the whole piece) take the\nnearest vertex of the piece you click next, in every pose.", func(): editor.start_pin(), true],
 		[_svg("unpin"), "Unpin the selected vertices (or the whole piece)", func(): editor.unpin()],
 		[_editor_icon(&"Remove"), "Delete piece", func(): editor.delete_piece()],
+		[_svg("connect"), "Connect to parent (N64 connected limbs): the piece's joint end takes\nthe parent piece's end vertices, so the joint's triangles span both bones;\ncaps go where no hole opens. Joints too far apart are left alone.", func(): editor.connect_piece()],
+		[_svg("connect_all"), "Connect all limbs: Connect to parent on every piece (one undo step;\nthe Output panel lists what each joint did).", func(): editor.connect_all()],
 	])
-	for i in [0, 1, 2, 3, 6]:
+	for i in [0, 1, 2, 3, 6, 7, 8]:
 		_geometry_tools.append(_piece_ops.get_child(i))
 	_element_ops = _action_grid([
 		[_svg("extrude"), "Extrude faces (edges in Edge mode) two grid steps", func(): editor.extrude()],

@@ -11,3 +11,6 @@ extends Resource
 @export var cloud_dark := Color(0.6, 0.65, 0.75)
 ## Star visibility before cloud cover (0 = none, 1 = full night sky).
 @export_range(0.0, 1.0, 0.05) var stars := 0.0
+## Screen look for this weather at this time of day (blended by the hour like the sky);
+## empty = the weather's own screen_look, else the zone's.
+@export var screen_look: ScreenLook

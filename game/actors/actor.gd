@@ -47,8 +47,14 @@ var health := 8
 ## While set (and the states allow turning), face this instead of the movement (lock-on,
 ## enemies squaring off).
 var face_target: Node3D
-## Extra horizontal velocity that fades out (knockback, lunges).
+## Sword chains (ActionState): the attack pressed last and how many times in a row.
+var combo_attack := &""
+var combo_count := 0
+## Facing to hold when there's no face_target (Z-targeting Parallel); zero = none.
+var face_dir := Vector3.ZERO
+## Extra horizontal velocity that fades out (knockback, lunges), IMPULSE_FADE m/s each second.
 var impulse := Vector3.ZERO
+const IMPULSE_FADE := 14.0
 ## Seconds left to punish a blocked attacker (set when this actor blocks).
 var counter_left := 0.0
 
@@ -200,6 +206,15 @@ func drive(_delta: float) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if _stop_left > 0.0:
+		# Hitstop: the fighters hold their poses for a moment (UI and the rest go on). Input
+		# is still read (and kept buffered: no intent.tick), so a press during it isn't lost.
+		_stop_left -= delta
+		if _stop_left <= 0.0 and _anim:
+			_anim.speed_scale = _anim_speed
+		if not (not scripted and Cutscenes.is_playing()):
+			drive(delta)
+		return
 	# During a cutscene, actors not in it hold still (no AI, no attacks), like OoT.
 	# (Brains are machines too: frozen actors don't tick theirs at all.)
 	var frozen := not scripted and Cutscenes.is_playing()
@@ -218,6 +233,74 @@ func _physics_process(delta: float) -> void:
 
 
 # --- Combat -------------------------------------------------------------------------------
+
+var _stop_left := 0.0
+var _anim_speed := 1.0
+var _flash_mat: StandardMaterial3D
+var _flash_left := 0.0
+var _flash_hold := 0.0
+var _flash_fade := 0.1
+var _flash_color := Color.RED
+
+
+## The striking stretch of the blade swung by this actor ([low end, high end], world), or []
+## (no blade: hits by reach and arc only).
+func blade() -> Array:
+	return []
+
+
+## The blade's strength (BladeTrigger.power): armour no harder turns it.
+func blade_power() -> int:
+	return 1
+
+
+## Where the blade's trigger sits in the sword hand's prop bone space (StrikeRig aims it).
+func blade_trigger_local() -> Vector3:
+	return Vector3(0, 0.5, 0)
+
+
+## Z-targeting: locked onto something or holding the facing (Parallel).
+func z_targeting() -> bool:
+	return is_instance_valid(face_target) or face_dir != Vector3.ZERO
+
+
+## In a hitstop freeze.
+func in_hitstop() -> bool:
+	return _stop_left > 0.0
+
+
+## Freezes this actor for `seconds` (hitstop): no thinking, moving or animating.
+func hitstop(seconds: float) -> void:
+	if _stop_left <= 0.0 and _anim:
+		_anim_speed = _anim.speed_scale
+		_anim.speed_scale = 0.0
+	_stop_left = maxf(_stop_left, seconds)
+
+
+## Tints the whole model `color` for `hold` seconds, then fades it out over `fade` (hit flash).
+func flash(color: Color, hold: float, fade: float) -> void:
+	if _flash_mat == null:
+		_flash_mat = StandardMaterial3D.new()
+		_flash_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_flash_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		# The model only (not shadows or other helpers on the actor).
+		var model: Node = body if body else self
+		for g in model.find_children("*", "MeshInstance3D", true, false):
+			(g as MeshInstance3D).material_overlay = _flash_mat
+	_flash_color = color
+	_flash_hold = hold
+	_flash_fade = maxf(fade, 0.01)
+	_flash_left = hold + fade
+	_flash_mat.albedo_color = color
+	set_process(true)
+
+
+func _process(delta: float) -> void:
+	if _flash_mat == null or _flash_left <= 0.0:
+		return
+	_flash_left = maxf(_flash_left - delta, 0.0)
+	var a := 1.0 if _flash_left > _flash_fade else _flash_left / _flash_fade
+	_flash_mat.albedo_color = Color(_flash_color, _flash_color.a * a)
 
 func is_dead() -> bool:
 	return health <= 0
@@ -323,6 +406,8 @@ func _move(delta: float) -> void:
 	if is_instance_valid(face_target):
 		look = face_target.global_position - global_position
 		look.y = 0.0
+	elif face_dir != Vector3.ZERO:
+		look = face_dir
 	if turn and look.length() > 0.1:
 		var target := look.normalized()
 		# Turned by heading angle (Vector3.slerp trips over near-opposite directions).
@@ -337,7 +422,7 @@ func _move(delta: float) -> void:
 	move_and_slide()
 	velocity.x -= impulse.x
 	velocity.z -= impulse.z
-	impulse = impulse.move_toward(Vector3.ZERO, 14.0 * delta)
+	impulse = impulse.move_toward(Vector3.ZERO, IMPULSE_FADE * delta)
 	_update_ground(delta)
 
 
@@ -530,7 +615,22 @@ func play_state_animation(_state: ActorState = null) -> void:
 		if anim != &"" and _anim.has_animation(anim):
 			if _anim.current_animation != anim or (not _anim.is_playing() and s.time < 0.05):
 				_anim.play(anim, s.blend_time)
+			elif s.time < 0.05:
+				# The same clip again from its start (a repeated cut): played under a second
+				# name, so it blends from where the last one is instead of carrying on.
+				_anim.play(_again(anim), s.blend_time)
 			return
+
+
+## `anim` under a second name (made once) for restarting it with a blend.
+func _again(anim: StringName) -> StringName:
+	var alias := StringName(String(anim) + "@again")
+	if not _anim.has_animation(alias):
+		var lib := _anim.get_animation_library(&"")
+		if lib == null:
+			return anim
+		lib.add_animation(alias, _anim.get_animation(anim))
+	return alias
 
 
 func animation_length(anim: StringName) -> float:
@@ -596,3 +696,8 @@ func _update_label() -> void:
 			t += " -> %s?" % m.pending()
 		lines.append(t)
 	_label.text = "\n".join(lines)
+
+
+## The impulse speed that carries the actor `metres` before it fades out (negative: back).
+static func impulse_for(metres: float) -> float:
+	return signf(metres) * sqrt(2.0 * IMPULSE_FADE * absf(metres))

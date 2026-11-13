@@ -30,6 +30,30 @@ static func _scan(dir: String, out: PackedStringArray) -> void:
 			out.append(dir.path_join(f))
 
 
+## The zone scenes the scene at `scene_path` links to (exits, zone doors, passages), that exist.
+static func targets(scene_path: String) -> PackedStringArray:
+	var out := PackedStringArray()
+	var packed := load(scene_path) as PackedScene
+	if packed == null:
+		return out
+	var root := packed.instantiate(PackedScene.GEN_EDIT_STATE_DISABLED)
+	var zones := []
+	for n in [root] + root.find_children("*", "", true, false):
+		if n is ZoneExit or (n is Door and n.mode == Door.Mode.ZONE) or n is Passage:
+			zones.append(String(n.target_zone))
+		elif n is LevelRoot and n.data:
+			for b: LevelBrush in n.data.brushes:
+				if b and b.is_passage():
+					zones.append(String(b.passage.target_zone))
+				elif b and b.is_door() and b.door.mode == Door.Mode.ZONE:
+					zones.append(String(b.door.target_zone))
+	root.free()
+	for z: String in zones:
+		if z != "" and z != scene_path and not z in out and ResourceLoader.exists(z):
+			out.append(z)
+	return out
+
+
 ## {errors: Array[String], warnings: Array[String], links: int} for `scenes`.
 static func check(scenes: PackedStringArray) -> Dictionary:
 	var links := []  # {from, what, zone, spawn}

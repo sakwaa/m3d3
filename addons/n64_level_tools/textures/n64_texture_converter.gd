@@ -293,6 +293,9 @@ static func convert(source: Image, s: Dictionary) -> Dictionary:
 		img = _tileable_region(img, size * WORK_SCALE, tiling, zoom, s.get("crop_center", Vector2(0.5, 0.5)), blend, source_tiles)
 	_adjust(img, s.saturation, s.contrast, s.brightness)
 	img = _box_down(img, WORK_SCALE, s.get("keep_lines", 0.0))
+	var grade: Dictionary = s.get("grade", {})
+	if not grade.is_empty():
+		apply_grade(img, grade)
 	if s.get("sharpen", 0.0) > 0.0:
 		_sharpen(img, s.sharpen, tiling)
 
@@ -315,9 +318,14 @@ static func convert(source: Image, s: Dictionary) -> Dictionary:
 	var palette := PackedColorArray()
 	if info.palette > 0:
 		palette = _quantize_indexed(img, info.palette)
+		if s.get("cycle_count", 0) > 1:
+			var cyc := cycle_sheet(img, palette, s.get("cycle_from", 0), s.cycle_count)
+			img = cyc.image
+			palette = cyc.palette
 	else:
 		_quantize_direct(img, format)
-		bleed_alpha(img)
+		if not format in [Format.I8, Format.I4]:
+			bleed_alpha(img)  # (intensity's alpha is its grey: nothing to bleed into)
 	return {image = img, palette = palette, tint_dark = tint_dark, tint_light = tint_light, tint_range = tint_range}
 
 
@@ -526,6 +534,46 @@ static func _adjust(img: Image, saturation: float, contrast: float, brightness: 
 			img.set_pixel(x, y, Color(clampf(rgb.x, 0, 1), clampf(rgb.y, 0, 1), clampf(rgb.z, 0, 1), c.a))
 
 
+## The texture grade (TextureGrade.settings_for): average brightness / saturation pulled
+## towards the category's target by `normalize`, then the LUT at `strength`.
+static func apply_grade(img: Image, g: Dictionary) -> void:
+	var norm: float = g.get("normalize", 0.0)
+	var gain := 1.0
+	var sat_k := 1.0
+	if norm > 0.0:
+		var st := TextureGrade.stats(img)
+		var t: Vector2 = g.target
+		gain = clampf(lerpf(1.0, t.x / maxf(st.x, 0.01), norm), 0.5, 2.0)
+		sat_k = clampf(lerpf(1.0, t.y / maxf(st.y, 0.01), norm), 0.4, 2.5)
+	# Value band: the texture's average lightness pulled into its category's band.
+	var vgain := 1.0
+	if g.has("band"):
+		var b: Vector3 = g.band
+		var l := TextureGrade.mean_lightness(img)
+		var want := lerpf(l, clampf(l, b.x, b.y), b.z)
+		var y_of := func(lv: float) -> float:
+			var f := (lv + 16.0) / 116.0
+			return f * f * f if f > 0.206893 else (f - 16.0 / 116.0) / 7.787
+		vgain = clampf(pow(y_of.call(want) / maxf(y_of.call(l), 0.0001), 1.0 / 2.2), 0.4, 2.5)
+	var strip: Image = g.get("strip")
+	var k: float = g.get("strength", 0.0)
+	var mv: PackedFloat32Array = g.get("match", PackedFloat32Array())
+	for y in img.get_height():
+		for x in img.get_width():
+			var c := img.get_pixel(x, y)
+			if norm > 0.0:
+				var l := c.get_luminance()
+				c = Color(lerpf(l, c.r, sat_k), lerpf(l, c.g, sat_k), lerpf(l, c.b, sat_k), c.a) * Color(gain, gain, gain, 1.0)
+				c = c.clamp()
+			if not is_equal_approx(vgain, 1.0):
+				c = Color(c.r * vgain, c.g * vgain, c.b * vgain, c.a).clamp()
+			if mv.size() == 7 and mv[3] > 0.0:
+				c = TextureGrade.match_color(c, mv)
+			if strip and k > 0.0:
+				c = c.lerp(LutFile.apply(strip, c), k)
+			img.set_pixel(x, y, c)
+
+
 ## Integer box downsample with alpha-weighted colour (no dark fringes on cut-outs).
 ## Integer box downsample with alpha-weighted colour (no dark fringes on cut-outs).
 ## `keep_lines` > 0: blocks crossed by a thin dark line (plank gaps, outlines, iron straps)
@@ -658,11 +706,60 @@ static func _quantize_direct(img: Image, format: Format) -> void:
 					c = Color(_q(l, 4), _q(l, 4), _q(l, 4), _q(c.a, 4))
 				Format.IA4:
 					c = Color(_q(l, 3), _q(l, 3), _q(l, 3), 1.0 if c.a >= 0.5 else 0.0)
+				# Intensity: the one value goes to R, G, B and alpha alike, as the N64's texture
+				# unit hands it to the combiner (dark = see-through where alpha is used:
+				# smoke, glows, shadows; floors and walls ignore it). A source's own alpha
+				# folds in (a white sprite cut out by alpha keeps its shape).
 				Format.I8:
-					c = Color(_q(l, 8), _q(l, 8), _q(l, 8), 1.0)
+					var i8 := _q(l * c.a, 8)
+					c = Color(i8, i8, i8, i8)
 				Format.I4:
-					c = Color(_q(l, 4), _q(l, 4), _q(l, 4), 1.0)
+					var i4 := _q(l * c.a, 4)
+					c = Color(i4, i4, i4, i4)
 			img.set_pixel(x, y, c)
+
+
+## Opaque entries of a palette (a transparent one, if any, sits first).
+static func opaque_count(palette: PackedColorArray) -> int:
+	return palette.size() - (1 if not palette.is_empty() and palette[0].a < 0.5 else 0)
+
+
+## Columns of a colour cycle's flipbook sheet of `frames` frames (near square).
+static func cycle_columns(frames: int) -> int:
+	return maxi(ceili(sqrt(float(frames))), 1)
+
+
+## Colour cycling: the palette's opaque entries sorted darkest first, then frame k shows
+## entries from .. from + count - 1 each moved k steps along (wrapping), the frames laid
+## out as a flipbook sheet (cycle_columns across). `img` holds only palette colours.
+## Returns {image, palette (sorted)}.
+static func cycle_sheet(img: Image, palette: PackedColorArray, from: int, count: int) -> Dictionary:
+	var clear := not palette.is_empty() and palette[0].a < 0.5
+	var opaque := Array(palette.slice(1 if clear else 0))
+	opaque.sort_custom(func(a: Color, b: Color): return a.get_luminance() < b.get_luminance())
+	from = clampi(from, 0, maxi(opaque.size() - 1, 0))
+	count = clampi(count, 1, opaque.size() - from)
+	var sorted := PackedColorArray([palette[0]] if clear else [])
+	sorted.append_array(PackedColorArray(opaque))
+	var index := {}  # RGBA8 -> opaque entry
+	for i in opaque.size():
+		index[(opaque[i] as Color).to_rgba32()] = i
+	var w := img.get_width()
+	var h := img.get_height()
+	var cols := cycle_columns(count)
+	var rows := ceili(float(count) / cols)
+	var sheet := Image.create(w * cols, h * rows, false, Image.FORMAT_RGBA8)
+	for k in count:
+		var ox := (k % cols) * w
+		var oy := (k / cols) * h
+		for y in h:
+			for x in w:
+				var c := img.get_pixel(x, y)
+				var i: int = index.get(c.to_rgba32(), -1)
+				if i >= from and i < from + count:
+					c = opaque[from + (i - from + k) % count]
+				sheet.set_pixel(ox + x, oy + y, c)
+	return {image = sheet, palette = sorted}
 
 
 ## Median-cut palette (+ k-means refinement), stored as RGBA5551, applied to the image.

@@ -1,5 +1,7 @@
 [gd_scene format=3]
 
+[ext_resource type="Script" path="res://game/actors/strike_point.gd" id="9_strike"]
+
 [ext_resource type="Script" path="res://addons/n64_actor_tools/actor_model.gd" id="1_ew5an"]
 [ext_resource type="Script" path="res://addons/n64_actor_tools/actor_animation.gd" id="2_c1f0f"]
 [ext_resource type="Script" path="res://addons/n64_actor_tools/actor_piece.gd" id="3_ss4ui"]
@@ -913,3 +915,69 @@ animations = Array[ExtResource("2_c1f0f")]([SubResource("Resource_md1fp"), SubRe
 [node name="WolfosModel" type="Node3D" unique_id=650945398]
 script = ExtResource("1_ew5an")
 data = SubResource("Resource_qy8jt")
+
+[node name="Strike_head" type="Node3D" parent="."]
+top_level = true
+script = ExtResource("9_strike")
+kind = 0
+bone = &"head"
+offset = Vector3(0, 0.02, -0.08)
+normal = Vector3(0, 0.2, -1)
+radius = 0.2
+damage_scale = 2.0
+part = "head"
+
+[node name="Strike_throat" type="Node3D" parent="."]
+top_level = true
+script = ExtResource("9_strike")
+kind = 0
+bone = &"neck"
+offset = Vector3(0, -0.05, 0.05)
+normal = Vector3(0, -0.2, -1)
+radius = 0.2
+damage_scale = 1.0
+part = "throat"
+
+[node name="Strike_left_flank" type="Node3D" parent="."]
+top_level = true
+script = ExtResource("9_strike")
+kind = 0
+bone = &"spine"
+offset = Vector3(-0.2, 0, 0)
+normal = Vector3(-1, 0.2, 0)
+radius = 0.22
+damage_scale = 1.0
+part = "left flank"
+
+[node name="Strike_right_flank" type="Node3D" parent="."]
+top_level = true
+script = ExtResource("9_strike")
+kind = 0
+bone = &"spine"
+offset = Vector3(0.2, 0, 0)
+normal = Vector3(1, 0.2, 0)
+radius = 0.22
+damage_scale = 1.0
+part = "right flank"
+
+[node name="Strike_haunch" type="Node3D" parent="."]
+top_level = true
+script = ExtResource("9_strike")
+kind = 0
+bone = &"pelvis"
+offset = Vector3(0, 0.05, 0.05)
+normal = Vector3(0, 0.2, 1)
+radius = 0.22
+damage_scale = 1.0
+part = "haunch"
+
+[node name="Strike_claws" type="Node3D" parent="."]
+top_level = true
+script = ExtResource("9_strike")
+kind = 2
+bone = &"neck"
+offset = Vector3(0, 0.2, -0.3)
+normal = Vector3(0, 0, -1)
+radius = 0.38
+damage_scale = 0.0
+part = "claws (guard)"

@@ -220,7 +220,11 @@ static func set_base(mat: ShaderMaterial, base: Texture2D, data: LevelData, tint
 	mat.set_shader_parameter(&"base_flip", anim[1])
 	_mark_animated(mat, &"base", _is_animated(anim))
 	mat.set_shader_parameter(&"variation_tex", VARIATION_NOISE)
+	mat.set_shader_parameter(&"base_variation_tex", base_variation_texture_for(base, data))
 	mat.set_shader_parameter(&"base_var", look.variation if look else base_variation_for(base, data))
+	var adj := ColourAdjust.params(adjust_for(look if look else base, data))
+	for k in 4:
+		mat.set_shader_parameter(StringName("base_adj%d" % k), adj[k])
 	var palette = look.palette if look and look.palette.size() == 2 else (data.base_tints.get(base) if base else null)
 	var combiner := texture_tint(base, palette)
 	mat.set_shader_parameter(&"base_recolour", look != null and look.recolour)
@@ -260,6 +264,21 @@ static func base_variation_for(texture: Texture2D, data: LevelData) -> Vector3:
 	if texture and data.base_variation.has(texture):
 		return data.base_variation[texture]
 	return Vector3(0.0, 8.0, 0.0)
+
+
+## The colour adjustment a palette entry shows with: a look's own, else the level's for
+## its texture (null = none).
+static func adjust_for(entry: Texture2D, data: LevelData) -> ColourAdjust:
+	if entry is TextureLook and (entry as TextureLook).adjust:
+		return (entry as TextureLook).adjust
+	var src := TextureLook.source_of(entry) if entry else null
+	return data.base_adjusts.get(src) if src else null
+
+
+## Variation texture of a base texture in a level: the level's pick, else the shared noise.
+static func base_variation_texture_for(texture: Texture2D, data: LevelData) -> Texture2D:
+	var t: Texture2D = data.base_variation_textures.get(texture) if texture else null
+	return t if t else VARIATION_NOISE
 
 
 ## Metres per repeat of a base texture in a level: the level's override, else the
@@ -360,8 +379,12 @@ static func apply_layers(mat: ShaderMaterial, data: LevelData, masks: Array) -> 
 			layer_tile(layer) if layer else 1.0, state))
 		mat.set_shader_parameter("tint_%d" % i, (layer.tint if layer.texture else layer.get_shade()) if layer else Color.WHITE)
 		# Noise mask, off on materials whose base texture isn't the layer's target.
+		# (a build's graded copy of the base counts as the base: GradeBake's grade_source)
+		var base_tex = mat.get_shader_parameter(&"base_tex")
+		if base_tex is Texture2D and base_tex.has_meta(&"grade_source"):
+			base_tex = base_tex.get_meta(&"grade_source")
 		var noise_on: bool = layer != null and layer.noise_coverage > 0.0 \
-			and (layer.noise_base == null or layer.noise_base == mat.get_shader_parameter(&"base_tex"))
+			and (layer.noise_base == null or layer.noise_base == base_tex)
 		mat.set_shader_parameter("noise_%d" % i, Vector4(layer.noise_coverage if noise_on else 0.0,
 			layer.noise_size if layer else 4.0, layer.noise_softness if layer else 0.3, layer.noise_combine if layer else 1))
 		mat.set_shader_parameter("var_%d" % i, Vector3(layer.variation, layer.variation_size, layer.variation_mode)

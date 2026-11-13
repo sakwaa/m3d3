@@ -1,0 +1,55 @@
+[gd_resource type="Resource" script_class="ZoneGrade" format=3 uid="uid://brln5nt1ecuby"]
+
+[ext_resource type="Script" uid="uid://dc1xicbuyy444" path="res://addons/n64_grade/grade_ao.gd" id="1_i57h1"]
+[ext_resource type="Script" uid="uid://dq014lgdmmikc" path="res://addons/n64_grade/zone_grade.gd" id="2_tqjjn"]
+[ext_resource type="Script" uid="uid://dtgymnc05fmrl" path="res://addons/n64_grade/filters/grade_levels.gd" id="3_awbnx"]
+[ext_resource type="Script" uid="uid://bfg27vpdqwnih" path="res://addons/n64_grade/filters/grade_gradient_map.gd" id="4_h2ady"]
+[ext_resource type="Script" uid="uid://bdc0iutw1qbu0" path="res://addons/n64_grade/filters/grade_balance.gd" id="5_1qnk0"]
+
+[sub_resource type="Resource" id="Resource_alk81"]
+script = ExtResource("1_i57h1")
+linked = false
+strength = PackedFloat32Array(1.2, 1, 0.9, 1.05)
+curve = PackedFloat32Array(0.85, 1, 1.1, 1)
+tint = PackedColorArray(0.04, 0.06, 0.22, 1, 0.2, 0.14, 0.18, 1, 0.3, 0.2, 0.1, 1, 0.22, 0.1, 0.2, 1)
+
+[sub_resource type="Resource" id="Resource_erouf"]
+script = ExtResource("5_1qnk0")
+shadows = Color(0.4, 0.45, 0.62, 1)
+highlights = Color(0.6, 0.54, 0.44, 1)
+strength = 0.35
+on_light = true
+
+[sub_resource type="Gradient" id="Gradient_nilj8"]
+offsets = PackedFloat32Array(0, 0.5, 1)
+colors = PackedColorArray(0.03, 0.04, 0.14, 1, 0.18, 0.22, 0.45, 1, 0.72, 0.76, 0.95, 1)
+
+[sub_resource type="Resource" id="Resource_y46um"]
+script = ExtResource("4_h2ady")
+gradient = SubResource("Gradient_nilj8")
+opacity = 0.45
+blend = 6
+keys = 1
+on_light = true
+
+[sub_resource type="Resource" id="Resource_6n6yi"]
+script = ExtResource("3_awbnx")
+gamma = 1.18
+
+[sub_resource type="Gradient" id="Gradient_arogc"]
+offsets = PackedFloat32Array(0.20173366, 0.41678646, 0.5535574, 0.5879796, 0.6175817, 0.65240216, 0.7047381)
+colors = PackedColorArray(0.21045151, 0.20570578, 0.15519023, 1, 0.43004233, 0.43382412, 0.28634244, 1, 0.5663397, 0.59267557, 0.3199249, 1, 0.6014743, 0.6278466, 0.34851798, 1, 0.63332945, 0.6571797, 0.37355697, 1, 0.67161083, 0.6911675, 0.40351978, 1, 0.73134184, 0.740281, 0.45285812, 1)
+
+[sub_resource type="Resource" id="Resource_k3j8p"]
+script = ExtResource("4_h2ady")
+gradient = SubResource("Gradient_arogc")
+opacity = 0.35
+blend = 4
+
+[resource]
+script = ExtResource("2_tqjjn")
+stacks = {
+"vertex/light": [SubResource("Resource_erouf"), SubResource("Resource_y46um")],
+"zone": [SubResource("Resource_6n6yi"), SubResource("Resource_k3j8p")]
+}
+ao = SubResource("Resource_alk81")

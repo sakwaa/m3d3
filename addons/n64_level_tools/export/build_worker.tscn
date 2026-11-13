@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://addons/n64_level_tools/export/build_worker.gd" id="1"]
+
+[node name="BuildWorker" type="Node"]
+script = ExtResource("1")

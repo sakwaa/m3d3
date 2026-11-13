@@ -19,6 +19,9 @@ signal layer_clear_requested(index: int)
 signal faces_reset_requested
 ## Merge the face-mask faces that lie flat together and match (texture, UV, set, surface).
 signal faces_merge_requested
+## Texture anchor for the face-mask faces' brushes (no mask: the level's plain brushes):
+## true = World (tiles on across brushes), false = Brush (rides with it).
+signal uv_anchor_requested(world: bool)
 ## Overlay sets: edit set `index` (its layers fill the list), add one, rename the edited
 ## one, give the face-mask faces the edited one.
 signal layer_set_selected(index: int)
@@ -31,6 +34,18 @@ signal layer_set_delete_requested
 signal layer_set_move_requested(dir: int)
 signal layer_property_changed(index: int, property: StringName, value: Variant)
 signal level_property_changed(property: StringName, value: Variant)
+## Colour adjust: `target` 0 = the texture to apply across the zone, 1 = the face mask's
+## faces (their own variant), 2 = a texture group (colour_adjust_group()) across the zone;
+## `values` = ColourAdjust fields ({} = reset).
+signal colour_adjust_changed(target: int, values: Dictionary)
+## Colour adjust: the target changed; the plugin answers with set_colour_adjust.
+signal colour_adjust_target_changed(target: int)
+## Colour adjust: every texture in the zone starts from grey (on) or back in colour (off).
+signal zone_grey_toggled(on: bool)
+## Value view: 0 off, 1 greyscale, 3 / 5 value groups (posterised).
+signal value_view_toggled(mode: int)
+## Value readout: measure the 3D view (and `reference`, an image path or "").
+signal value_measure_requested(reference: String)
 signal brush_changed(property: StringName, value: Variant)
 signal brush_add_requested
 signal vertex_color_changed(color: Color)
@@ -62,6 +77,17 @@ var _base_tile: SpinBox
 var _base_var: HSlider
 var _base_var_size: SpinBox
 var _base_var_mode: OptionButton
+var _base_var_tex: N64TexturePicker
+var _adj_target: OptionButton
+var _adj_info: Label
+var _adj_group: OptionButton
+var _adj_group_row: Control
+var _zone_grey: CheckButton
+var _adj := {}  # field -> slider / picker
+var _value_ref := ""
+var _value_ref_label: Label
+var _value_text: Label
+var _value_hist: TextureRect
 var _layer_var: HSlider
 var _layer_var_size: SpinBox
 var _layer_var_mode: OptionButton
@@ -118,6 +144,8 @@ var _color_range: OptionButton
 var _base_bright: HSlider
 var _rotation: OptionButton
 var _follow_slope: CheckBox
+var _tex_scale: Array[SpinBox] = []
+var _tex_scale_link: CheckButton
 var _stay: CheckBox
 var _tool_buttons: Array[Button] = []
 var _size: HSlider
@@ -293,11 +321,48 @@ func _init(panel_style: StyleBox = null, button_factory: Callable = Callable()) 
 	_rotation.tooltip_text = "Turns the texture on the faces it's painted on (bricks along a\nnorth-south path vs east-west). R: next quarter turn, Shift+R: back."
 	_rotation.item_selected.connect(func(i): if not _updating: brush_changed.emit(&"rotation", i * 90.0))
 	_row(_base_box, "Rotation", _rotation)
+	var scale_row := HBoxContainer.new()
+	for axis in 2:
+		var sb := SpinBox.new()
+		sb.min_value = 0.05
+		sb.max_value = 16.0
+		sb.step = 0.05
+		sb.value = 1.0
+		sb.allow_greater = true
+		sb.prefix = "X" if axis == 0 else "Y"
+		sb.suffix = "×"
+		sb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		sb.tooltip_text = "Texture size %s on the faces it's painted on (2 = twice as big, 0.5 = half). Linked:\nX and Y together (one multiplier). Picking a face (I) takes its scale." % ("across (X)" if axis == 0 else "up (Y)")
+		sb.value_changed.connect(func(v):
+			if _updating:
+				return
+			if _tex_scale_link.button_pressed:
+				_tex_scale[1 - axis].set_value_no_signal(v)
+			brush_changed.emit(&"texture_scale", Vector2(_tex_scale[0].value, _tex_scale[1].value)))
+		_tex_scale.append(sb)
+		scale_row.add_child(sb)
+	_tex_scale_link = CheckButton.new()
+	_tex_scale_link.text = "Link"
+	_tex_scale_link.button_pressed = true
+	_tex_scale_link.tooltip_text = "X and Y change together (a plain multiplier)."
+	scale_row.add_child(_tex_scale_link)
+	_row(_base_box, "Scale", scale_row)
 	_follow_slope = CheckBox.new()
 	_follow_slope.text = "Follow slope"
 	_follow_slope.tooltip_text = "Lays the texture on each face's own plane instead of projecting it straight down /\nsideways: on a ramp it keeps its size (no stretch up the slope) and rows run level across\nit. Flat floors and straight walls look the same either way. Leave off on bumpy terrain\n(each face would get its own seam). Applies to the faces you paint."
 	_follow_slope.toggled.connect(func(on): if not _updating: brush_changed.emit(&"follow_slope", on))
 	_base_box.add_child(_follow_slope)
+	var anchor_row := HBoxContainer.new()
+	for world in [true, false]:
+		var ab := Button.new()
+		ab.text = "World" if world else "Brush"
+		ab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		ab.tooltip_text = ("World: the base texture is laid from the world across X / Z, so touching brushes\ntile on without a seam (heights still count from each brush's base, so brick courses\nstart whole at its foot). New brushes start this way."
+			if world else "Brush: the texture rides with the brush when it moves (a trim board's grain, a\nloose block). How brushes made before this worked.") \
+			+ "\nApplies to the brushes of the face-mask faces; with no mask, to every plain brush of the\nlevel (houses, doors, windows, passages, props keep theirs). Offsets, turns and A-aligns\nyou've set stay where they are. Undoable."
+		ab.pressed.connect(func(): uv_anchor_requested.emit(world))
+		anchor_row.add_child(ab)
+	_row(_base_box, "Texture anchor", anchor_row)
 	_overrides_box = VBoxContainer.new()
 	_base_setup.add_child(_overrides_box)
 	var bv := _variation_rows(_base_setup)
@@ -307,6 +372,12 @@ func _init(panel_style: StyleBox = null, button_factory: Callable = Callable()) 
 	_base_var.value_changed.connect(func(_v): _emit_base_variation())
 	_base_var_size.value_changed.connect(func(_v): _emit_base_variation())
 	_base_var_mode.item_selected.connect(func(_i): _emit_base_variation())
+	_base_var_mode.add_item("Colour")
+	_base_var_mode.set_item_tooltip(2, "Colour: multiplies by the variation texture's colour relative to its average\n(e.g. a small yellow-green / dark-green patch texture over a field, as OoT / MM did).")
+	_base_var_tex = _picker(_base_setup, "Variation texture")
+	_base_var_tex.tooltip_text = "This base texture's own variation texture, for the whole level (empty = the shared noise).\nGrey: shapes the Light & dark / Darken patches. Colour mode: its colours tint the base.\nVariation size = metres it covers."
+	_base_var_tex.resource_changed.connect(_emit_base_variation_texture)
+	_build_colour_adjust(_base_setup)
 
 	# Vertex colour: colour to paint (Paint on); range and AO (Layer setup).
 	_vertex_box = VBoxContainer.new()
@@ -571,6 +642,10 @@ func set_tool_state(tool: LevelPaintTool) -> void:
 	_base_texture = tool.base_texture
 	_rotation.select(int(roundi(tool.rotation / 90.0)) % 4)
 	_follow_slope.set_pressed_no_signal(tool.follow_slope)
+	_tex_scale[0].set_value_no_signal(tool.texture_scale.x)
+	if not is_equal_approx(tool.texture_scale.x, tool.texture_scale.y):
+		_tex_scale_link.set_pressed_no_signal(false)
+	_tex_scale[1].set_value_no_signal(tool.texture_scale.y)
 	_color_mode.select(tool.color_mode)
 	_stay.button_pressed = tool.stay_on_brush
 	if tool.tool < _tool_buttons.size():
@@ -871,6 +946,7 @@ func _refresh_base_tint(look := {}) -> void:
 		_base_var.value = v.x
 		_base_var_size.value = v.y
 		_base_var_mode.select(int(v.z))
+		_base_var_tex.edited_resource = _data.base_variation_textures.get(_base_texture) if _base_texture else null
 	_refresh_overrides()
 	var override = _data.base_tints.get(_base_texture) if _data and _base_texture else null
 	var pal: PackedColorArray = look.get("palette", PackedColorArray())
@@ -960,6 +1036,197 @@ func _emit_base_variation() -> void:
 	else:
 		vars[_base_texture] = Vector3(_base_var.value, _base_var_size.value, _base_var_mode.selected)
 	level_property_changed.emit(&"base_variation", vars)
+
+
+## Colour adjust: live hue / saturation / brightness... of the texture to apply across the
+## zone, or of the masked faces (they get their own variant), in the paint shader.
+func _build_colour_adjust(parent: Control) -> void:
+	var head := Label.new()
+	head.text = "Colour adjust"
+	head.add_theme_font_size_override(&"font_size", int(13 * _scale))
+	parent.add_child(head)
+	_adj_target = OptionButton.new()
+	_adj_target.add_item("This texture, whole zone")
+	_adj_target.add_item("Masked faces (own variant)")
+	_adj_target.add_item("Texture group, whole zone")
+	_adj_target.tooltip_text = "Whole zone: every face of the texture to apply (Texture to apply, or pick one with I).\nMasked faces: the faces in the face mask get their own copy of their texture to adjust;\nthe rest keep theirs.\nTexture group: every texture of one kind in the zone (brick, roof, ground... the texture's\ngrade category), one set of sliders for all of them.\nLive in the viewport; Build & Play bakes it in."
+	_adj_target.item_selected.connect(func(i):
+		_adj_group_row.visible = i == 2
+		colour_adjust_target_changed.emit(i))
+	_row(parent, "Adjust", _adj_target)
+	_adj_group = OptionButton.new()
+	_adj_group.tooltip_text = "The kind of texture to adjust together (the texture's folder, or its Grade As)."
+	_adj_group.item_selected.connect(func(_i): colour_adjust_target_changed.emit(_adj_target.selected))
+	_row(parent, "Group", _adj_group)
+	_adj_group_row = _adj_group.get_parent()  # (the row _row made)
+	_adj_group_row.visible = false
+	_zone_grey = CheckButton.new()
+	_zone_grey.text = "Zone in grey"
+	_zone_grey.tooltip_text = "Every texture in this zone starts from grey (its light and dark only), ready to set\nvalues and then colour group by group (Colorize / Shadow colour). Off: back to each\ntexture's own colours (other slider settings stay)."
+	_zone_grey.toggled.connect(func(on): if not _updating: zone_grey_toggled.emit(on))
+	parent.add_child(_zone_grey)
+	_adj_info = Label.new()
+	_adj_info.add_theme_font_size_override(&"font_size", int(11 * _scale))
+	_adj_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	parent.add_child(_adj_info)
+	var specs := [[&"hue", "Hue", -180.0, 180.0, 1.0], [&"saturation", "Saturation", 0.0, 2.0, 0.01],
+		[&"brightness", "Brightness", 0.0, 2.0, 0.01], [&"contrast", "Contrast", 0.5, 1.5, 0.01],
+		[&"temperature", "Warm / cool", -1.0, 1.0, 0.01], [&"tint", "Magenta / green", -1.0, 1.0, 0.01],
+		[&"gamma", "Midtones", 0.5, 2.0, 0.01], [&"colorize_amount", "Colorize", 0.0, 1.0, 0.01]]
+	for sp in specs:
+		var sl := _slider(parent, sp[1], sp[2], sp[3], sp[4])
+		sl.value_changed.connect(func(_v): _emit_colour_adjust())
+		_adj[sp[0]] = sl
+	var pick := ColorPickerButton.new()
+	pick.color = Color(0.6, 0.5, 0.35)
+	pick.edit_alpha = false
+	pick.color_changed.connect(func(_c): _emit_colour_adjust())
+	_row(parent, "Colorize colour", pick)
+	_adj[&"colorize"] = pick
+	var grey := CheckBox.new()
+	grey.text = "Start from grey"
+	grey.tooltip_text = "The texture keeps only its light and dark; Colorize then colours it with a ramp from\nShadow colour (its darks) to Colorize colour (its lights). Colorize 1 = fully your colours."
+	grey.toggled.connect(func(_on): _emit_colour_adjust())
+	parent.add_child(grey)
+	_adj[&"from_grey"] = grey
+	var shadow := ColorPickerButton.new()
+	shadow.color = Color(0.18, 0.14, 0.12)
+	shadow.edit_alpha = false
+	shadow.color_changed.connect(func(_c): _emit_colour_adjust())
+	_row(parent, "Shadow colour", shadow)
+	_adj[&"shadow"] = shadow
+	_build_value_tools(parent)
+	var reset := Button.new()
+	reset.text = "Reset colour"
+	reset.pressed.connect(func(): colour_adjust_changed.emit(_adj_target.selected, {}))
+	parent.add_child(reset)
+	set_colour_adjust({}, "")
+
+
+## Value tools: the viewport in greyscale or value groups, and a readout of how the view reads
+## (darks / mids / lights, spread, key) beside a reference picture's.
+func _build_value_tools(parent: Control) -> void:
+	var head := Label.new()
+	head.text = "Values"
+	head.add_theme_font_size_override(&"font_size", int(13 * _scale))
+	parent.add_child(head)
+	var mode := OptionButton.new()
+	for t in ["Off", "Greyscale", "3 value groups", "5 value groups"]:
+		mode.add_item(t)
+	mode.tooltip_text = "Shows the 3D viewport by value alone (changes nothing). Value groups: the squint test,\nlight posterised into 3 or 5 flat greys: shapes that should read apart but share a grey merge.\nIn game: the debug HUD's F1 steps through the same."
+	mode.item_selected.connect(func(i): value_view_toggled.emit([0, 1, 3, 5][i]))
+	_row(parent, "Value view", mode)
+	var row := HBoxContainer.new()
+	var measure := Button.new()
+	measure.text = "Measure view"
+	measure.tooltip_text = "Reads the 3D view's values: darks / mids / lights (10th / 50th / 90th percentile\nlightness), spread (a readable daytime scene ~50-60; under 30 reads flat) and key."
+	measure.pressed.connect(func(): value_measure_requested.emit(_value_ref))
+	row.add_child(measure)
+	var pick := Button.new()
+	pick.text = "Reference..."
+	pick.tooltip_text = "A picture to compare with (another game's screenshot, a painting): its histogram is\noutlined in orange over the view's."
+	pick.pressed.connect(_pick_value_reference)
+	row.add_child(pick)
+	parent.add_child(row)
+	_value_ref_label = Label.new()
+	_value_ref_label.add_theme_font_size_override(&"font_size", int(11 * _scale))
+	_value_ref_label.text = "No reference"
+	parent.add_child(_value_ref_label)
+	_value_hist = TextureRect.new()
+	_value_hist.stretch_mode = TextureRect.STRETCH_SCALE
+	_value_hist.custom_minimum_size = Vector2(0, 56 * _scale)
+	_value_hist.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	parent.add_child(_value_hist)
+	_value_text = Label.new()
+	_value_text.add_theme_font_size_override(&"font_size", int(11 * _scale))
+	_value_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	parent.add_child(_value_text)
+
+
+func _pick_value_reference() -> void:
+	var dlg := EditorFileDialog.new()
+	dlg.file_mode = EditorFileDialog.FILE_MODE_OPEN_FILE
+	dlg.access = EditorFileDialog.ACCESS_FILESYSTEM
+	dlg.filters = PackedStringArray(["*.png, *.jpg, *.jpeg, *.webp ; Pictures"])
+	dlg.file_selected.connect(func(path):
+		_value_ref = path
+		_value_ref_label.text = "Reference: " + path.get_file()
+		dlg.queue_free())
+	dlg.canceled.connect(dlg.queue_free)
+	add_child(dlg)
+	dlg.popup_file_dialog()
+
+
+## Shows a value reading: the view's `view` and the reference's `ref` (ValueStats).
+func show_value_stats(view: Dictionary, ref: Dictionary) -> void:
+	_value_hist.texture = ImageTexture.create_from_image(ValueStats.histogram(view, ref))
+	var t := "View: " + ValueStats.describe(view)
+	if not ref.is_empty():
+		t += "\nReference: " + ValueStats.describe(ref)
+	_value_text.text = t
+
+
+func _emit_colour_adjust() -> void:
+	if _updating:
+		return
+	var d := {}
+	for f in _adj:
+		d[f] = _adj[f].color if _adj[f] is ColorPickerButton else (_adj[f].button_pressed if _adj[f] is CheckBox else _adj[f].value)
+	colour_adjust_changed.emit(_adj_target.selected, d)
+
+
+## Shows `values` (ColourAdjust fields; {} = neutral) and what's being adjusted.
+func set_colour_adjust(values: Dictionary, info: String) -> void:
+	var was := _updating
+	_updating = true
+	var neutral := ColourAdjust.new().to_dict()
+	for f in _adj:
+		var v = values.get(f, neutral[f])
+		if _adj[f] is ColorPickerButton:
+			_adj[f].color = v
+		elif _adj[f] is CheckBox:
+			_adj[f].button_pressed = v
+		else:
+			_adj[f].value = v
+	_adj_info.text = info
+	_updating = was
+
+
+func colour_adjust_target() -> int:
+	return _adj_target.selected
+
+
+## The group the Texture group target adjusts ("" = none).
+func colour_adjust_group() -> String:
+	return _adj_group.get_item_text(_adj_group.selected) if _adj_group.selected >= 0 else ""
+
+
+## Fills the group list (the zone's texture kinds), keeping the selection when it's still
+## there; `grey`: whether the whole zone starts from grey.
+func set_colour_groups(groups: PackedStringArray, grey: bool) -> void:
+	var was := _updating
+	_updating = true
+	var cur := colour_adjust_group()
+	_adj_group.clear()
+	for g in groups:
+		_adj_group.add_item(g)
+	var i := groups.find(cur)
+	_adj_group.select(i if i >= 0 else (0 if not groups.is_empty() else -1))
+	_zone_grey.set_pressed_no_signal(grey)
+	_updating = was
+
+
+## Variation texture for the texture to apply: per texture in this level (whatever Level-wide
+## says: looks of one texture share it); none removes it.
+func _emit_base_variation_texture(r: Resource) -> void:
+	if _updating or _data == null or _base_texture == null:
+		return
+	var vars := _data.base_variation_textures.duplicate()
+	if r is Texture2D:
+		vars[_base_texture] = r
+	else:
+		vars.erase(_base_texture)
+	level_property_changed.emit(&"base_variation_textures", vars)
 
 
 func _emit_base_tile(v: float) -> void:
@@ -1054,6 +1321,7 @@ func _update_tool_visibility(tool: int) -> void:
 
 var _grass_box: Control
 var _grass_height: SpinBox
+var _grass_style: OptionButton
 var _trees_box: Control
 var _trees_list: ItemList
 var _trees_spacing: SpinBox
@@ -1063,9 +1331,16 @@ var _trees_size_var: HSlider
 ## Grass settings: the carpet height painted.
 func _build_grass() -> void:
 	_grass_box = VBoxContainer.new()
-	_grass_height = _spin(_grass_box, "Carpet height (m)", 0.05, 1.0, 0.05)
+	_grass_height = _spin(_grass_box, "Carpet height (m)", 0.05, GrassSettings.MAX_PAINT_HEIGHT, 0.05)
 	_grass_height.tooltip_text = "Height of the carpet painted (about a quarter to a third of the player's height reads\nlike Majora's Mask: 0.45 m). The rest (lumps, rounding, tufts) is in the level's Grass settings."
 	_grass_height.value_changed.connect(func(v): if not _updating: brush_changed.emit(&"grass_height", v))
+	_grass_style = OptionButton.new()
+	_grass_style.add_item("Level's own", 0)
+	for name in ["Carpet", "Ledge", "Mound", "Rim"]:
+		_grass_style.add_item(name, _grass_style.item_count)
+	_grass_style.tooltip_text = "Edge style of the carpet painted: Carpet (waded through), Ledge (raised lawn on an earth side,\nsolid), Mound (soft bank, waded through), Rim (bed with a leafy border above it, solid).\nLevel's own: whatever the level's Grass settings say. Erasing clears it. Look settings\n(side texture, rim height, mound width…) are the level's."
+	_grass_style.item_selected.connect(func(i): if not _updating: brush_changed.emit(&"grass_style", i - 1))
+	_row(_grass_box, "Edge style", _grass_style)
 
 
 ## Trees settings: which species (several = a mix), spacing, size variation.
@@ -1103,6 +1378,7 @@ func _emit_tree_species() -> void:
 func set_grass_state(g: LevelGrassTool, t: LevelTreeTool) -> void:
 	_updating = true
 	_grass_height.value = g.height
+	_grass_style.select(g.style + 1)
 	_trees_spacing.value = t.spacing
 	_trees_size_var.value = t.size_var
 	_trees_list.deselect_all()

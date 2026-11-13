@@ -1,7 +1,7 @@
 [gd_resource type="Resource" script_class="N64Effect" format=3 uid="uid://bpgt1sbv13fm8"]
 
 [ext_resource type="Script" uid="uid://b8b2olhwlgvyw" path="res://addons/n64_runtime/effects/n64_effect.gd" id="1_inm7b"]
-[ext_resource type="Texture2D" uid="uid://cok7idh6eip5t" path="res://game/effects/sprites/spark.png" id="2_sqphi"]
+[ext_resource type="Texture2D" path="res://textures/effects/spark.res" id="2_sqphi"]
 
 [sub_resource type="Gradient" id="Gradient_tbjjw"]
 colors = PackedColorArray(1, 1, 0.85, 1, 1, 0.6, 0.2, 0)
@@ -11,6 +11,7 @@ resource_name = "hit_sparks"
 script = ExtResource("1_inm7b")
 texture = ExtResource("2_sqphi")
 blend = 1
+intensity = true
 max_sprites = 10
 lifetime = Vector2(0.18, 0.3)
 speed = Vector2(3, 5)

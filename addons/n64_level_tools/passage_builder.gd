@@ -46,18 +46,24 @@ static func carve_brush(brush: LevelBrush, bxf: Transform3D, xf: Transform3D, wi
 	var c := xf.origin
 	var t := xf.basis.x.normalized()          # along the wall
 	var inward := xf.basis.z.normalized()     # into the room
-	var planes := [[t, t.dot(c) - width * 0.5], [t, t.dot(c) + width * 0.5],
-		[Vector3.UP, c.y], [Vector3.UP, c.y + height]]
+	# Uprights first, then the horizontals. Each cuts only near the opening: the uprights the
+	# faces level with it (its storey, not the wall above or below), the horizontals only the
+	# faces between the uprights - not lines right across the wall (several openings in one
+	# wall would cut it into strips, every one too painted for the build's dissolve to merge).
+	var planes := [[t, t.dot(c) - width * 0.5], [t, t.dot(c) + width * 0.5]]
 	# Plus a row TRIM_FALLOFF further out: the trim's contact shadow on the wall fades out
 	# there instead of across the whole face.
 	if trim.x > 0.0:
 		for off in [trim.x, trim.x + TRIM_FALLOFF]:
 			planes.append_array([[t, t.dot(c) - width * 0.5 - off], [t, t.dot(c) + width * 0.5 + off]])
+	planes.append_array([[Vector3.UP, c.y], [Vector3.UP, c.y + height]])
 	if trim.y > 0.0:
 		# Above the top bar the first row sits a little up the wall: right at the bar's edge
 		# the bar blocks every downward ray, much darker than beside the posts.
 		for off in [trim.y + TRIM_TOP_LIFT, trim.y + TRIM_TOP_FALLOFF]:
 			planes.append([Vector3.UP, c.y + height + off])
+	var side_reach := width * 0.5 + (trim.x + TRIM_FALLOFF if trim.x > 0.0 else 0.0) + EPS
+	var top_reach := height + (trim.y + TRIM_TOP_FALLOFF if trim.y > 0.0 else 0.0)
 	# Any wall surface of this brush inside the opening's box?
 	if _opening_faces(brush, bxf, c, t, inward, width, height, depth, EPS, true).is_empty():
 		return false
@@ -86,9 +92,23 @@ static func carve_brush(brush: LevelBrush, bxf: Transform3D, xf: Transform3D, wi
 				pts.append(bxf * verts[v])
 			if absf(PolyUtil.newell_normal(pts).normalized().dot(inward)) < 0.99:
 				continue
+			if brush.get_face_lod(map[f]) == LevelBrush.LOD_FAR:
+				continue  # (far stand-ins stay whole: the opening's own far version covers them)
 			var behind := -inward.dot(pts[0] - c)
-			if behind >= -EPS and behind <= depth:
-				only[f] = true
+			if behind < -EPS or behind > depth:
+				continue
+			var lo := Vector2(INF, INF)  # (along the wall, up)
+			var hi := Vector2(-INF, -INF)
+			for p in pts:
+				var q := Vector2(t.dot(p - c), p.y - c.y)
+				lo = lo.min(q)
+				hi = hi.max(q)
+			if pl[0] == Vector3.UP:
+				if lo.x < -side_reach or hi.x > side_reach:
+					continue  # (beside the opening: the horizontals stay between its uprights)
+			elif hi.y <= EPS or lo.y >= top_reach - EPS:
+				continue  # (above or below it)
+			only[f] = true
 		if only.is_empty():
 			continue
 		var cut := BrushOps.cut_plane(verts, faces, nl / len, dl / len, only)
@@ -184,6 +204,8 @@ static func _opening_faces(brush: LevelBrush, bxf: Transform3D, c: Vector3, t: V
 	var out: Array[int] = []
 	var nb := bxf.basis.inverse().transposed()
 	for f in brush.get_face_count():
+		if brush.get_face_lod(f) == LevelBrush.LOD_FAR:
+			continue  # (far stand-ins aren't opened)
 		var n := (nb * brush.get_face_normal(f)).normalized()
 		if absf(n.dot(inward)) < 0.99:
 			continue

@@ -167,6 +167,22 @@ const IDENTITY_BASIS := Vector4(1, 0, 0, 1)
 	set(value):
 		base_variation = value
 		materials_changed.emit()
+## Per-level colour adjustment of base textures: Texture2D -> ColourAdjust (Paint panel >
+## Colour adjust, zone-wide; masked variants keep theirs on their TextureLook).
+@export var base_adjusts := {}:
+	set(value):
+		base_adjusts = value
+		materials_changed.emit()
+## The Grade screen's layers for this zone (ZoneGrade: filter stacks per zone / group /
+## texture / variant). Typed loosely so this file doesn't depend on the Grade addon.
+@export var grade: Resource
+## Per-level variation texture for base textures: Texture2D -> Texture2D (absent = the
+## shared noise). Grey ones shape the Light & dark / Darken patches; Colour mode multiplies
+## by the texture's colour relative to its average (OoT-style field patches).
+@export var base_variation_textures := {}:
+	set(value):
+		base_variation_textures = value
+		materials_changed.emit()
 ## Per-level palette for base textures: Texture2D -> PackedColorArray([dark, light]).
 ## Overrides the texture's own tint (e.g. darker grass in a dungeon zone).
 @export var base_tints := {}:
@@ -305,6 +321,9 @@ const IDENTITY_BASIS := Vector4(1, 0, 0, 1)
 @export_storage var rain_light_layers := 1
 @export_storage var rain_light_keys := Vector4.ONE
 @export_storage var bake_summary := ""
+## The build (Build & Play) this bake came from: its inputs' key (BuildCache.level_key);
+## 0 = an editor bake.
+@export_storage var build_key := 0
 
 
 func add_brush(brush: LevelBrush, index := -1) -> void:
@@ -336,7 +355,8 @@ func with_texture(texture: Texture2D) -> Array[Texture2D]:
 
 
 func paint_hash() -> int:
-	var parts := [textures, base_tile_size, base_tile_sizes, base_tints, base_variation, lighting_mode, light_contrast, light_floor, light_bake_strength,
+	var parts := [textures, base_tile_size, base_tile_sizes, base_tints, base_variation, base_variation_textures, base_adjusts.keys(), base_adjusts.values().map(func(a): return a.to_dict() if a else null),
+		textures.map(func(t): return t.adjust.to_dict() if t is TextureLook and t.adjust else null), lighting_mode, light_contrast, light_floor, light_bake_strength,
 		vertex_color_range, overlay_offsets, overlay_angles, overlay_bases, overlay_stairs]
 	for s in layer_set_count():
 		parts.append(s)

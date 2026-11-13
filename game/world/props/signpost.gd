@@ -218,8 +218,13 @@ func _rebuild() -> void:
 func _add_talkable(centre_y: float) -> void:
 	talkable = Talkable.new()
 	talkable.prompt = "Read"
-	talkable.radius = maxf(1.4, board_size.x)
+	talkable.radius = maxf(2.7, board_size.x)  # (MM signs: 68 units)
 	talkable.target_kind = Targetable.Kind.POI
+	# Read from in front of its face (MM: ±56°), banners from either side; a second to
+	# step away after reading.
+	talkable.facing_gate = 56.25
+	talkable.two_sided = kind == Kind.CLOTH or kind == Kind.HANGING or kind == Kind.NOBORI
+	talkable.cooldown = 1.0
 	talkable.target_height = centre_y
 	_parts.add_child(talkable)
 	_update_dialogue()

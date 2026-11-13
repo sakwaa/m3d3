@@ -13,6 +13,8 @@ extends SkeletonModifier3D
 ##   pull: hands stay on the edge while the body rises, then let go; the feet push on the
 ##     wall, then step up onto the top where it stands.
 ##   leap: arms reach the way of the leap, then for the hold it lands on.
+##   ladder: hands and feet on the rungs the climb state picks (pose.targets, world),
+##     arcs between rungs included; nothing stepped here.
 ## Changing state, the limbs go from the old state's pose to the new one over mode_blend.
 
 ## Blend, step timing, lift, reach, head look and every state's limb spots: ClimbTuning
@@ -215,6 +217,8 @@ func _ideals(pose: Dictionary, o: Vector3) -> Array[Vector3]:
 				var w := hip - Vector3.UP * t.pull_up_foot_down + r * 0.15 * s
 				w.y = minf(w.y, edge - 0.2)
 				var wall := _on_surface(w, n, tune.toe)
+				if pose.has(&"ladder"):
+					wall = _ladder_foot(pose.ladder, w.y, s, n)
 				var stand := _on_ground(target + r * t.stand_foot_out * s)
 				# Over the lip: a curve from the wall up over the edge (clear of it) and onto the top.
 				var over := lip + r * 0.15 * s + Vector3.UP * t.over_edge
@@ -226,6 +230,10 @@ func _ideals(pose: Dictionary, o: Vector3) -> Array[Vector3]:
 				else:
 					go = smoothstep(t.beat_press - 0.12, 0.95, p)  # (leaves the wall as the hips come over)
 					out[FOOT_L] = _curve(wall, over, stand, go)
+		&"ladder":
+			var spots: Array = pose.targets
+			for i in 4:
+				out[i] = spots[i]
 		&"leap":
 			# Off the wall the legs kick straight, tuck up mid-flight, reach for the catch
 			# (blending into the pose of the hold it lands on, below).
@@ -258,7 +266,7 @@ func _wants(pose: Dictionary) -> Array[bool]:
 		&"pull":
 			var p: float = pose.progress
 			return [p < 0.8, p < 0.8, true, true]
-		&"leap":
+		&"leap", &"ladder":
 			return [true, true, true, true]
 	return [false, false, false, false]
 
@@ -378,8 +386,12 @@ func _solve_all(sk: Skeleton3D, pose: Dictionary) -> void:
 		var target: Vector3 = end.lerp(to_sk * _shown[i], _weight[i])
 		# Elbows out, down and off the wall; knees towards the wall and a little out.
 		var pole_world: Vector3
-		if i <= HAND_R:
+		if i <= HAND_R and pose.mode == &"ladder":
+			pole_world = r * side * 0.35 - Vector3.UP * 0.8 + away * 0.2  # elbows down by the sides, not winged
+		elif i <= HAND_R:
 			pole_world = r * side * 0.8 - Vector3.UP * 0.35 + away * 0.25
+		elif pose.mode == &"ladder":
+			pole_world = -away * 0.5 + Vector3.UP * 0.3 + r * side * 0.25  # knees up into the ladder, a little out
 		elif pose.mode == &"wall" and pose.get(&"planted", false):
 			pole_world = r * side * 0.6 + Vector3.UP * 0.25 - away * 0.1  # knees out to the sides
 		elif pose.mode == &"wall":
@@ -399,7 +411,7 @@ func _orient_hand(sk: Skeleton3D, limb: int, bone: int, pose: Dictionary, to_sk:
 	var palm: Vector3
 	var fingers: Vector3
 	match pose.mode:
-		&"wall":
+		&"wall", &"ladder":
 			palm = -n
 			fingers = ClimbState.up_of(n)
 		&"ledge", &"pull":
@@ -493,6 +505,8 @@ func _look(sk: Skeleton3D, pose: Dictionary, delta: float) -> void:
 			target = (_plant[HAND_L] + _plant[HAND_R]) * 0.5 + actor.facing * 0.6
 		&"leap":
 			target = o + Vector3.UP * 1.6 + (pose.dir as Vector3) * 2.0
+		&"ladder":
+			target = pose.look
 	for i in [HAND_L, HAND_R]:
 		if _moving[i]:
 			target = _to[i]  # eyes on where the hand is going
@@ -512,13 +526,29 @@ func _look(sk: Skeleton3D, pose: Dictionary, delta: float) -> void:
 ## shoulder width apart.
 func _edge_grip(pose: Dictionary, side: float) -> Vector3:
 	var n: Vector3 = pose.normal
-	var o := actor.global_position
-	var r := actor.facing.cross(Vector3.UP).normalized()
+	var o: Vector3 = pose.get(&"from", actor.global_position)
+	var r := ClimbState.right_of(n)
 	var edge := float(pose.edge)
 	var p := Vector3(o.x, edge - 0.1, o.z) + r * 0.22 * side
 	var hit := _ray(p + n * 0.5, -n, 1.5)
 	var face: Vector3 = hit.position if not hit.is_empty() else p - n * 0.35
 	return Vector3(face.x, edge + 0.03, face.z) - n * 0.06
+
+
+## A foot (side -1 left, +1 right) on the ladder's rungs as the hip rises with it at `y`
+## (world): it stands on the rung under `y` and steps up to the next as `y` nears it, the
+## two feet half a rung out of step; never onto the top rung (that's the lip it climbs over).
+func _ladder_foot(lad: Ladder, y: float, side: float, n: Vector3) -> Vector3:
+	var top := maxi(lad.rung_count() - 2, 0)
+	var k := (y - lad.global_position.y - lad.first_rung) / lad.rung_spacing + (0.5 if side > 0.0 else 0.0)
+	var i := floori(k)
+	var e := smoothstep(0.55, 1.0, k - i)
+	var spot := func(j: int) -> Vector3:
+		return lad.rung_point(clampi(j, 0, top)) + lad.right() * side * tune.ladder_foot_out + n * tune.toe \
+			+ Vector3.UP * (lad.rung_radius + tune.ankle_height)
+	var a: Vector3 = spot.call(i)
+	var b: Vector3 = spot.call(i + 1)
+	return a.lerp(b, e) + n * sin(PI * e) * tune.ladder_arc * (1.0 if a != b else 0.0)
 
 
 ## The ground under `p` with an ankle over it (the ankle at `p`'s height without ground).

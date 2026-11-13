@@ -15,7 +15,7 @@ extends RefCounted
 
 
 ## Part of HouseSpec.key(): bump it when the faces built change, so houses rebuild.
-const VERSION := 16
+const VERSION := 17
 
 
 static func build(spec: HouseSpec, joins := {}) -> Array:
@@ -59,6 +59,9 @@ static func build(spec: HouseSpec, joins := {}) -> Array:
 		_gable(out, spec, hw, hd, top, tan_p, lift, o, 0.0 if joins.has("left") else o, 0.0 if joins.has("right") else o)
 	else:
 		_hip(out, spec, hw, hd, top, tan_p, lift, o)
+	var first := out.size()
+	_timber(out, spec, joins)
+	_retag(out, first, LevelBrush.LOD_ALWAYS)
 	out = HouseTerrace.cut_faces(out, hw, joins)
 	# What collides: the simple box (_collision) and the roof's top; everything else is only
 	# drawn (no snagging on awnings, curtains or shelves, and far fewer collision triangles).
@@ -68,6 +71,56 @@ static func build(spec: HouseSpec, joins := {}) -> Array:
 		var roof_top: bool = f.lod == LevelBrush.LOD_ALWAYS and f.texture == spec.roof_texture and f.normal.y > 0.3
 		f.bake = 0 if roof_top else 1
 	return out
+
+
+## How far timber posts and rails stand out of the wall.
+const TIMBER_PROUD := 0.035
+
+
+## Timber posts (HouseSpec front_posts / right / back / left: along each wall) and rails
+## (HouseSpec.rails: heights above each storey's floor, round the house), trim_width wide in
+## the trim texture, standing out of the walls; a shop opening clears them, party walls in a
+## terrace get none. Doors and windows cut through them like through the wall.
+static func _timber(out: Array, spec: HouseSpec, joins: Dictionary) -> void:
+	if spec.trim_texture == null or spec.trim_width <= 0.0:
+		return
+	var w := spec.trim_width
+	var top := spec.wall_height()
+	var posts := [spec.front_posts, spec.right_posts, spec.back_posts, spec.left_posts]
+	var span := spec.shop_span() if spec.shopfront else Vector2.ZERO
+	var shop_top := spec.foundation + minf(spec.shop_height, spec.storey_height - 0.2)
+	for side in 4:
+		if joins.has(HouseSpec.SIDE_NAMES[side]):
+			continue
+		var half_len := spec.wall_length(side) * 0.5
+		var face := spec.wall_length((side + 1) % 4) * 0.5
+		var shop := side == 0 and spec.shopfront
+		var pieces := []  # [x0, x1, y0, y1] along / up the wall
+		for p in posts[side]:
+			var x := clampf(p, -half_len + w * 0.5, half_len - w * 0.5)
+			var y0 := shop_top if shop and absf(x - span.x) < span.y + w * 0.5 else spec.foundation
+			pieces.append([x - w * 0.5, x + w * 0.5, y0, top])
+		for k in spec.storeys:
+			for h in spec.rails:
+				var y := spec.foundation + k * spec.storey_height + h
+				if y - w * 0.5 < spec.foundation or y + w * 0.5 > top:
+					continue
+				var runs := [[-half_len, half_len]]
+				if shop and k == 0 and y - w * 0.5 < shop_top:
+					runs = [[-half_len, span.x - span.y], [span.x + span.y, half_len]]
+				for r in runs:
+					if r[1] - r[0] > 0.05:
+						pieces.append([r[0], r[1], y - w * 0.5, y + w * 0.5])
+		var basis := Basis(Vector3.UP, side * PI * 0.5)
+		for pc in pieces:
+			var mark := out.size()
+			_block(out, Vector3(pc[0], pc[2], face), Vector3(pc[1], pc[3], face + TIMBER_PROUD), spec.trim_texture, Color.WHITE,
+				[Vector3.FORWARD])
+			for i in range(mark, out.size()):
+				var f: Dictionary = out[i]
+				for k in f.pts.size():
+					f.pts[k] = basis * f.pts[k]
+				f.normal = basis * f.normal
 
 
 ## Faces from `first` on drawn at `lod` instead.
@@ -127,15 +180,28 @@ static func _wall(out: Array, a: Vector2, b: Vector2, y0: float, y1: float, n: V
 ## Then the awning / noren (a shuttered shop keeps only its awning).
 static func _shop_wall(out: Array, spec: HouseSpec, a: Vector2, b: Vector2, ib: Vector2, ia: Vector2, y0: float, y1: float,
 		n: Vector3, t: float) -> void:
-	var hw := absf(a.x)
-	var half := clampf(spec.shop_opening * 0.5, 0.3, hw - t - 0.2)
+	var span := spec.shop_span()
+	var cx := span.x
+	var half := span.y
 	var top := minf(y0 + spec.shop_height, y1 - 0.2)
 	var z := a.y
 	var band := "front_0"
-	# Outside: left and right of the opening, then over it.
-	_wall(out, a, Vector2(-half, z), y0, y1, n, spec, band)
-	_wall(out, Vector2(half, z), b, y0, y1, n, spec, band)
-	_wall(out, Vector2(-half, z), Vector2(half, z), top, y1, n, spec, band)
+	# Outside: left and right of the opening, then over it (the opening at cx along the front).
+	_wall(out, a, Vector2(cx - half, z), y0, y1, n, spec, band)
+	_wall(out, Vector2(cx + half, z), b, y0, y1, n, spec, band)
+	_wall(out, Vector2(cx - half, z), Vector2(cx + half, z), top, y1, n, spec, band)
+	# The rest is built round x = 0 and slid over to cx.
+	var first := out.size()
+	_shop_inside(out, spec, half, y0, top, z, t)
+	if cx != 0.0:
+		for i in range(first, out.size()):
+			var pts: Array = out[i].pts
+			for k in pts.size():
+				pts[k] = pts[k] + Vector3(cx, 0, 0)
+
+
+## What's behind and over a shop opening centred on x = 0 (see _shop_wall).
+static func _shop_inside(out: Array, spec: HouseSpec, half: float, y0: float, top: float, z: float, t: float) -> void:
 	var style := spec.front_style
 	# Shutters: set in by SHUTTER_SET, so only that much of the reveal shows.
 	var zb := z - SHUTTER_SET if style == HouseSpec.Front.SHUTTERED else \

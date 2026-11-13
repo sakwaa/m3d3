@@ -22,6 +22,8 @@ func build() -> void:
 	body.name = "Body"
 	add_child(body)
 	body.add_child(MODEL.instantiate())
+	# (Where a blade lands - head, throat, flanks, haunch, claws up when guarding - is the
+	# model's StrikePoints: characters/wolfos_model.tscn.)
 	add_child(ProjectedShadow.new())
 
 	add_machine(WolfosBrain.build())

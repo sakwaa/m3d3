@@ -24,6 +24,30 @@ extends Resource
 @export var fog_begin := 40.0
 @export var fog_end := 160.0
 @export_range(0.0, 1.0, 0.05) var fog_amount := 0.6
+@export_group("Fog look")
+## This weather's fog replaces outdoor zones' own fog while it lasts (thick mist rolling into
+## a town that's normally clear). Off: only zones whose fog says From Weather use it. Rooms
+## with a fog of their own keep it.
+@export var fog_overrides_zone := false
+## Fog colour as a share of the horizon's: below 1 the fog is darker than the sky, so
+## buildings deep in it still read as dim silhouettes against it (thick mist, dusk haze).
+@export_range(0.3, 1.5, 0.05) var fog_shade := 1.0
+## The same once the sky is dark: night fog catches the town's lights and the moon, so it
+## shows as a pale veil over darker shapes (above 1 = lighter than the night sky). Blends in
+## as the horizon darkens.
+@export_range(0.3, 3.0, 0.05) var fog_night_shade := 1.0
+## Ground-hugging fog: how high it reaches above the zone's fog floor (m; 0 = even
+## everywhere), and how much it thins above that (rooftops and chimneys rise out of it).
+@export_range(0.0, 40.0, 0.5, "suffix:m") var fog_height := 0.0
+@export_range(0.0, 1.0, 0.05) var fog_height_thin := 0.6
+## Drifting fog banks: how much thinner the fog is between them (0 = none), and their size.
+@export_range(0.0, 1.0, 0.05) var fog_drift := 0.0
+@export_range(2.0, 60.0, 1.0, "suffix:m") var fog_drift_size := 14.0
+## Light hanging in the fog: lamps and windows tint more of the air round them and glow
+## wider and brighter (0 = the zone's own settings).
+@export_range(0.0, 2.0, 0.05) var fog_glow := 0.0
+## Screen look while this weather lasts outdoors (over the zone's; a room's wins).
+@export var screen_look: ScreenLook
 @export_group("Effects")
 @export var lightning := false
 ## Rain intensity 0..1, for the rain system (not rendered yet).

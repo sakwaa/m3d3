@@ -578,6 +578,26 @@ func _build_dressing() -> void:
 	var faces := _dressing_faces()
 	var ao := dressing_ao if dressing_ao_key == dressing.shape_key(width, height, faces) else PackedFloat32Array()
 	OpeningDressing.apply(dressing, _dressing, _dressing_shape, width, height, faces, ao, Vector2(top, arch_rise))
+	_batch_dressing()
+
+
+## In game, the casing never moves: a copy of it goes into the zone's prop batch (one draw
+## for many doors' casings); this one stays, hidden, for its collision.
+func _batch_dressing() -> void:
+	if Engine.is_editor_hint() or _dressing.mesh == null or not _dressing.visible or not is_inside_tree():
+		return
+	var holder := Node3D.new()
+	holder.name = "DressingBatch"
+	add_child(holder)
+	var copy := MeshInstance3D.new()
+	copy.mesh = _dressing.mesh
+	copy.material_override = _dressing.material_override
+	for i in _dressing.get_surface_override_material_count():
+		copy.set_surface_override_material(i, _dressing.get_surface_override_material(i))
+	holder.add_child(copy)
+	copy.global_transform = _dressing.global_transform
+	_dressing.visible = false
+	PropBatch.add(holder)
 
 
 ## N64 material (fog, no Godot specular): wood for swing doors, iron with a metal sheen

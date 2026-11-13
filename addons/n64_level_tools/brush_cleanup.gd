@@ -37,7 +37,7 @@ static func clean_up(b: LevelBrush, faces: Array[int], cell: float, density: flo
 		if not chosen.has(f):
 			compat.append(["keep", f])
 			continue
-		compat.append([b.get_face_texture(f), b.get_face_uv(f), b.get_face_surface(f), b.get_face_layer_set(f),
+		compat.append([b.get_face_texture(f), b.get_face_uv(f), b.get_face_uv_stretch(f), b.get_face_surface(f), b.get_face_layer_set(f),
 			b.face_bake[f] if f < b.face_bake.size() else 0, _tone(b, f), b.get_face_lod(f)])
 	var merged := BrushOps.merge_coplanar(verts, polys, compat)
 

@@ -326,13 +326,14 @@ func _in_blender() -> bool:
 
 
 ## One undo step around an edit of the pieces (fn mutates model.data.pieces in place).
-## Pins on other pieces follow vertices that moved in a topology change.
-func edit(label: String, fn: Callable) -> void:
+## Pins on other pieces follow vertices that moved in a topology change (`remap` false:
+## the op already did that itself, e.g. it pinned to the new vertex ids).
+func edit(label: String, fn: Callable, remap := true) -> void:
 	if model == null:
 		return
 	var before := model.pieces_copy()
 	fn.call()
-	for i in mini(before.size(), model.data.pieces.size()):
+	for i in (mini(before.size(), model.data.pieces.size()) if remap else 0):
 		var b: ActorPiece = before[i]
 		var a: ActorPiece = model.data.pieces[i]
 		if b.id == a.id and (b.vertices.size() != a.vertices.size() or b.face_counts != a.face_counts):
@@ -450,6 +451,39 @@ func unpin() -> void:
 	var p := _need_piece()
 	if p:
 		edit("Unpin", func(): ActorPieceOps.unpin(p, model.selected_vertices()))
+
+
+## N64 connected limbs: the selected piece's joint end takes its parent piece's end
+## vertices (pins), so the joint's triangles span both bones; caps go where nothing opens.
+## Joints too far apart to join cleanly are left alone (a warning says why).
+func connect_piece() -> void:
+	var p := _need_piece()
+	if p == null or _in_blender():
+		return
+	var pi := model.sel_piece
+	var dry := ActorPieceOps.connect_to_parent(model, pi, false)
+	if not dry.ok:
+		push_warning("N64 Actor Tools: %s not connected: %s." % [p.bone, dry.text])
+		return
+	var r := [{}]
+	edit("Connect To Parent", func(): r[0] = ActorPieceOps.connect_to_parent(model, pi), false)
+	print("[N64 Actor Tools] Connected %s: %s." % [p.bone, r[0].text])
+
+
+## connect_piece for every piece of the model (one undo step); prints what each joint did.
+func connect_all() -> void:
+	if model == null or _in_blender():
+		return
+	var results := [[]]
+	var before := model.tri_count
+	# Starter shapes become pieces first (inside the step, so undo goes back to them).
+	edit("Connect All Limbs", func():
+		model.begin_modelling()
+		results[0] = ActorPieceOps.connect_all(model), false)
+	model.rebuild()
+	for r in results[0]:
+		print("[N64 Actor Tools] %s %s: %s." % ["Connected" if r.ok else "Skipped", r.bone, r.text])
+	print("[N64 Actor Tools] Connect all: %d -> %d triangles." % [before, model.tri_count])
 
 
 # --- Moving the selection (drag) ------------------------------------------------------------

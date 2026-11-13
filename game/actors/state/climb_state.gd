@@ -18,6 +18,7 @@ extends ActorState
 @export var ceiling_state: StringName = &"Ceiling"
 @export var leap_state: StringName = &"Leap"
 @export var pull_up_state: StringName = &"ClimbUp"
+@export var ladder_state: StringName = &"Ladder"
 @export var fall_state: StringName = &"Fall"
 @export var land_state: StringName = &"Idle"
 ## Seconds after letting go before the actor can grab again (not straight back on).

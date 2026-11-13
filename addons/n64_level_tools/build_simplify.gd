@@ -31,8 +31,11 @@ static func optimized_copy(data: LevelData) -> Dictionary:
 		before += c.get_face_count()
 		if not c.has_corner_uvs() and c.blend_file == "":
 			simplify(c, origin, data.mask_density)
-		after += c.get_face_count()
 		brushes.append(c)
+	drop_straight(brushes)
+	for c in brushes:
+		if c:
+			after += c.get_face_count()
 	copy.brushes = brushes
 	return {data = copy, before = before, after = after}
 
@@ -78,7 +81,7 @@ static func simplify(b: LevelBrush, origin: Vector3, density: float) -> void:
 		centre /= pts.size()
 		var cell := Vector2i(floori((centre.x - origin.x) / LevelBaker.chunk_size()),
 			floori((centre.z - origin.z) / LevelBaker.chunk_size()))
-		compat.append([b.get_surface_key(f), b.get_face_texture(f), b.get_face_uv(f), b.get_face_surface(f),
+		compat.append([b.get_surface_key(f), b.get_face_texture(f), b.get_face_uv(f), b.get_face_uv_stretch(f), b.get_face_surface(f),
 			b.get_face_layer_set(f), b.face_bake[f] if f < b.face_bake.size() else 0, cell, b.get_face_lod(f),
 			BrushOps._plane_key(verts, polys[f])])
 		var list := []
@@ -199,6 +202,140 @@ static func simplify(b: LevelBrush, origin: Vector3, density: float) -> void:
 		b.corner_lighting_keys = nk
 	b.face_masks = BrushCleanup._masks(b, out_faces.size(), parent, out_members, unchanged, old_masks, old_flat, old_rect,
 		density, MAX_MASK)
+
+
+## Drops corners lying in a straight line between their neighbours from every face of a
+## brush using them (each is a triangle more in the bake). Merging and the Blender dissolve
+## leave many: a face keeps the corners its neighbours still use, and the neighbour keeps
+## them for the same reason. Dropped only where every face using the vertex has it in line,
+## its values (colour, AO, lighting) lie on the blend between its neighbours, and no other
+## brush has a corner there (theirs would sit on the middle of the edge: a crack). Returns
+## how many corners went.
+static func drop_straight(brushes: Array) -> int:
+	const NEAR := 0.002
+	var grid := {}  # 1 m cell -> [[world point, brush index], ...]
+	for bi in brushes.size():
+		var b: LevelBrush = brushes[bi]
+		if b == null:
+			continue
+		for v in b.vertices:
+			var p := b.transform * v
+			grid.get_or_add(Vector3i(floori(p.x), floori(p.y), floori(p.z)), []).append([p, bi])
+	var dropped := 0
+	for bi in brushes.size():
+		var b: LevelBrush = brushes[bi]
+		if b == null or b.has_corner_uvs() or b.blend_file != "" or b.get_face_count() == 0:
+			continue
+		dropped += _drop_straight_brush(b, bi, grid, NEAR)
+	return dropped
+
+
+static func _drop_straight_brush(b: LevelBrush, bi: int, grid: Dictionary, near: float) -> int:
+	var verts := b.vertices
+	var keys := b.corner_lighting_keys
+	var lit := b.corner_lighting.size() == b.face_indices.size()
+	var faces := []  # per face: [[vertex, old corner], ...]
+	var using := {}  # vertex -> faces using it
+	var polys := b.get_faces()
+	for f in b.get_face_count():
+		var start := b.get_face_start(f)
+		var ring := []
+		var poly: PackedInt32Array = polys[f]
+		for k in poly.size():
+			ring.append([poly[k], start + k])
+			using.get_or_add(poly[k], {})[f] = true
+		faces.append(ring)
+	var shared := func(v: int) -> bool:
+		var p := b.transform * verts[v]
+		var c := Vector3i(floori(p.x), floori(p.y), floori(p.z))
+		for dx in [-1, 0, 1]:
+			for dy in [-1, 0, 1]:
+				for dz in [-1, 0, 1]:
+					for e in grid.get(c + Vector3i(dx, dy, dz), []):
+						if e[1] != bi and (e[0] as Vector3).distance_to(p) < near:
+							return true
+		return false
+	var count := 0
+	var changed := true
+	while changed:
+		changed = false
+		for v: int in using:
+			var at := []  # [face, position in its ring]
+			var ok := true
+			for f: int in using[v]:
+				var ring: Array = faces[f]
+				if ring.size() <= 3:
+					ok = false
+					break
+				var k := -1
+				for i in ring.size():
+					if ring[i][0] == v:
+						k = i
+						break
+				if k < 0 or not _in_line(b, verts, ring, k, lit, keys):
+					ok = false
+					break
+				at.append([f, k])
+			if not ok or at.is_empty() or shared.call(v):
+				continue
+			for e in at:
+				(faces[e[0]] as Array).remove_at(e[1])
+				count += 1
+			using.erase(v)
+			changed = true
+			break
+	if count == 0:
+		return 0
+	var out_faces: Array[PackedInt32Array] = []
+	var picks := PackedInt32Array()
+	for ring: Array in faces:
+		var poly := PackedInt32Array()
+		for e in ring:
+			poly.append(e[0])
+			picks.append(e[1])
+		out_faces.append(poly)
+	var pick := func(src: PackedColorArray) -> PackedColorArray:
+		var out := PackedColorArray()
+		for c in picks:
+			out.append(src[c] if c < src.size() else Color.WHITE)
+		return out
+	var corners := b.has_corner_colors()
+	var old_colors := b.corner_colors
+	var old_light := b.corner_lighting
+	var old_keys := keys.duplicate()
+	b.set_faces(out_faces)
+	if corners:
+		b.corner_colors = pick.call(old_colors)
+	if lit:
+		b.corner_lighting = pick.call(old_light)
+	if not old_keys.is_empty():
+		var nk: Array[PackedColorArray] = []
+		for k: PackedColorArray in old_keys:
+			nk.append(pick.call(k))
+		b.corner_lighting_keys = nk
+	return count
+
+
+## Whether corner `k` of `ring` ([[vertex, old corner], ...]) sits on the straight line
+## between its neighbours, its values on their blend.
+static func _in_line(b: LevelBrush, verts: PackedVector3Array, ring: Array, k: int, lit: bool, keys: Array[PackedColorArray]) -> bool:
+	var pa: Array = ring[(k + ring.size() - 1) % ring.size()]
+	var pc: Array = ring[(k + 1) % ring.size()]
+	var a := verts[pa[0]]
+	var m := verts[ring[k][0]]
+	var c := verts[pc[0]]
+	var d1 := m - a
+	var d2 := c - m
+	if d1.cross(d2).length() > 1e-5 * d1.length() * d2.length() or d1.dot(d2) <= 0.0:
+		return false
+	var t := d1.length() / (d1.length() + d2.length())
+	var va := _values(b, pa[1], pa[0], lit, keys)
+	var vm := _values(b, ring[k][1], ring[k][0], lit, keys)
+	var vc := _values(b, pc[1], pc[0], lit, keys)
+	for ch in vm.size():
+		if absf(lerpf(va[ch], vc[ch], t) - vm[ch]) > tolerance:
+			return false
+	return true
 
 
 ## What a corner carries into the bake: painted colour, AO, baked light, each key's light.

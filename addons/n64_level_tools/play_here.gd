@@ -5,6 +5,16 @@ extends RefCounted
 ## ZoneManager only loads it in editor-launched runs.
 
 const FILE := "user://play_here.json"
+## Present while the last run was started with Build & Play (LevelRoot then warns about
+## zones that aren't showing a current build).
+const BUILD_RUN := "user://play_build_run"
+
+
+static func mark_build_run(build: bool) -> void:
+	if build:
+		FileAccess.open(BUILD_RUN, FileAccess.WRITE)
+	elif FileAccess.file_exists(BUILD_RUN):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(BUILD_RUN))
 
 
 static func write(scene_path: String, position: Vector3, yaw: float, room_path: String, hour: float) -> void:

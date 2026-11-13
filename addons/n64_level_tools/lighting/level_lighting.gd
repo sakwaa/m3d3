@@ -8,6 +8,11 @@ extends RefCounted
 
 const SMOOTH_ANGLE := 50.0
 const BIAS := 0.03
+## Vertex AO is read this far in from a vertex, towards the middle of the faces that meet
+## there (at most 40% of the way): exactly at a corner it sits in the contact shadow of
+## whatever touches it (a beam, a sill, the eaves) and one dark value would spread over the
+## whole big face it bounds. A vertex in the middle of a flat area stays put.
+const AO_INSET := 0.0
 
 
 ## Every occluder triangle in a private physics space: shadow / AO rays use the physics
@@ -176,17 +181,47 @@ static func _share_corner_lighting(target: LevelRoot, lit: Dictionary) -> void:
 ## darker where geometry within `radius` blocks the hemisphere. Normals are fully smoothed,
 ## so a vertex in an inside corner looks along the corner's bisector and darkens.
 ## Returns {LevelBrush: PackedFloat32Array (per vertex)}.
-static func bake_vertex_ao(target: LevelRoot, occluders: Array, strength: float, radius: float, sample_count := 24) -> Dictionary:
-	var occ := _occluder_list(occluders)
+## Windows and doors (their frames, sills, reveals) don't occlude other surfaces: a frame a
+## few centimetres deep would darken the wall round it in a box the wall's few vertices
+## can't round off (a dark column under every window). They take AO themselves.
+## In Build & Play (BuildCache.active) each brush's result is kept, keyed on the brush and
+## every occluder within `radius` of it: an edit re-bakes only the brushes near it.
+## `only`: just these brushes (all if empty). `errors`: filled with {brush: {face: [miss,
+## point]}}, how far each face's fitted shading misses its readings (AOSubdivide).
+static func bake_vertex_ao(target: LevelRoot, occluders: Array, strength: float, radius: float, sample_count := 24,
+		only := {}, errors := {}) -> Dictionary:
+	var occ_all := _occluder_list(occluders)
+	var occ_walls := _occluder_list(occluders.filter(func(o): return o is LevelRoot), true)
 	var samples := _hemisphere(sample_count)
+	var cache := preload("res://addons/n64_level_tools/export/build_cache.gd")
+	var near_all := _triangle_lists(occluders) if cache.active else []
+	var near_walls := _triangle_lists(occluders.filter(func(o): return o is LevelRoot), true) if cache.active else []
+	var setup := [cache.pipeline_hash(), strength, radius, sample_count, AO_FIT_DENSITY, AO_FIT_PRIOR] if cache.active else []
 	var out := {}
 	for brush in target.data.brushes:
-		if brush == null:
+		if brush == null or (not only.is_empty() and not only.has(brush)):
 			continue
 		brush.ensure_geometry()
 		var xf := target.brush_global_transform(brush)
 		var nb := xf.basis.inverse().transposed()
+		var key := 0
+		if cache.active:
+			var box := xf * brush.local_aabb()
+			var near := []
+			for e: Dictionary in (near_all if brush.window or brush.door else near_walls):
+				if (e.aabb as AABB).intersects(box.grow(radius)):
+					near.append(hash(e.tris))
+			near.sort()
+			key = cache.key([setup, xf, brush.vertices, brush.face_indices, brush.face_counts, brush.face_lod, brush.face_bake,
+				brush.window != null or brush.door != null, near])
+			var kept = cache.read("ao_fit", key)
+			if kept is Array and kept.size() == 2 and kept[0] is PackedFloat32Array and kept[0].size() == brush.vertices.size():
+				out[brush] = kept[0]
+				errors[brush] = kept[1]
+				continue
 		var vn := brush.get_vertex_normals()
+		var inset := _ao_inset_points(brush)
+		var occ: Array = occ_all if brush.window or brush.door else occ_walls
 		var ao := PackedFloat32Array()
 		ao.resize(brush.vertices.size())
 		for i in brush.vertices.size():
@@ -194,7 +229,7 @@ static func bake_vertex_ao(target: LevelRoot, occluders: Array, strength: float,
 			if n == Vector3.ZERO:
 				ao[i] = 1.0
 				continue
-			var origin := xf * brush.vertices[i] + n * BIAS
+			var origin := xf * inset[i] + n * BIAS
 			var t1 := n.cross(Vector3.UP if absf(n.y) < 0.9 else Vector3.RIGHT).normalized()
 			var t2 := n.cross(t1)
 			var blocked := 0
@@ -202,8 +237,168 @@ static func bake_vertex_ao(target: LevelRoot, occluders: Array, strength: float,
 				if _occluded(origin, origin + (t1 * smp.x + t2 * smp.y + n * smp.z) * radius, occ):
 					blocked += 1
 			ao[i] = 1.0 - strength * float(blocked) / samples.size()
+		var err := {}
+		if AO_FIT_DENSITY > 0.0:
+			var fit := _fit_vertex_ao(brush, xf, nb, ao, occ, _hemisphere(maxi(sample_count / 2, 8)), strength, radius)
+			ao = fit.ao
+			err = fit.err
 		out[brush] = ao
-	_share_vertex_ao(target, out)
+		errors[brush] = err
+		if cache.active:
+			cache.write("ao_fit", key, [ao, err])
+	if only.is_empty():
+		_share_vertex_ao(target, out)
+	return out
+
+
+## Least-squares vertex baking (after Kavan et al. 2011): AO read densely over each drawn
+## face (AO_FIT_DENSITY samples a metre, at least six per triangle), then the vertex values
+## whose blend across the triangles best matches those readings. A vertex's own reading
+## (`prior`) only pulls gently (AO_FIT_PRIOR), so a corner pressed against a beam or a
+## sill takes the value that suits its whole face, not its contact shadow; vertices only far
+## stand-ins use keep it. The dense readings take half the rays (they average out anyway).
+## Returns the fitted values (0..1).
+const AO_FIT_DENSITY := 0.0
+const AO_FIT_PRIOR := 0.02
+const AO_FIT_PASSES := 80
+
+
+## AO readings by spot while a build refines its faces (ExportBake turns it on and off).
+static var ao_memo_on := false:
+	set(v):
+		ao_memo_on = v
+		_ao_memo.clear()
+static var _ao_memo := {}
+
+
+static func _fit_vertex_ao(brush: LevelBrush, xf: Transform3D, nb: Basis, prior: PackedFloat32Array, occ: Array,
+		samples: PackedVector3Array, strength: float, radius: float) -> Dictionary:
+	# Vertices at the same spot are one unknown (faces split apart by the build's cuts keep
+	# their own copies; solved apart they'd differ and draw a seam).
+	var group := PackedInt32Array()
+	group.resize(brush.vertices.size())
+	var at := {}
+	for i in brush.vertices.size():
+		var key := (brush.vertices[i] / 0.001).round()
+		if not at.has(key):
+			at[key] = at.size()
+		group[i] = at[key]
+	var nv := at.size()
+	var ata: Array[Dictionary] = []  # per vertex: other vertex -> sum of weight products
+	ata.resize(nv)
+	for i in nv:
+		ata[i] = {}
+	var diag := PackedFloat32Array()
+	diag.resize(nv)
+	var rhs := PackedFloat32Array()
+	rhs.resize(nv)
+	var readings := []  # [face, groups, weights, value, brush-space point]
+	for f in brush.get_face_count():
+		if not brush.face_visual(f) or brush.get_face_lod(f) in [LevelBrush.LOD_FAR, LevelBrush.LOD_DETAIL_FAR]:
+			continue
+		var ids := brush.get_face_vertex_ids(f)
+		var pts := PackedVector3Array()
+		for vi in ids:
+			pts.append(brush.vertices[vi])
+		var nl := brush.get_face_normal(f)
+		var n := (nb * nl).normalized()
+		if n == Vector3.ZERO:
+			continue
+		var t1 := n.cross(Vector3.UP if absf(n.y) < 0.9 else Vector3.RIGHT).normalized()
+		var t2 := n.cross(t1)
+		var order := PolyUtil.triangulate(pts, nl)
+		for t in range(0, order.size(), 3):
+			var pa: Vector3 = brush.vertices[ids[order[t]]]
+			var pb: Vector3 = brush.vertices[ids[order[t + 1]]]
+			var pc: Vector3 = brush.vertices[ids[order[t + 2]]]
+			var tv := [group[ids[order[t]]], group[ids[order[t + 1]]], group[ids[order[t + 2]]]]
+			var area := (xf.basis * (pb - pa)).cross(xf.basis * (pc - pa)).length() * 0.5
+			# k rows of samples: k (k + 1) / 2 points, about area x density^2 of them.
+			var k := clampi(ceili(sqrt(2.0 * area * AO_FIT_DENSITY * AO_FIT_DENSITY)), 3, 16)
+			for i in k:
+				for j in k - i:
+					var u := (i + 1.0 / 3.0) / k
+					var v := (j + 1.0 / 3.0) / k
+					var w := PackedFloat32Array([1.0 - u - v, u, v])
+					var origin: Vector3 = xf * (pa * w[0] + pb * w[1] + pc * w[2]) + n * BIAS
+					# (Readings kept by spot and normal while a build refines: faces left
+					# uncut read the same spots again.)
+					var mkey := [(origin / 0.001).round(), (n / 0.01).round(), occ.size()]
+					var val: float = _ao_memo.get(mkey, -1.0)
+					if val < 0.0:
+						var blocked := 0
+						for smp in samples:
+							if _occluded(origin, origin + (t1 * smp.x + t2 * smp.y + n * smp.z) * radius, occ):
+								blocked += 1
+						val = 1.0 - strength * float(blocked) / samples.size()
+						if ao_memo_on:
+							_ao_memo[mkey] = val
+					readings.append([f, tv, w, val, pa * w[0] + pb * w[1] + pc * w[2]])
+					for a in 3:
+						var va: int = tv[a]
+						rhs[va] += w[a] * val
+						for b in 3:
+							var vb: int = tv[b]
+							if va == vb:
+								diag[va] += w[a] * w[b]
+							else:
+								ata[va][vb] = ata[va].get(vb, 0.0) + w[a] * w[b]
+	# Gauss-Seidel on (AtA + prior) x = Atb + prior x0 (a spot's prior: its vertices' mean).
+	var x0 := PackedFloat32Array()
+	x0.resize(nv)
+	var count := PackedInt32Array()
+	count.resize(nv)
+	for i in brush.vertices.size():
+		x0[group[i]] += prior[i]
+		count[group[i]] += 1
+	for g in nv:
+		x0[g] /= maxi(count[g], 1)
+	var x := x0.duplicate()
+	for i in nv:
+		diag[i] += AO_FIT_PRIOR
+		rhs[i] += AO_FIT_PRIOR * x0[i]
+	for pass_i in AO_FIT_PASSES:
+		for i in nv:
+			var sum := rhs[i]
+			var row: Dictionary = ata[i]
+			for j in row:
+				sum -= row[j] * x[j]
+			x[i] = sum / diag[i]
+	var out := PackedFloat32Array()
+	out.resize(brush.vertices.size())
+	for i in out.size():
+		out[i] = clampf(x[group[i]], 0.0, 1.0)
+	# How far the fitted shading misses each face's readings (the worst one, and where).
+	var err := {}  # face -> [miss, brush-space point]
+	for r in readings:
+		var tv: Array = r[1]
+		var w: PackedFloat32Array = r[2]
+		var miss := absf(clampf(x[tv[0]], 0.0, 1.0) * w[0] + clampf(x[tv[1]], 0.0, 1.0) * w[1] + clampf(x[tv[2]], 0.0, 1.0) * w[2] - r[3])
+		if miss > err.get(r[0], [-1.0])[0]:
+			err[r[0]] = [miss, r[4]]
+	return {ao = out, err = err}
+
+
+## Where each vertex's AO is read (brush space, AO_INSET): moved towards the average of
+## the middles of the faces using it.
+static func _ao_inset_points(brush: LevelBrush) -> PackedVector3Array:
+	var out := brush.vertices.duplicate()
+	var mids := PackedVector3Array()
+	for f in brush.get_face_count():
+		var c := Vector3.ZERO
+		var ids := brush.get_face_vertex_ids(f)
+		for vi in ids:
+			c += brush.vertices[vi]
+		mids.append(c / maxf(ids.size(), 1))
+	var vfaces := brush.get_vertex_faces()
+	for i in out.size():
+		if i >= vfaces.size() or vfaces[i].is_empty():
+			continue
+		var pull := Vector3.ZERO
+		for f in vfaces[i]:
+			pull += mids[f] - brush.vertices[i]
+		pull /= vfaces[i].size()
+		out[i] = brush.vertices[i] + pull.limit_length(minf(AO_INSET, pull.length() * 0.4))
 	return out
 
 
@@ -411,8 +606,8 @@ static func _lift_suns(lights: Array, min_deg: float) -> Array:
 ## World-space triangles of every visible brush, grouped per brush with an AABB.
 ## Occluders: LevelRoots, or {tris: PackedVector3Array (world)} for extra geometry such
 ## as door / passage dressing (see dressing_occluders()).
-static func _occluder_list(roots: Array) -> Array:
-	var occ := _triangle_lists(roots)
+static func _occluder_list(roots: Array, skip_openings := false) -> Array:
+	var occ := _triangle_lists(roots, skip_openings)
 	var all := PackedVector3Array()
 	for o in occ:
 		all.append_array(o.tris)
@@ -433,7 +628,7 @@ static func _is_prepared(occ: Array) -> bool:
 
 
 ## World-space triangles per occluder (with AABBs) for the exact fallback test.
-static func _triangle_lists(roots: Array) -> Array:
+static func _triangle_lists(roots: Array, skip_openings := false) -> Array:
 	var occ := []
 	for entry in roots:
 		if entry is Dictionary:
@@ -451,6 +646,8 @@ static func _triangle_lists(roots: Array) -> Array:
 		for brush in root.data.brushes:
 			# Cutout brushes (fences) are mostly holes: they don't cast baked shadows.
 			if brush == null or brush.bake_mode == LevelBrush.BakeMode.COLLISION_ONLY or brush.cutout:
+				continue
+			if skip_openings and (brush.window or brush.door):
 				continue
 			brush.ensure_geometry()
 			var xf := root.brush_global_transform(brush)

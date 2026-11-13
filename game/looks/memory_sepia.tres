@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="ScreenLook" format=3]
+
+[ext_resource type="Script" path="res://addons/n64_runtime/post/screen_look.gd" id="1_asu71"]
+
+[sub_resource type="Gradient" id="Gradient_iy5v7"]
+offsets = PackedFloat32Array(0, 0.5, 1)
+colors = PackedColorArray(0.12, 0.07, 0.04, 1, 0.55, 0.4, 0.26, 1, 0.96, 0.9, 0.76, 1)
+
+[resource]
+script = ExtResource("1_asu71")
+gradient = SubResource("Gradient_iy5v7")
+palette = PackedColorArray()

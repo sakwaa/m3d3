@@ -31,6 +31,13 @@ extends OpeningSpec
 	set(v):
 		wall_depth = maxf(v, 0.02)
 		emit_changed()
+## Built for the outside only: the frame on the outer face, the reveal from it in to the glass,
+## the pane facing out - for a house with no interior to see it from (about half the
+## triangles). Off: framed and glazed both ways.
+@export var outside_only := false:
+	set(v):
+		outside_only = v
+		emit_changed()
 @export_group("Dressing")
 ## Frame around the opening, on both faces of the wall.
 @export var dressing: OpeningDressing:
@@ -106,11 +113,26 @@ func front_z() -> float:
 	return wall_depth * 0.5
 
 
-## The frame on both wall faces (see DoorSpec.dressing_faces).
+const FLAT_LIFT := 0.01
+
+
+## The frame on both wall faces, or the outer one only (outside_only; see DoorSpec.dressing_faces).
 func dressing_faces() -> Array:
 	if dressing == null:
 		return []
+	if outside_only:
+		# A flat frame (no depth) sits FLAT_LIFT off the wall, not on it (no z-fighting where the
+		# wall under it isn't cut away).
+		var flat := dressing.side_depth <= 0.0 and dressing.top_depth <= 0.0
+		return [[wall_depth * 0.5 + (FLAT_LIFT if flat else 0.0), 1.0]]
 	return [[wall_depth * 0.5, 1.0], [-wall_depth * 0.5, -1.0]]
+
+
+## A flat frame (no depth) casts no contact shadow: the wall needs no trim rows cut round it.
+func cut_trim() -> Vector2:
+	if dressing and dressing.side_depth <= 0.0 and dressing.top_depth <= 0.0:
+		return Vector2.ZERO
+	return trim()
 
 
 ## A wooden frame like Kakariko's: a plain casing, mitred.

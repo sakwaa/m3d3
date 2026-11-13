@@ -54,13 +54,16 @@ func is_in(state: StringName) -> bool:
 
 ## Asks for `state`. Returns true if it's current now. A refused request is buffered for
 ## `buffer_time` (the latest one wins). `force` skips every check (cutscenes, resets).
-func request(state: StringName, force := false) -> bool:
+## `reenter`: asking for the current state starts it over (if it can be left now).
+func request(state: StringName, force := false, reenter := false) -> bool:
 	var target: ActorState = states.get(state)
 	if target == null:
 		push_error("StateMachine %s: no state '%s'." % [name, state])
 		return false
 	if target == current:
 		_pending = &""
+		if reenter and (force or current.can_leave()):
+			_switch(target, current)
 		return true
 	if not force and not _allowed(target):
 		_pending = state

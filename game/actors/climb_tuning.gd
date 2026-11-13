@@ -119,6 +119,34 @@ enum Ease { LINEAR, SMOOTHSTEP, MIN_JERK, EASE_OUT, SKEWED }
 @export var leap_hand_ahead := 0.55
 @export var leap_tuck := 0.5
 
+@export_group("Ladder")
+## Measured from MM (Link on the Great Bay lab ladder, 30 fps): one hand reaches a rung every
+## ~10.5 frames, the opposite foot follows while the body rises one rung. Seconds per rung.
+@export var ladder_step_time := 0.35
+## Low hand's rung: the one nearest this far above the feet's rung (the high hand one above).
+@export var ladder_reach := 1.45
+## Body (actor origin) out from the ladder's face; hands / feet out from its middle.
+@export var ladder_gap := 0.24
+@export var ladder_hand_out := 0.16
+@export var ladder_foot_out := 0.1
+## Hands and feet arc this far off the rungs between them.
+@export var ladder_arc := 0.1
+## Going up: hand reaches first (MM: up 0..5 of 10.5 frames), the body rises after it, the
+## opposite foot steps during the rise.
+@export var ladder_up_hand := Vector2(0.0, 0.45)
+@export var ladder_up_foot := Vector2(0.4, 0.85)
+@export var ladder_up_body := Vector2(0.35, 0.95)
+## Going down: the foot feels for the rung first, the body lowers, the hand follows.
+@export var ladder_down_foot := Vector2(0.0, 0.4)
+@export var ladder_down_hand := Vector2(0.5, 0.95)
+@export var ladder_down_body := Vector2(0.2, 0.8)
+## Getting on from the ground (MM: ~12 frames).
+@export var ladder_mount_time := 0.4
+## Climbing off the top onto the floor (MM: ~26 frames: hands to the lip, chest over, knee
+## on, stand) and getting on from the top (the same backwards).
+@export var ladder_top_time := 0.87
+@export var ladder_on_top_time := 0.75
+
 @export_group("ClimbUp (mantle)")
 ## Seconds for a short pull, plus per metre risen.
 @export var pull_up_time := 0.9

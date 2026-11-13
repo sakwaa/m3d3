@@ -21,6 +21,8 @@ const ACTORS_NODE := "Actors"
 ## Fog while the player is in this room (fades in over its blend time); empty = the
 ## zone's fog. A FogSettings with Enabled off clears the fog here.
 @export var fog_override: FogSettings
+## Screen look while the player is in this room (over the weather's and the zone's).
+@export var screen_look: ScreenLook
 
 var state := State.GEOMETRY
 

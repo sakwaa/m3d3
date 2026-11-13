@@ -70,6 +70,7 @@ static func bake(data: LevelData, merge_coplanar: bool, optimize := false) -> Di
 	var simplified := {}
 	var hidden := {}
 	if optimize:
+		BuildProgress.step("simplify")
 		simplified = BuildSimplify.optimized_copy(data)
 		data = simplified.data
 	else:
@@ -133,8 +134,17 @@ static func bake(data: LevelData, merge_coplanar: bool, optimize := false) -> Di
 	_assign_stair_runs(sources, polys, data.stair_textures())
 	# The ground goes near-only, cut along the cell lines; its flattened far stand-in is
 	# added per cell below.
+	BuildProgress.step("cut cells and chunks")
 	polys = GroundLOD.split_to_cells(polys, sources, lgrid.origin, lgrid.size)
+	# Long always-drawn faces cut at the chunk lines, so each chunk's mesh stays in its cell.
+	polys = ChunkSplit.split(polys, sources, grid)
 	var ground := GroundLOD.mark(polys, sources)
+	# The build's drawing rooms (RoomVis): meshes split by room too, and what each is seen from.
+	var vis_rooms: Array[Dictionary] = RoomVis.rooms(data) if optimize else ([] as Array[Dictionary])
+	var blockers := PackedVector3Array()
+	var blocker_ground := PackedByteArray()
+	var unseen := optimize and UnseenCull.enabled()
+	BuildProgress.step("surfaces and materials")
 
 	var surfaces := {}
 	var painted := {}  # surface key -> overlay layers painted on it (any cell)
@@ -154,15 +164,27 @@ static func bake(data: LevelData, merge_coplanar: bool, optimize := false) -> Di
 		if n == Vector3.ZERO:
 			continue
 		var uv_normal := PolyUtil.newell_normal(local) * (-1.0 if src.mirrored else 1.0)
+		var anchor: Vector3 = src.brush.uv_anchor() if src.brush else Vector3.ZERO
 		var tris := PolyUtil.triangulate(pts, n)
+		var lod_of: int = poly.get("lod", LevelBrush.LOD_ALWAYS)
+		var room := -1
+		if (unseen or not vis_rooms.is_empty()) and poly.visual:
+			var mid := Vector3.ZERO
+			for p in pts:
+				mid += p
+			room = RoomVis.room_at(vis_rooms, mid / pts.size()) if not vis_rooms.is_empty() else -1
+			if not poly.cutout and not lod_of in [LevelBrush.LOD_FAR, LevelBrush.LOD_GROUND_FAR, LevelBrush.LOD_DETAIL_FAR]:
+				for t in range(0, tris.size(), 3):
+					blockers.append_array([pts[tris[t]], pts[tris[t + 1]], pts[tris[t + 2]]])
+					blocker_ground.append(1 if lod_of == LevelBrush.LOD_GROUND_NEAR else 0)
 		var surf: Dictionary = {}
 		var chart = null
 		var face_rect := Rect2()
 		if poly.visual:
 			var lod: int = poly.get("lod", LevelBrush.LOD_ALWAYS)
-			var skey := [poly.cell, lod, poly.key]
+			var skey := [poly.cell, lod, poly.key, room]
 			if not surfaces.has(skey):
-				surfaces[skey] = {cell = poly.cell, lod = lod, key = poly.key, pos = PackedVector3Array(), nrm = PackedVector3Array(), uv = PackedVector2Array(),
+				surfaces[skey] = {cell = poly.cell, lod = lod, key = poly.key, room = room, pos = PackedVector3Array(), nrm = PackedVector3Array(), uv = PackedVector2Array(),
 					uv2 = PackedVector2Array(), col = PackedColorArray(), idx = PackedInt32Array(), weld = {},
 					keys = [PackedByteArray(), PackedByteArray(), PackedByteArray(), PackedByteArray()],
 					material = poly.material, texture = poly.texture, overlay = poly.get("overlay", 0), stair_frame = poly.get("stair_frame"),
@@ -187,7 +209,7 @@ static func bake(data: LevelData, merge_coplanar: bool, optimize := false) -> Di
 				var i := tris[t + k]
 				if poly.visual:
 					var exact: PackedVector2Array = poly.get("exact_uvs", PackedVector2Array())
-					var uv := exact[i] if exact.size() == ids.size() else LevelBrush.tweaked_uv(local[i], uv_normal, poly.uv_tweak)
+					var uv := exact[i] if exact.size() == ids.size() else LevelBrush.tweaked_uv(local[i] + anchor, uv_normal, poly.uv_tweak, poly.uv_stretch)
 					var uv2 := PaintAtlas.chart_uv(chart, atlas.size, face_rect, PolyUtil.planar_uv(local[i], uv_normal)) \
 						if chart != null else PaintAtlas.empty_uv(atlas.size)
 					var cc: PackedColorArray = poly.get("corner_colors", PackedColorArray())
@@ -232,6 +254,7 @@ static func bake(data: LevelData, merge_coplanar: bool, optimize := false) -> Di
 	# Surfaces sharing a mesh and material are one draw: append them (ground kept apart, named
 	# "ground" for the build report's floor spots).
 	var merged := {}  # [cell, range, key, ground] -> surface dict
+	var pending := []  # [surface, group, arrays, flags]: added once cracks are closed
 	for sk in surfaces:
 		var s: Dictionary = surfaces[sk]
 		if s.idx.is_empty():
@@ -239,7 +262,7 @@ static func bake(data: LevelData, merge_coplanar: bool, optimize := false) -> Di
 		var targets := [lod_range(s.lod)]
 		var is_ground: bool = s.lod == LevelBrush.LOD_GROUND_NEAR
 		for r: Vector2 in targets:
-			var gkey := [s.cell, r, s.key, is_ground]
+			var gkey := [s.cell, r, s.key, is_ground, s.get("room", -1)]
 			if not merged.has(gkey):
 				merged[gkey] = {s = s, range = r, ground = is_ground, parts = []}
 			merged[gkey].parts.append(s)
@@ -280,9 +303,38 @@ static func bake(data: LevelData, merge_coplanar: bool, optimize := false) -> Di
 			flags = LevelBrush.KEY_FORMAT
 		if not materials.has(s.key):
 			materials[s.key] = _bake_material(s, data, masks, painted.get(s.key, 0))
+		pending.append([s, g, arrays, flags])
+	# Cracks: where one surface's vertex lies on another's edge (a T-junction, often between
+	# brushes or cells), the edge without it splits there, so no hairline opens.
+	BuildProgress.step("close cracks")
+	var fixed := CrackClose.close(pending.map(func(e): return [e[2], e[1].range]))
+	stats.cracks_closed = fixed
+	# Triangles no one can see from the walkable ground, out (UnseenCull).
+	if unseen:
+		BuildProgress.step("never-seen cull")
+		var walk := PackedVector3Array()
+		for t in blocker_ground.size():
+			if blocker_ground[t]:
+				walk.append_array(blockers.slice(t * 3, t * 3 + 3))
+		var uc := UnseenCull.cull(pending.map(func(e):
+			var opaque: bool = not e[0].get("cutout", false) and e[0].get("material") == null
+			var r: Vector2 = e[1].range
+			var cell: Vector2i = e[0].cell
+			var v: PackedVector3Array = e[2][Mesh.ARRAY_VERTEX]
+			var mid := Vector3(lgrid.origin.x + (cell.x + 0.5) * lgrid.size.x, v[0].y if not v.is_empty() else 0.0,
+				lgrid.origin.z + (cell.y + 0.5) * lgrid.size.y)
+			return [e[2], opaque and r.x <= 0.0, opaque, r, mid]), walk)
+		stats.unseen = uc
+	for e in pending:
+		var s: Dictionary = e[0]
+		var g: Dictionary = e[1]
+		var arrays: Array = e[2]
+		var flags: int = e[3]
+		if (arrays[Mesh.ARRAY_INDEX] as PackedInt32Array).is_empty():
+			continue  # every triangle never seen (UnseenCull)
 		# One mesh per chunk cell and visibility range (the "range" meta; LevelRoot applies it).
 		var r: Vector2 = g.range
-		var mkey := [s.cell, r]
+		var mkey := [s.cell, r, s.get("room", -1)]
 		if not meshes.has(mkey):
 			meshes[mkey] = ArrayMesh.new()
 			if r != Vector2.ZERO:
@@ -315,6 +367,19 @@ static func bake(data: LevelData, merge_coplanar: bool, optimize := false) -> Di
 			lgrid.origin.z + (cell.y + 0.5) * lgrid.size.y)
 		var half := (all.end - centre).max(centre - all.position)
 		meshes[mkey].custom_aabb = AABB(centre - half, half * 2.0)
+	# The build: plain surfaces of each mesh drawn as one (MaterialMerge).
+	if optimize and bool(ProjectSettings.get_setting(MaterialMerge.SETTING, true)):
+		BuildProgress.step("merge materials")
+		var mm := MaterialMerge.merge(meshes.values())
+		stats.surfaces = stats.surfaces - mm.surfaces_before + mm.surfaces_after
+		stats.merged_surfaces_from = mm.surfaces_before
+		stats.merged_surfaces_to = mm.surfaces_after
+	if not vis_rooms.is_empty():
+		var t0 := Time.get_ticks_msec()
+		BuildProgress.step("drawing rooms")
+		var rv := RoomVis.mark(meshes.values(), vis_rooms, blockers, blocker_ground)
+		stats.room_vis = rv
+		stats.room_vis_ms = Time.get_ticks_msec() - t0
 	var chunks: Array[ArrayMesh] = []
 	for cell in meshes:
 		var mesh: ArrayMesh = meshes[cell]
@@ -323,6 +388,7 @@ static func bake(data: LevelData, merge_coplanar: bool, optimize := false) -> Di
 		mesh.remove_meta(&"formats")
 		chunks.append(mesh)
 	stats.chunks = chunks.size()
+	BuildProgress.step("collision")
 	var parts: Array[ConcavePolygonShape3D] = []
 	var part_surfaces := PackedInt32Array()
 	var keys := collision.keys()
@@ -540,7 +606,7 @@ static func _add_source(sources: Array[Dictionary], polys: Array[Dictionary], ve
 		polys.append({src = sources.size() - 1, ids = ids, pts = pts, normal = n, visual = visual, collide = collide, lod = lod,
 			colored = colored, corner_colors = corner_colors, key_colors = key_colors,
 			key = ("mat:%d" % material.get_instance_id()) if material else ("tex:%d:%d:%d%s" % [texture, overlay, layer_set, ":cut" if cut else ""]),
-			texture = texture, overlay = overlay, layer_set = layer_set, cutout = cut, exact_uvs = exact_uvs, material = material, masked_face = masked, uv_tweak = tweak,
+			texture = texture, overlay = overlay, layer_set = layer_set, cutout = cut, exact_uvs = exact_uvs, material = material, masked_face = masked, uv_tweak = tweak, uv_stretch = brush.get_face_uv_stretch(f),
 			surface = surfaces[f] if f < surfaces.size() else fixed_surface})
 
 
@@ -628,7 +694,7 @@ static func _merge_coplanar(sources: Array[Dictionary], polys: Array[Dictionary]
 			var tone := _uniform_tone(poly) if poly.colored else []
 			var unique: bool = poly.masked_face >= 0 or (poly.colored and tone.is_empty()) or not poly.get("exact_uvs", PackedVector2Array()).is_empty()
 			compat.append([poly.visual, poly.collide, poly.key, poly.uv_tweak, i if unique else -1, poly.cell, tone,
-				poly.surface if poly.collide else 0, poly.get("lod", 0)])
+				poly.surface if poly.collide else 0, poly.get("lod", 0), poly.uv_stretch])
 		var merged := BrushOps.merge_coplanar(sources[src].verts, faces, compat)
 		var visual_before := group.filter(func(p): return p.visual).size()
 		for f in merged.faces.size():
@@ -660,7 +726,7 @@ static func _first_with(group: Array, flags: Array) -> Dictionary:
 	for poly in group:
 		if poly.visual == flags[0] and poly.collide == flags[1] and poly.key == flags[2] and poly.uv_tweak == flags[3] \
 				and poly.cell == flags[5] and poly.masked_face < 0 and (poly.surface if poly.collide else 0) == flags[7] \
-				and poly.get("lod", 0) == flags[8] \
+				and poly.get("lod", 0) == flags[8] and poly.uv_stretch == flags[9] \
 				and ((not poly.colored and flags[6].is_empty()) or (poly.colored and _uniform_tone(poly) == flags[6])):
 			return poly
 	return group[0]

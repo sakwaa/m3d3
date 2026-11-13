@@ -102,6 +102,40 @@ uniform vec3 stair_params = vec3(1.5, 0.5, 0.5);
 uniform vec3 stair_base_mean = vec3(0.5);
 varying vec2 stair_uv;
 
+// Grade screen preview (editor only; off in builds, where the grade is baked into the
+// vertex data): each time key's light and the painted colour through colour tables (strips
+// of N slices of N x N, key k in rows k*N..), AO per key (strength, curve, tint) folded
+// into the key's light.
+uniform bool grade_vertex = false;
+uniform bool grade_light_on = false;
+uniform bool grade_paint_on = false;
+uniform bool grade_ao_on = false;
+uniform float grade_lut_n = 13.0;
+uniform sampler2D grade_light_lut : filter_linear, repeat_disable;
+uniform sampler2D grade_paint_lut : filter_linear, repeat_disable;
+uniform vec4 grade_ao_strength = vec4(1.0);
+uniform vec4 grade_ao_gamma = vec4(1.0);
+uniform mat4 grade_ao_tint = mat4(0.0);
+
+vec3 grade_lut(sampler2D t, vec3 c, float row, float rows) {
+	float n = grade_lut_n;
+	c = clamp(c, 0.0, 1.0);
+	float b = c.b * (n - 1.0);
+	float b0 = floor(b);
+	float b1 = min(b0 + 1.0, n - 1.0);
+	vec2 sz = vec2(n * n, n * rows);
+	float x = c.r * (n - 1.0) + 0.5;
+	float y = c.g * (n - 1.0) + 0.5 + row * n;
+	vec3 s0 = textureLod(t, vec2(b0 * n + x, y) / sz, 0.0).rgb;
+	vec3 s1 = textureLod(t, vec2(b1 * n + x, y) / sz, 0.0).rgb;
+	return mix(s0, s1, b - b0);
+}
+
+vec3 grade_ao(float ao, int k) {
+	float g = pow(clamp(ao, 0.0, 1.0), grade_ao_gamma[k]);
+	return mix(vec3(1.0), mix(grade_ao_tint[k].rgb, vec3(1.0), g), grade_ao_strength[k]);
+}
+
 void vertex() {
 	VERTEX = n64_reflect_flatten(VERTEX, MODEL_MATRIX, CAMERA_POSITION_WORLD);
 	n64_fogv = n64_fog_vertex((MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz);
@@ -114,7 +148,19 @@ void vertex() {
 		vec4 k[4] = vec4[](CUSTOM0, CUSTOM1, CUSTOM2, CUSTOM3);
 		int a = clamp(int(n64_light_blend.x + 0.5), 0, light_keys - 1);
 		int b = clamp(int(n64_light_blend.y + 0.5), 0, light_keys - 1);
-		key_light = mix(k[a].rgb, k[b].rgb, clamp(n64_light_blend.z, 0.0, 1.0));
+		vec3 la = k[a].rgb;
+		vec3 lb = k[b].rgb;
+		if (grade_vertex) {
+			if (grade_light_on) {
+				la = grade_lut(grade_light_lut, la, float(a), 4.0);
+				lb = grade_lut(grade_light_lut, lb, float(b), 4.0);
+			}
+			if (grade_ao_on) {
+				la *= grade_ao(COLOR.a, a);
+				lb *= grade_ao(COLOR.a, b);
+			}
+		}
+		key_light = mix(la, lb, clamp(n64_light_blend.z, 0.0, 1.0));
 	}
 }
 
@@ -155,7 +201,14 @@ uniform vec4 tint_3 : source_color = vec4(1.0);
 // Large-scale variation that breaks up repetition: one shared seamless noise, per
 // texture x = strength, y = metres per noise repeat, z = mode (0 light & dark, 1 darken).
 uniform sampler2D variation_tex : filter_linear_mipmap, repeat_enable, hint_default_white;
+// The base texture's own variation texture (PaintAtlas: the level's pick for it, else the
+// shared noise). z = 2 (Colour) multiplies by its colour relative to its average.
+uniform sampler2D base_variation_tex : filter_linear_mipmap, repeat_enable, hint_default_white;
 uniform vec3 base_var = vec3(0.0, 8.0, 0.0);
+uniform vec4 base_adj0 = vec4(0.0);
+uniform vec4 base_adj1 = vec4(0.0);
+uniform vec4 base_adj2 = vec4(0.0);
+uniform vec4 base_adj3 = vec4(0.0);
 uniform vec3 var_0 = vec3(0.0, 8.0, 0.0);
 uniform vec3 var_1 = vec3(0.0, 8.0, 0.0);
 uniform vec3 var_2 = vec3(0.0, 8.0, 0.0);
@@ -256,18 +309,74 @@ vec2 noise_warp(vec2 p) {
 }
 
 // Noise in the face's world-aligned projection (metres), turned ~37° so its repeat never
-// lines up with the texture grid.
-vec3 apply_variation(vec3 c, vec2 uv, vec3 v) {
-	if (v.x <= 0.001) {
-		return c;
+// lines up with the texture grid; the shared noise bends it (noise_warp).
+vec2 variation_point(vec2 uv, vec3 v) {
+	return noise_warp(mat2(vec2(0.7986, 0.6018), vec2(-0.6018, 0.7986)) * uv / max(v.y, 0.05));
+}
+
+// `s`: the variation texture's sample, `mean`: its average colour (Colour mode).
+// FBM values cluster mid-grey; stretch so the strength slider spans real patches.
+vec3 vary(vec3 c, vec3 v, vec3 s, vec3 mean) {
+	if (v.z > 1.5) {
+		return c * mix(vec3(1.0), pow(s, vec3(2.2)) / max(pow(mean, vec3(2.2)), vec3(0.005)), v.x);
 	}
-	vec2 p = noise_warp(mat2(vec2(0.7986, 0.6018), vec2(-0.6018, 0.7986)) * uv / max(v.y, 0.05));
-	// FBM values cluster mid-grey; stretch so the strength slider spans real patches.
-	float n = smoothstep(0.25, 0.75, texture(variation_tex, p).r);
+	float n = smoothstep(0.25, 0.75, s.r);
 	if (v.z < 0.5) {
 		return c * (1.0 + (n - 0.5) * 2.0 * v.x);
 	}
 	return c * (1.0 - n * v.x);
+}
+
+// ColourAdjust (Paint panel > Colour adjust): a0 = hue turn (rad), saturation, brightness,
+// contrast; a1 = temperature, tint, gamma, on (1; 2 = start from grey); a2 = colorize rgb,
+// amount; a3 = shadow rgb (start from grey: the ramp's dark end). Display space.
+vec3 colour_adjust(vec3 c, vec4 a0, vec4 a1, vec4 a2, vec4 a3) {
+	if (a1.w < 0.5) {
+		return c;
+	}
+	vec3 s = pow(max(c, vec3(0.0)), vec3(1.0 / 2.2));
+	float l = dot(s, vec3(0.299, 0.587, 0.114));
+	if (a1.w > 1.5) {
+		// Start from grey: brightness through the shadow -> colorize ramp.
+		vec3 ramp = mix(pow(max(a3.rgb, vec3(0.0)), vec3(1.0 / 2.2)), pow(max(a2.rgb, vec3(0.0)), vec3(1.0 / 2.2)), l);
+		s = mix(vec3(l), ramp, a2.a);
+	} else if (a2.a > 0.0) {
+		vec3 col = pow(max(a2.rgb, vec3(0.0)), vec3(1.0 / 2.2));
+		s = mix(s, col * (l / max(dot(col, vec3(0.299, 0.587, 0.114)), 0.05)), a2.a);
+	}
+	if (a0.x != 0.0) {
+		// Hue turned in YIQ (brightness kept).
+		vec3 yiq = mat3(vec3(0.299, 0.596, 0.211), vec3(0.587, -0.274, -0.523), vec3(0.114, -0.322, 0.312)) * s;
+		float cs = cos(a0.x);
+		float sn = sin(a0.x);
+		yiq.yz = vec2(yiq.y * cs - yiq.z * sn, yiq.y * sn + yiq.z * cs);
+		s = mat3(vec3(1.0, 1.0, 1.0), vec3(0.956, -0.272, -1.106), vec3(0.621, -0.647, 1.703)) * yiq;
+	}
+	l = dot(s, vec3(0.299, 0.587, 0.114));
+	s = mix(vec3(l), s, a0.y);
+	s *= vec3(1.0 + a1.x * 0.12, 1.0 - a1.y * 0.1, 1.0 - a1.x * 0.12);
+	s = (s - 0.5) * a0.w + 0.5;
+	s *= a0.z;
+	s = pow(max(s, vec3(0.0)), vec3(1.0 / max(a1.z, 0.05)));
+	return pow(max(s, vec3(0.0)), vec3(2.2));
+}
+
+
+// Layers: the shared noise.
+vec3 apply_variation(vec3 c, vec2 uv, vec3 v) {
+	if (v.x <= 0.001) {
+		return c;
+	}
+	return vary(c, v, texture(variation_tex, variation_point(uv, v)).rgb, vec3(0.5));
+}
+
+// The base: its own variation texture.
+vec3 apply_base_variation(vec3 c, vec2 uv, vec3 v) {
+	if (v.x <= 0.001) {
+		return c;
+	}
+	vec3 mean = textureLod(base_variation_tex, vec2(0.5), 16.0).rgb;
+	return vary(c, v, texture(base_variation_tex, variation_point(uv, v)).rgb, mean);
 }
 
 // Layer coverage from painting and / or the noise mask (in the face's own projection, so
@@ -397,7 +506,8 @@ void fragment() {
 		} else {
 			c = n64_tint(c, base_tint_mode, base_tint_dark, base_tint_light, base_tint_extra) * base_tint.rgb;
 		}
-		c = apply_variation(c, UV, base_var);
+		c = colour_adjust(c, base_adj0, base_adj1, base_adj2, base_adj3);
+		c = apply_base_variation(c, UV, base_var);
 		// Busy bases (bricks, cobbles) calm down so the painted steps read.
 		if (stair_on) {
 			c = mix(stair_base_mean, c, stair_params.y);
@@ -433,7 +543,7 @@ void fragment() {
 		float wet = n64_wetness * n64_rain_exposed(world) * mix(0.35, 1.0, up);
 		c = n64_wet(c, wet);
 		float graze = pow(1.0 - clamp(dot(normalize(NORMAL), VIEW), 0.0, 1.0), 4.0);
-		c += n64_fog_color.rgb * graze * up * wet * 0.35;
+		c += n64_fog_color.rgb * graze * up * wet * 0.15;
 	}
 	// Vertex colours (painted x baked lighting) shade the result, like the N64's per-vertex
 	// colour. Vertex-lit levels are unlit: the colour goes out through EMISSION so scene
@@ -441,7 +551,11 @@ void fragment() {
 	// Painted vertex colour x baked vertex AO (alpha), AO hideable in the editor.
 	// (Recoloured faces took their colour in the gradient; AO still shades them.)
 	vec3 paint = base_recolour ? vec3(1.0) : COLOR.rgb * vertex_color_scale;
-	vec3 vc = paint * mix(1.0, COLOR.a, n64_vertex_ao);
+	if (grade_vertex && grade_paint_on && !base_recolour) {
+		paint = grade_lut(grade_paint_lut, paint / vertex_color_scale, 0.0, 1.0) * vertex_color_scale;
+	}
+	// (Grade AO per key is in the key light already.)
+	vec3 vc = paint * mix(1.0, COLOR.a, grade_vertex && grade_ao_on && light_keys > 0 ? 0.0 : n64_vertex_ao);
 	// N64 fog: flat colour blended in last (after lighting), amount from the vertices.
 	FOG = n64_fog_out(n64_fogv, n64_fog_tintv, VERTEX, INV_VIEW_MATRIX);
 #if defined(N64_CUTOUT)

@@ -54,6 +54,13 @@ extends ImageTexture
 @export_range(1, 64) var flip_frames := 1
 @export_range(1, 16) var flip_columns := 1
 @export_range(0.5, 60.0, 0.5, "suffix:fps") var flip_fps := 8.0
+## Colour cycling (CI4 / CI8, no flipbook): palette colours cycle_from .. + cycle_count - 1
+## (counted darkest first) shift one step along each frame, as N64 / 16-bit games animated
+## palettes: water shimmer, lava, torchlight, glowing signs. Built into flipbook frames on
+## Rebuild From Source, so it costs the shader nothing. 0 = off.
+@export_range(0, 256) var cycle_count := 0
+@export_range(0, 255) var cycle_from := 0
+@export_range(0.5, 60.0, 0.5, "suffix:fps") var cycle_fps := 6.0
 @export_group("")
 ## 0 = the source already tiles (no seam blending).
 @export_range(0.0, 1.0) var seam_blend := 0.35
@@ -73,6 +80,14 @@ extends ImageTexture
 @export_range(0.0, 2.0) var saturation := 1.0
 @export_range(0.0, 2.0) var contrast := 1.0
 @export_range(-0.5, 0.5) var brightness := 0.0
+## The project texture grade (TextureGrade) on this texture: 1 = as its category gets it,
+## 0 = left out (signs, logos), in between = partly.
+@export_range(0.0, 1.0, 0.05) var grade_amount := 1.0
+## Graded as another category than its folder's (what it is rather than where it's filed:
+## a mossy wall in rock graded as plants); empty = its category.
+@export var grade_as := &""
+## What it was last graded with (TextureGrade.settings_for key; "" = ungraded).
+@export_storage var graded_key := ""
 ## Palette for CI4 / CI8 textures (RGBA5551 colours).
 @export var palette := PackedColorArray()
 ## Object photo (plain background): cut out and cropped for this use before converting.
@@ -99,6 +114,13 @@ static func texels_per_metre() -> float:
 
 
 ## Metres per repeat on levels: world_size, or Auto from the texel density.
+## Frames of the colour cycle built into the image (0 = none).
+func cycle_frames() -> int:
+	if cycle_count < 2 or flip_frames > 1 or palette.size() < 2:
+		return 0
+	return mini(cycle_count, N64TextureConverter.opaque_count(palette) - cycle_from)
+
+
 func metres_per_repeat() -> float:
 	if world_size > 0.0:
 		return world_size
@@ -128,6 +150,10 @@ func anim_params() -> Array:
 		if scroll_direction.length() > 0.001 else Vector4.ZERO
 	var cols := clampi(flip_columns, 1, maxi(flip_frames, 1))
 	var flip := Vector4(cols, ceili(float(flip_frames) / cols), flip_frames, flip_fps) if flip_frames > 1 else Vector4(1, 1, 1, 0)
+	var cycle := cycle_frames()
+	if cycle > 1:
+		cols = N64TextureConverter.cycle_columns(cycle)
+		flip = Vector4(cols, ceili(float(cycle) / cols), cycle, cycle_fps)
 	return [scroll, flip]
 
 
@@ -178,7 +204,19 @@ func get_settings() -> Dictionary:
 		tint_mode = tint_mode, tint_auto = tint_auto, tint_dark = tint_dark, tint_light = tint_light,
 		tint_amount = tint_amount, tint_range = tint_range, object = object, mirror = mirror, holes = holes,
 		sharpen = sharpen, keep_lines = keep_lines,
+		cycle_count = cycle_count if flip_frames <= 1 else 0, cycle_from = cycle_from,
+		grade = _grade_settings(),
 	}
+
+
+func _grade_settings() -> Dictionary:
+	var g := TextureGrade.current()
+	return g.settings_for(grade_category(), grade_amount, resource_path) if g else {}
+
+
+## The category the texture grade treats it as.
+func grade_category() -> StringName:
+	return grade_as if grade_as != &"" else category
 
 
 func apply_settings(s: Dictionary) -> void:
@@ -210,6 +248,8 @@ func apply_settings(s: Dictionary) -> void:
 	holes = s.get("holes", N64ObjectExtract.Holes.GLASS)
 	sharpen = s.get("sharpen", 0.0)
 	keep_lines = s.get("keep_lines", 0.0)
+	cycle_count = s.get("cycle_count", 0)
+	cycle_from = s.get("cycle_from", 0)
 
 
 func rebuild() -> Error:
@@ -217,7 +257,9 @@ func rebuild() -> Error:
 	if source == null:
 		push_error("N64Texture: can't load source %s" % source_path)
 		return ERR_FILE_NOT_FOUND
-	var result := N64TextureConverter.convert(source, get_settings())
+	var settings := get_settings()
+	graded_key = settings.grade.get("key", "")
+	var result := N64TextureConverter.convert(source, settings)
 	palette = result.palette
 	tint_dark = result.tint_dark
 	tint_light = result.tint_light

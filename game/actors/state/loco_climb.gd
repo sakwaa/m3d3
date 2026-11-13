@@ -23,9 +23,12 @@ var _grab := {}
 var _mount := false
 
 
-## Grabs a hold ahead along `dir` (horizontal): a climbable wall; in the air also a ledge
+## Grabs a hold ahead along `dir` (horizontal): a ladder (LocoLadder), a climbable wall; in the air also a ledge
 ## (LocoHang) or a climbable ceiling overhead (LocoCeiling). True if now holding on.
 func try_grab(dir: Vector3, in_air := false) -> bool:
+	var ladder := sibling(ladder_state) as LocoLadder
+	if ladder and ladder.try_mount(dir, in_air):
+		return true
 	if not can_grab():
 		return false
 	read_capsule()

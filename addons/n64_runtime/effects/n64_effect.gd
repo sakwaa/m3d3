@@ -18,6 +18,11 @@ enum Facing { CAMERA, FLAT }
 ## Frames per second (0 = the flipbook plays once over each sprite's life).
 @export_range(0.0, 60.0, 0.5) var fps := 0.0
 @export var blend := Blend.MIX
+## The texture is an intensity image (I4 / I8: grey = how solid): the sprites take their
+## colour from `color` alone and the texture only says how see-through each texel is, as
+## the N64 combiner drew smoke and glows (primitive colour, texel alpha). Off: texture
+## colour x `color`.
+@export var intensity := false
 @export var facing := Facing.CAMERA
 
 @export_group("Emission")

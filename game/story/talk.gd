@@ -2,7 +2,7 @@ extends Node
 ## Conversations. Autoloaded as `Talk`. Runs a Dialogue through a DialogueRunner into the
 ## DialogueBox; while one is open the clock is held (GameState.hold_clock) and the player
 ## doesn't move. Talkables register here while the player is near: the interact button
-## talks to the best one (the Z-targeted one, else the nearest one in front), and the box
+## talks to the best one (the Z-targeted one, else the nearest offering), and the box
 ## shows its "E  Talk" prompt.
 
 signal conversation_started(with: Node3D)
@@ -14,7 +14,6 @@ var runner: DialogueRunner
 var partner: Node3D
 var active := false
 
-var _nearby: Array[Node3D] = []
 var _cooldown := 0.0
 
 
@@ -65,39 +64,33 @@ func _end() -> void:
 		player.set_controlled(true)
 	var with := partner
 	partner = null
+	if with is Talkable:
+		with.ready_at = Time.get_ticks_msec() * 0.001 + with.cooldown
 	conversation_ended.emit(with)
 
 
-func register(t: Node3D) -> void:
-	if not _nearby.has(t):
-		_nearby.append(t)
-
-
-func unregister(t: Node3D) -> void:
-	_nearby.erase(t)
-
-
-## The Talkable the interact button would talk to now.
+## The Talkable the interact button would talk to now (MM): the Z-targeted one wherever it
+## is (while locked onto anything else, nobody); else the nearest (flat distance) offering
+## to the player - inside its cylinder and facing gate. Not in the air.
 func best_talkable() -> Node3D:
 	var player := _player()
 	if player == null:
 		return null
-	var locked = player.lock.target if "lock" in player and player.lock else null
+	if player is CharacterBody3D and not (player as CharacterBody3D).is_on_floor():
+		return null
+	var lock: TargetLock = player.lock if "lock" in player else null
+	if lock and lock.target:
+		var t := lock.target.get_parent() as Talkable
+		return t if t and t.can_talk() and t.in_gate(player.global_position) else null
 	var best: Node3D = null
-	var best_score := INF
-	for t in _nearby:
-		if not is_instance_valid(t) or not t.can_talk():
+	var best_d := INF
+	for t: Talkable in get_tree().get_nodes_in_group(Talkable.GROUP):
+		if not t.can_talk() or not t.offers_to(player.global_position):
 			continue
-		if locked and locked.get_parent() == t:
-			return t
 		var to: Vector3 = t.global_position - player.global_position
-		to.y = 0.0
-		var ahead: float = player.facing.dot(to.normalized()) if to.length() > 0.01 else 1.0
-		if ahead < -0.2:
-			continue
-		var score := to.length() - ahead
-		if score < best_score:
-			best_score = score
+		var d := Vector2(to.x, to.z).length()
+		if d < best_d:
+			best_d = d
 			best = t
 	return best
 

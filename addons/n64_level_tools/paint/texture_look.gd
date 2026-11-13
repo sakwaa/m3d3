@@ -21,6 +21,9 @@ extends Texture2D
 ## The faces' vertex colour recolours the texture (the texture gives brightness detail,
 ## the vertex colour the colour) instead of multiplying it.
 @export var recolour := false
+## Colour adjustment of this variant (Paint panel > Colour adjust on masked faces); null =
+## the level's for its texture.
+@export var adjust: ColourAdjust
 
 
 ## The plain texture behind `t` (itself when it isn't a look).
@@ -30,6 +33,8 @@ static func source_of(t: Texture2D) -> Texture2D:
 
 func same_as(src: Texture2D, p_palette: PackedColorArray, p_color: Color, p_variation: Vector3, p_tile: float,
 		p_recolour := false) -> bool:
+	if adjust != null:
+		return false  # (a colour-adjusted variant belongs to the faces it was made for)
 	if texture != src or recolour != p_recolour or palette.size() != p_palette.size() or not color.is_equal_approx(p_color):
 		return false
 	for i in palette.size():

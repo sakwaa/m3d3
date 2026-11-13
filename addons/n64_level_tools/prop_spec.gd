@@ -9,7 +9,7 @@ extends Resource
 ## from it at the brush (in the editor and in game, never saved with the scene; written out
 ## on export), like Door nodes from door brushes.
 
-enum Kind { SIGN, STALL, RAIN_DRIP, BIRD_FLOCK, NPC_SPOT, NPC_PATH, TREE }
+enum Kind { SIGN, STALL, RAIN_DRIP, BIRD_FLOCK, NPC_SPOT, NPC_PATH, TREE, LADDER, ROOM }
 
 const SCRIPTS := {
 	Kind.SIGN: "res://game/world/props/signpost.gd",
@@ -19,9 +19,11 @@ const SCRIPTS := {
 	Kind.NPC_SPOT: "res://game/world/npc_spot.gd",
 	Kind.NPC_PATH: "res://game/world/npc_path.gd",
 	Kind.TREE: "res://game/world/props/world_tree.gd",
+	Kind.LADDER: "res://game/world/props/ladder.gd",
+	Kind.ROOM: "res://addons/n64_runtime/world/vis_room.gd",
 }
 const NAMES := {Kind.SIGN: "Sign", Kind.STALL: "Stall", Kind.RAIN_DRIP: "RainDrip", Kind.BIRD_FLOCK: "Birds",
-	Kind.NPC_SPOT: "Spot", Kind.NPC_PATH: "Path", Kind.TREE: "Tree"}
+	Kind.NPC_SPOT: "Spot", Kind.NPC_PATH: "Path", Kind.TREE: "Tree", Kind.LADDER: "Ladder", Kind.ROOM: "Room"}
 
 ## What the prop is. Changing it starts the new kind from its defaults.
 @export var kind := Kind.SIGN:
@@ -45,9 +47,16 @@ const NAMES := {Kind.SIGN: "Sign", Kind.STALL: "Stall", Kind.RAIN_DRIP: "RainDri
 var _template: Node
 
 
-## The node for this prop, set up from the settings (not in the tree).
+## Kinds that move or change while playing (and trees: their own LOD cards): not batched.
+const UNBATCHED := [Kind.RAIN_DRIP, Kind.BIRD_FLOCK, Kind.NPC_SPOT, Kind.NPC_PATH, Kind.TREE, Kind.ROOM]
+
+
+## The node for this prop, set up from the settings (not in the tree). Static kinds join
+## PropBatch.AUTO_GROUP (their meshes merge in game).
 func instantiate() -> Node:
 	var node: Node = (load(SCRIPTS[kind]) as Script).new()
+	if not kind in UNBATCHED:
+		node.add_to_group(&"prop_batch_auto", true)
 	for k in settings:
 		node.set(k, settings[k])
 	return node

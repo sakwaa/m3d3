@@ -45,17 +45,23 @@ func trim() -> Vector2:
 	return Vector2(d.side_width, d.top_height) if d and d.texture else Vector2.ZERO
 
 
+## The trim reach the wall is cut along round the opening (rows for the trim's contact
+## shadow; PassageBuilder.carve_brush): trim() by default.
+func cut_trim() -> Vector2:
+	return trim()
+
+
 ## The carved opening matches the size / trim at `xf` (the opening's transform now).
 func carve_matches(xf: Transform3D) -> bool:
 	var size := opening_size()
 	return is_equal_approx(carved_width, size.x) and is_equal_approx(carved_height, size.y) \
-		and carved_xf.is_equal_approx(xf) and carved_trim.is_equal_approx(trim()) and carved_shape.is_equal_approx(shape()) \
+		and carved_xf.is_equal_approx(xf) and carved_trim.is_equal_approx(cut_trim()) and carved_shape.is_equal_approx(shape()) \
 		and not stale_cut()
 
 
 ## Cut with older carving rules while it has a trim (the wall needs its trim cuts redone).
 func stale_cut() -> bool:
-	return carved and trim() != Vector2.ZERO and carved_version < preload("res://addons/n64_level_tools/passage_builder.gd").CARVE_VERSION
+	return carved and cut_trim() != Vector2.ZERO and carved_version < preload("res://addons/n64_level_tools/passage_builder.gd").CARVE_VERSION
 
 
 ## Records the opening as cut now at `xf`.
@@ -64,6 +70,6 @@ func mark_carved(xf: Transform3D) -> void:
 	carved_width = opening_size().x
 	carved_height = opening_size().y
 	carved_xf = xf
-	carved_trim = trim()
+	carved_trim = cut_trim()
 	carved_shape = shape()
 	carved_version = preload("res://addons/n64_level_tools/passage_builder.gd").CARVE_VERSION

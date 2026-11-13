@@ -14,6 +14,8 @@ uniform sampler2D sprite : source_color, filter_nearest_mipmap, repeat_disable;
 // Flipbook grid: columns, rows.
 uniform vec2 grid = vec2(1.0);
 uniform bool billboard = true;
+// Intensity texture (I4 / I8): colour from the tint, the texel only as alpha (N64Effect.intensity).
+uniform bool intensity = false;
 varying vec2 n64_fogv;
 varying vec3 n64_fog_tintv;
 varying float frame;
@@ -41,5 +43,6 @@ vec4 effect_color(vec2 uv, vec4 tint) {
 	vec2 cell = vec2(mod(f, g.x), floor(f / g.x));
 	vec2 px = vec2(textureSize(sprite, 0)) / g;
 	vec2 inside = clamp(uv, 0.5 / px, 1.0 - 0.5 / px);
-	return n64_texture(sprite, (inside + cell) / g) * tint;
+	vec4 t = n64_texture(sprite, (inside + cell) / g);
+	return intensity ? vec4(tint.rgb, t.a * tint.a) : t * tint;
 }

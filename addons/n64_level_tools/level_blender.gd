@@ -443,6 +443,7 @@ static func _state(obj: Dictionary, pool: Array, own: LevelBrush, moved := false
 			corner_src = {verts = vs, indices = b.face_indices, counts = b.face_counts, colors = b.corner_colors}
 	var tex := PackedInt32Array()
 	var uv := PackedVector4Array()
+	var uv_scale := PackedVector2Array()
 	var surf := PackedInt32Array()
 	var sets := PackedInt32Array()
 	var masks := {}
@@ -460,6 +461,7 @@ static func _state(obj: Dictionary, pool: Array, own: LevelBrush, moved := false
 		if best.is_empty():
 			tex.append(-1)
 			uv.append(LevelBrush.DEFAULT_UV)
+			uv_scale.append(Vector2.ONE)
 			surf.append(0)
 			sets.append(0)
 			continue
@@ -467,6 +469,7 @@ static func _state(obj: Dictionary, pool: Array, own: LevelBrush, moved := false
 		var sf: int = best.face
 		tex.append(src.get_face_texture(sf))
 		uv.append(src.get_face_uv(sf))
+		uv_scale.append(src.get_face_uv_stretch(sf))
 		surf.append(src.get_face_surface(sf))
 		sets.append(src.get_face_layer_set(sf))
 		if matched and _normal(verts, faces[fi]).dot(best.n) > 0.95:
@@ -491,7 +494,7 @@ static func _state(obj: Dictionary, pool: Array, own: LevelBrush, moved := false
 			corner_src.colors, verts, nb.face_indices, nb.face_counts, colours)
 	var same := own != null and own.face_indices == nb.face_indices and own.face_counts == nb.face_counts and (moved or own.vertices == verts)
 	return {vertices = verts, face_indices = nb.face_indices, face_counts = nb.face_counts, face_ids = ids, hand_edited = true,
-		face_textures = tex, face_uv = uv, face_masks = masks, face_surfaces = surf, face_layer_sets = sets, vertex_colors = colours,
+		face_textures = tex, face_uv = uv, face_uv_scale = uv_scale, face_masks = masks, face_surfaces = surf, face_layer_sets = sets, vertex_colors = colours,
 		vertex_ao = own.vertex_ao if same else PackedFloat32Array(),
 		corner_lighting = own.corner_lighting if same else PackedColorArray(),
 		corner_lighting_keys = own.corner_lighting_keys if same else ([] as Array[PackedColorArray]),
