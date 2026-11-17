@@ -8,7 +8,10 @@ extends Node3D
 #   west:  a little town: NPCs to talk to, signs facing different ways (read from in front
 #          only), one behind a wall, two NPCs side by side (nearest offers);
 #   south-east: the combat arena - training dummies (one shielded: hit it from the side),
-#          Wolfos on demand, and the hit juice (OoT remake) to switch piece by piece.
+#          Wolfos on demand, and the hit juice (OoT remake) to switch piece by piece;
+#   south-west: the archery range - stand on the mat, hold Aim (F / mouse back button /
+#          right trigger), Attack shoots: dummies at 5, 10, 20 and 35 m, one up on a
+#          tower, one sliding side to side, a backstop wall the misses stick in.
 # The arrow's target and the locked one show rings on the ground round their feet (solid:
 # locks within; faint: lets go past).
 # Keys: T hold / switch mode, R rings on / off, 8 respawn the pack, 9 two Wolfos in the
@@ -28,6 +31,10 @@ var pack: Array[Node] = []
 var info: Label
 var arena_wolfos: Array[Node] = []
 const ARENA := Vector3(26, 0, 24)
+## The archery range's shooting mat (targets out along -X from it).
+const RANGE := Vector3(-14, 0, 26)
+var _slider: Node3D
+var _slide_t := 0.0
 
 
 func _ready() -> void:
@@ -45,6 +52,7 @@ func _ready() -> void:
 	_lane()
 	_town()
 	_arena()
+	_archery()
 	var hud := CanvasLayer.new()
 	hud.layer = 5
 	add_child(hud)
@@ -123,6 +131,7 @@ func _process(_delta: float) -> void:
 			"ON" if StrikeRig.edge_lead else "off", "shown" if StrikePoint.show else "hidden"],
 		"sword power (6): %d   (armour 2: bounces at 1-2, cuts at 3)" % player.blade_power(),
 		"rings R  pack 8  arena wolfos 9  juice 1-4 / 0",
+		"bow: hold F / mouse back / right trigger, attack shoots (range: south-west)",
 	])
 
 
@@ -216,6 +225,56 @@ func _arena() -> void:
 	label.font_size = 64
 	label.outline_size = 14
 	add_child(label)
+
+
+## The archery range (south-west): a mat, dummies along -X at 5 / 10 / 20 / 35 m, one up
+## on a tower, one sliding across (moved in _physics_process), a backstop wall.
+func _archery() -> void:
+	var c := RANGE
+	var mat := MeshInstance3D.new()
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(2.5, 2.5)
+	mat.mesh = pm
+	var mm := StandardMaterial3D.new()
+	mm.albedo_color = Color(0.6, 0.45, 0.3)
+	mat.material_override = mm
+	mat.position = c + Vector3.UP * 0.02
+	add_child(mat)
+	# (Staggered across so none stands in front of another.)
+	for spec in [[5.0, -2.5], [10.0, 1.5], [20.0, -4.0], [35.0, 4.5]]:
+		var dist: float = spec[0]
+		var d := _range_dummy("Range %d m" % int(dist), c + Vector3(-dist, 0.1, spec[1]))
+		d.color = Color(0.85, 0.75, 0.45)
+	# Up a tower: aim up.
+	_pillar(c + Vector3(-16, 0, -7), Vector3(2, 6, 2))
+	_range_dummy("Tower dummy", c + Vector3(-16, 6.1, -7))
+	# Sliding across at 15 m: lead it.
+	_slider = _range_dummy("Sliding dummy", c + Vector3(-15, 0.1, 6))
+	# Backstop.
+	_pillar(c + Vector3(-42, 0, 0), Vector3(1, 7, 24))
+	var label := Label3D.new()
+	label.text = "ARCHERY RANGE\nhold F / mouse back / RT to aim, attack shoots"
+	label.position = c + Vector3(2.5, 3.0, 0)
+	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	label.font_size = 64
+	label.outline_size = 14
+	add_child(label)
+
+
+func _range_dummy(title: String, at: Vector3) -> CombatDummy:
+	var d := CombatDummy.new()
+	d.name = title
+	d.position = at
+	d.respawn = 1.5
+	add_child(d)
+	return d
+
+
+func _physics_process(delta: float) -> void:
+	if is_instance_valid(_slider):
+		_slide_t += delta
+		var z := RANGE.z + sin(_slide_t * 0.9) * 6.0
+		_slider.global_position = Vector3(_slider.global_position.x, _slider.global_position.y, z)
 
 
 func _arena_wolfos() -> void:

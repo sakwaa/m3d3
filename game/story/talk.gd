@@ -20,6 +20,9 @@ var _cooldown := 0.0
 func _ready() -> void:
 	box = DialogueBox.new()
 	add_child(box)
+	# Through the N64 video output with the rest of the HUD (deferred: RenderScale, a later
+	# autoload, may not be in the tree yet).
+	RenderScale.video_hud.call_deferred(box)
 	box.advanced.connect(func(): _show(runner.advance()))
 	box.chosen.connect(func(i: int): _show(runner.choose(i)))
 	runner = DialogueRunner.new(GameState)

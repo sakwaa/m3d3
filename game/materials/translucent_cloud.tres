@@ -1,0 +1,9 @@
+[gd_resource type="ShaderMaterial" format=3]
+
+[ext_resource type="Shader" path="res://addons/n64_runtime/shaders/n64_translucent.gdshader" id="1_xlu"]
+
+[resource]
+render_priority = 1
+shader = ExtResource("1_xlu")
+shader_parameter/color = Color(0.92, 0.92, 0.95, 0.5)
+shader_parameter/cloud = true

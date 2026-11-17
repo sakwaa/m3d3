@@ -10,6 +10,7 @@ render_mode unshaded, cull_disabled, shadows_disabled, fog_disabled;
 
 #include "res://addons/n64_runtime/shaders/n64_sampling.gdshaderinc"
 #include "res://addons/n64_runtime/shaders/n64_weather.gdshaderinc"
+#include "res://addons/n64_runtime/shaders/n64_coverage.gdshaderinc"
 
 // Time of day light (Zone.outdoor_light), like the effect sprites.
 global uniform vec4 n64_ambient_light;
@@ -28,10 +29,12 @@ void vertex() {
 	// Reversed Z (0 = far): never past the far plane, nearer things still in front.
 	float z = max(clip.z / clip.w, 0.0) + 1e-5 / max(clip.w, 1.0);
 	clip.z = z * clip.w;
+	clip.xy = mat2(n64_distort.xy, n64_distort.zw) * clip.xy;  // (ScreenDistortion)
 	POSITION = clip;
 }
 
 void fragment() {
 	float h = mix(haze.x, haze.y, clamp(n64_rain.x * 1.5, 0.0, 1.0)) * clamp(dist / ring_distance, 0.3, 1.0);
 	ALBEDO = mix(COLOR.rgb * n64_ambient_light.rgb * n64_weather_tint.rgb, n64_fog_color.rgb, h);
+	N64_COVERAGE;
 }

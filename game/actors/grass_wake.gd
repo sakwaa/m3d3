@@ -104,7 +104,7 @@ func _exit_tree() -> void:
 func _process(delta: float) -> void:
 	if actor == null:
 		return
-	var feet := actor.global_position
+	var feet := actor.get_global_transform_interpolated().origin
 	var probe := feet + Vector3.UP * 0.05
 	var field := GrassField.at(probe)
 	var top := field.top_here(probe) if field else -INF

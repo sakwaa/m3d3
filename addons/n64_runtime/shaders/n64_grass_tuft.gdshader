@@ -6,8 +6,11 @@ render_mode unshaded, cull_disabled, skip_vertex_transform;
 // triangles). Each level fades with a screen-door dither (no blending: the 1-bit cut-out
 // stays): across the `fade` band at near_end the card dissolves into the crossed tuft pixel
 // by pixel (the two take complementary pixels, never both, never neither), and over the
-// last `grow` metres before far_end the cards dissolve away. Instance colour = tint; UV.y 0 at the tips (they move), 1 at the root.
+// last `grow` metres before far_end the cards dissolve away. Instance colour = tint; custom = the ground's baked light keys (n64_grass_light); UV.y 0 at the tips (they move), 1 at the root.
 #include "res://addons/n64_runtime/shaders/n64_sampling.gdshaderinc"
+#include "res://addons/n64_runtime/shaders/n64_wind.gdshaderinc"
+#include "res://addons/n64_runtime/shaders/n64_coverage.gdshaderinc"
+#include "res://addons/n64_runtime/shaders/n64_grass_light.gdshaderinc"
 
 uniform sampler2D tex : source_color, filter_nearest_mipmap, repeat_disable;
 uniform float shade = 1.0;
@@ -22,15 +25,21 @@ uniform float grow = 10.0;
 // Sway (metres at the tips at wind strength 1) and how far tufts part round a bender.
 uniform float sway = 0.12;
 uniform float part = 0.35;
-global uniform vec4 n64_wind;
+// Gusts lighten the tips a little (the sheen of bent blades; matches the carpet's).
+uniform float gust_shine = 0.3;
 global uniform vec4 n64_bender0;
 global uniform vec4 n64_bender1;
 global uniform vec4 n64_bender2;
 global uniform vec4 n64_bender3;
+// The grass simulation (Zone's GroundSim): rg = push (metres), b = pressed; corner x, z, size.
+uniform sampler2D field_map : filter_linear, repeat_disable, hint_default_black;
+uniform vec4 field_rect = vec4(0.0);
 
-varying vec2 n64_fogv;
-varying vec3 n64_fog_tintv;
-varying vec3 tint;
+varying N64_SHADE vec2 n64_fogv;
+varying N64_SHADE vec3 n64_fog_tintv;
+varying N64_SHADE vec3 tint;
+// The ground's baked light at the root (INSTANCE_CUSTOM: four keys packed).
+varying flat vec3 key_light;
 varying float near_v;  // 1 all crossed tuft .. 0 all card
 varying float far_v;  // the card's fade out at the far end (1 shown)
 
@@ -60,15 +69,25 @@ void vertex() {
 		world = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	}
 	float tip = 1.0 - UV.y;
+	float g = n64_gust(origin.xz);
 	if (tip > 0.0) {
-		float along = dot(origin.xz, n64_wind.xy);
-		float gust = 0.5 + 0.5 * sin(along * 0.35 - TIME * (1.2 + n64_wind.z)) * n64_wind.w;
+		float lean_amt = n64_wind_push_g(g);
 		float flick = sin(TIME * 3.3 + origin.x * 2.1 + origin.z * 1.7) * 0.3;
-		vec2 lean = n64_wind.xy * (gust + flick) * sway * n64_wind.z;
+		vec2 lean = n64_wind.xy * (lean_amt + flick) * sway * n64_wind.z;
 		if (level == 0) {
 			vec2 p = push(n64_bender0, origin) + push(n64_bender1, origin) + push(n64_bender2, origin) + push(n64_bender3, origin);
 			lean += p * part;
 			world.y -= length(p) * part * 0.5 * tip * size;
+		}
+		// Waded through: leaning away along the push, pressed down, springing back.
+		if (field_rect.z > 0.0) {
+			vec2 fuv = (origin.xz - field_rect.xy) / field_rect.z;
+			if (all(greaterThan(fuv, vec2(0.0))) && all(lessThan(fuv, vec2(1.0)))) {
+				vec2 fe = min(fuv, 1.0 - fuv);
+				vec4 f = textureLod(field_map, fuv, 0.0) * smoothstep(0.0, 0.1, min(fe.x, fe.y));
+				lean += f.rg * 1.4;
+				world.y -= clamp(f.b, 0.0, 1.0) * 0.55 * tip * size;
+			}
 		}
 		world.xz += lean * tip * size;
 	}
@@ -79,16 +98,19 @@ void vertex() {
 	far_v = 1.0 - smoothstep(far_end - grow, far_end, dist);
 	n64_fogv = n64_fog_vertex(world);
 	n64_fog_tintv = n64_fog_tint_vertex(world);
-	tint = COLOR.rgb;
+	key_light = n64_grass_key_light(n64_grass_unpack(INSTANCE_CUSTOM.x), n64_grass_unpack(INSTANCE_CUSTOM.y),
+		n64_grass_unpack(INSTANCE_CUSTOM.z), n64_grass_unpack(INSTANCE_CUSTOM.w));
+	tint = COLOR.rgb * (1.0 + gust_shine * g * n64_gust_show() * (0.4 + 0.6 * tip));
 	VERTEX = (VIEW_MATRIX * vec4(world, 1.0)).xyz;
 	NORMAL = normalize((VIEW_MATRIX * vec4(0.0, 1.0, 0.0, 0.0)).xyz);
+	N64_SNAP_VIEW;
 }
 
 // 4 x 4 ordered dither threshold for this pixel (0..1).
 float bayer(vec2 p) {
 	ivec2 q = ivec2(mod(p, 4.0));
-	int m[16] = int[16](0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5);
-	return (float(m[q.y * 4 + q.x]) + 0.5) / 16.0;
+	int m[16] = int[16](0, 6, 1, 7, 4, 2, 5, 3, 1, 7, 0, 6, 5, 3, 4, 2);  // (the RDP's magic square)
+	return (float(m[q.y * 4 + q.x]) + 0.5) / 8.0;
 }
 
 void fragment() {
@@ -97,8 +119,13 @@ void fragment() {
 		discard;
 	}
 	vec4 c = n64_texture(tex, UV);
-	ALBEDO = c.rgb * tint * shade * n64_world_tint.rgb * n64_weather_tint.rgb;
-	ALPHA = c.a;
-	ALPHA_SCISSOR_THRESHOLD = 0.5;
+	ALBEDO = c.rgb * tint * shade * n64_grass_light(key_light) * n64_weather_tint.rgb;
+	// The RDP's alpha compare (discard: ALPHA + scissor with MSAA breaks the coverage tag)
+	if (c.a < 0.5) {
+		discard;
+	}
 	FOG = n64_fog_out(n64_fogv, n64_fog_tintv, VERTEX, INV_VIEW_MATRIX);
+	// Texture edge (G_RM_AA_TEX_EDGE): coverage x texel alpha.
+	N64_FOG_GAMMA;
+	COVERAGE_TEXEDGE;
 }

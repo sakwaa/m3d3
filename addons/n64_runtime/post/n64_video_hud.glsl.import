@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://vpmesibt1l1c"
+path="res://.godot/imported/n64_video_hud.glsl-e8c81d99875f6a634b2e0cb618d550a0.res"
+
+[deps]
+
+source_file="res://addons/n64_runtime/post/n64_video_hud.glsl"
+dest_files=["res://.godot/imported/n64_video_hud.glsl-e8c81d99875f6a634b2e0cb618d550a0.res"]
+
+[params]
+

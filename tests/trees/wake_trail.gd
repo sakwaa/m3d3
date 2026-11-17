@@ -16,7 +16,11 @@ var _shot := false
 
 func _ready() -> void:
 	var zone: Node = (load(OS.get_environment("ZONE")) as PackedScene).instantiate()
+	if OS.get_environment("MIST") != "":
+		zone.set(&"ground_mist", float(OS.get_environment("MIST")))  # MIST=amount: ground mist
 	add_child(zone)
+	if OS.get_environment("WEATHER") != "":
+		GameState.set_weather(StringName(OS.get_environment("WEATHER")), 0.0)
 	var f := OS.get_environment("FROM").split(",")
 	var t := OS.get_environment("TO").split(",")
 	_from = Vector3(float(f[0]), 0.0, float(f[1]))
@@ -33,7 +37,7 @@ func _ready() -> void:
 	add_child(_cam)
 	var c := OS.get_environment("CAM").split(",")
 	_cam.position = Vector3(float(c[0]), float(c[1]), float(c[2]))
-	GameState.set_time(15.0)
+	GameState.set_time(float(OS.get_environment("HOUR")) if OS.get_environment("HOUR") != "" else 15.0)
 	Actor.show_debug = false
 
 

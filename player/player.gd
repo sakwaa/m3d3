@@ -26,6 +26,12 @@ const FALL_GRAVITY := 1.9
 const MOUSE_SENSITIVITY := 0.004
 ## Right stick camera turn, radians per second at full tilt.
 const STICK_TURN_SPEED := 3.0
+## Seconds the stick's camera turn rate takes to ease in / out; the mouse's movement is worked
+## off over MOUSE_EASE.
+const STICK_EASE := 0.08
+const MOUSE_EASE := 0.04
+var _stick_rate := Vector2.ZERO
+var _mouse_pending := Vector2.ZERO
 const STICK_DEADZONE := 0.2
 const MODEL := preload("res://characters/player_model.tscn")
 const SWORD := preload("res://characters/props/practice_sword.tscn")  # generated stand-in (0.64 m)
@@ -74,14 +80,22 @@ func _ready() -> void:
 	body.add_child(model)
 	_model = model
 	_sword = ActorSockets.attach(model, &"prop_R", SWORD.instantiate())
-	add_child(SwordTrail.new(_sword, _swing_trail, self))
+	# (the blade hangs from the grip on a spring - looks only, the trigger stays true; the
+	# trail follows the blade as drawn)
+	_sway = SwordSway.install(_sword, self, _swinging, _strike_window) if _sword else null
+	add_child(SwordTrail.new(_sway if _sway else _sword, _swing_trail, self))
 	_sheathe(true)
 	var skeleton := model.find_children("*", "Skeleton3D", true, false)
 	if not skeleton.is_empty():
 		skeleton[0].add_child(ClimbRig.new(self))  # hands and feet on what's climbed
 		skeleton[0].add_child(StrikeRig.new(self))  # swings bent onto the strike point aimed at
 		skeleton[0].add_child(LandDip.new(self))  # the knees give on soft landings
-	add_child(GrassWake.new(self))  # wading through grass carpets
+		aim_rig = AimRig.new(self, false)  # right-handed: sword and drawing hand right, bow in the left
+		skeleton[0].add_child(aim_rig)  # aiming: side-on, bow arm out along the aim, string drawn
+		hit_react = HitReact.new(self)
+		skeleton[0].add_child(hit_react)  # blows bend the body the way they push
+	# (Wading through grass carpets: the zone's grass simulation dents and bends them - Zone
+	# _update_grass_sim; GrassWake's rings, divot and bowl are retired.)
 	_build_machines()
 	# Fake shadow: silhouette decals from the sun and nearest torch (no shadow maps).
 	add_child(ProjectedShadow.new())  # darkness: the zone's shadow_strength
@@ -95,6 +109,12 @@ func _ready() -> void:
 	var arm := SpringArm3D.new()
 	arm.spring_length = 5.0
 	arm.add_excluded_object(get_rid())
+	# A sphere, not a ray: the camera stops this far off a wall or the ground, so its near
+	# plane never cuts into them (looking up from low, a ray let it sit on the ground and the
+	# near plane sliced the street open).
+	var ball := SphereShape3D.new()
+	ball.radius = 0.25
+	arm.shape = ball
 	_pitch.add_child(arm)
 	# The orbit rig's end; the real camera (top-level) follows it or a CameraZone's shot.
 	var orbit := Camera3D.new()
@@ -105,6 +125,10 @@ func _ready() -> void:
 	camera.fov = 60.0  # OoT / MM vertical FOV
 	camera.top_level = true
 	add_child(camera)
+	# The rig turns with the mouse / stick every frame and the view is placed every frame
+	# (CameraDirector, from the player's interpolated position): not physics-interpolated.
+	for n: Node3D in [_yaw, _pitch, arm, orbit, camera]:
+		n.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	camera.make_current()
 	director = CameraDirector.new(self, _yaw, _pitch, arm, orbit, camera)
 	add_child(director)
@@ -123,7 +147,10 @@ func _ready() -> void:
 	var marks := TargetMarks.new(lock)
 	marks.letterboxed = func() -> bool: return director.z_targeting()
 	hud.add_child(marks)
+	hud.add_child(AimReticle.new(self))
+	RenderScale.video_hud(hud)
 
+	_outline.call_deferred()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	footsteps = true
 	fall_damage_height = 8.0  # about three storeys
@@ -216,6 +243,11 @@ func _build_machines() -> void:
 	var ladder := LocoLadder.new()
 	ladder.name = "Ladder"
 	var climbing: Array[ClimbState] = [climb, hang, ceiling, leap, pull_up, ladder]
+	# Push blocks (OoT): hold Grab facing one, the stick pushes / pulls it a step at a time.
+	var push := LocoPush.new()
+	push.name = "Push"
+	push.animation = &"Idle"
+	push.restrict = {&"Action": PackedStringArray(["Ready"])}
 	# Limbs come from the ClimbRig; the body holds a neutral pose under them.
 	for s in [climb, hang, ceiling, leap, ladder]:
 		s.animation = &"Idle"
@@ -224,10 +256,13 @@ func _build_machines() -> void:
 		s.restrict = {&"Action": PackedStringArray(["Ready"])}
 	for s in [idle, walk, run, jump, fall] + strafes:
 		s.climb_state = &"Climb"
+	for s in [idle, walk, run] + strafes:
+		s.push_state = &"Push"
 	for s in [idle, walk, run, jump, fall, land] + strafes:
 		loco.add_child(s)
 	for s in climbing:
 		loco.add_child(s)
+	loco.add_child(push)
 	add_machine(loco)
 
 	var action := StateMachine.new()
@@ -246,7 +281,7 @@ func _build_machines() -> void:
 	ready_state.name = "Ready"
 	ready_state.inputs = {&"attack": ActionState.PICK, &"jump_attack": &"JumpSlash"}
 	ready_state.attacks = attacks
-	ready_state.holds = {&"guard": &"Guard"}
+	ready_state.holds = {&"guard": &"Guard", &"aim": &"Aim"}
 	var swings: Array[AttackState] = [_attack("SlashH", 1, 2.0), _attack("SlashH2", 1, 2.0), _attack("SlashD", 1, 1.5),
 		_attack("SlashV", 2, 0.0), _attack("Stab", 1, 0.0), _attack("JumpSlash", 2, 1.5)]
 	swings[0].slash_axis = Vector3.RIGHT
@@ -294,6 +329,8 @@ func _build_machines() -> void:
 	for a in swings:
 		action.add_child(a)
 	action.add_child(guard)
+	# Bow (TOTK aiming: references/aiming/totk_aim_reference.md): hold Aim, Attack shoots.
+	action.add_child(AimState.new())
 	Actor.add_reaction_states(action, &"Ready")
 	add_machine(action)
 
@@ -315,6 +352,18 @@ func _attack(state_name: String, damage: int, knockback: float, lunge := 0.0) ->
 	a.tags = PackedStringArray(["attacking"])
 	a.blocked_by_tags = PackedStringArray(["airborne"])
 	return a
+
+
+var _sway: SwordSway
+
+
+func _swinging() -> bool:
+	return state_of(ACTION) is AttackState
+
+
+func _strike_window() -> bool:
+	var a := state_of(ACTION) as AttackState
+	return a != null and a.windows.has(&"active") and a.in_window(&"active")
 
 
 ## The sword's BladeTrigger (made for a sword scene that has none: the top of the blade).
@@ -354,6 +403,9 @@ func _swing_trail() -> bool:
 		return false
 	var w: Vector2 = a.windows[&"active"]
 	var p := a.progress()
+	if SwordTrail.style == SwordTrail.Style.OOT:
+		# (OoT: from the swing's first frame to the end of its hit window, then fades out)
+		return p >= 0.0 and p <= w.y
 	return p >= w.x - 0.08 and p <= w.y + 0.03
 
 
@@ -396,6 +448,13 @@ static func _ensure_input_actions() -> void:
 	_add_action(&"guard", [KEY_K], [JOY_BUTTON_RIGHT_SHOULDER], [MOUSE_BUTTON_RIGHT])
 	_add_action(&"target", [KEY_Q], [JOY_BUTTON_LEFT_SHOULDER])  # (not Shift: it clashes with screenshot keys)
 	_add_action(&"walk", [[KEY_ALT, KEY_LOCATION_LEFT]], [])
+	# Aim the bow (hold; Attack shoots): F, the mouse's back button, the right trigger (TOTK's ZR).
+	if not InputMap.has_action(&"aim"):
+		_add_action(&"aim", [KEY_F], [], [MOUSE_BUTTON_XBUTTON1])
+		var trig := InputEventJoypadMotion.new()
+		trig.axis = JOY_AXIS_TRIGGER_RIGHT
+		trig.axis_value = 1.0
+		InputMap.action_add_event(&"aim", trig)
 	# Left stick moves (with WASD / arrows), right stick turns the camera.
 	_add_axis_action(&"move_left", [KEY_A, KEY_LEFT], JOY_AXIS_LEFT_X, -1.0)
 	_add_axis_action(&"move_right", [KEY_D, KEY_RIGHT], JOY_AXIS_LEFT_X, 1.0)
@@ -444,9 +503,15 @@ static func _add_action(action: StringName, keys: Array, pads: Array, mouse := [
 		InputMap.action_add_event(action, e)
 
 
+## Where the aiming reticle looks from (AimState): the aim camera's place (not mid-blend).
+func aim_view() -> Transform3D:
+	return director.aim_xf()
+
+
 ## Moves the player to a spawn transform, facing its -Z.
 func teleport(xf: Transform3D) -> void:
 	global_position = xf.origin
+	reset_physics_interpolation()
 	velocity = Vector3.ZERO
 	set_safe_position(xf.origin)
 	_yaw.rotation.y = xf.basis.get_euler().y
@@ -454,10 +519,8 @@ func teleport(xf: Transform3D) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-		if not _z_camera() and director.allows_turn():  # Z-targeting, the camera frames the target / holds behind
-			_yaw.rotation.y -= event.relative.x * MOUSE_SENSITIVITY
-		if director.allows_pitch():
-			_pitch.rotation.x = clampf(_pitch.rotation.x - event.relative.y * MOUSE_SENSITIVITY, -1.2, 0.4)
+		# (collected, then turned in smoothly every frame: _turn_camera)
+		_mouse_pending += event.relative * MOUSE_SENSITIVITY
 	elif event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	elif event is InputEventMouseButton and event.pressed and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
@@ -469,7 +532,9 @@ func _unhandled_input(event: InputEvent) -> void:
 ## Grass parts round the player (n64_bender0: position, radius).
 func _process(delta: float) -> void:
 	super(delta)
-	var p := global_position
+	if not scripted and not is_dead():
+		_turn_camera(delta)
+	var p := get_global_transform_interpolated().origin
 	RenderingServer.global_shader_parameter_set(&"n64_bender0", Vector4(p.x, p.y, p.z, 0.9))
 
 
@@ -486,9 +551,8 @@ func drive(delta: float) -> void:
 			ZoneManager.respawn_player()
 		return
 	_update_sword(delta)
-	_turn_camera(delta)
 	# Left stick (analog strength) or WASD / arrow keys.
-	var input := Input.get_vector(&"move_left", &"move_right", &"move_forward", &"move_back")
+	var input := N64Stick.read(&"move_left", &"move_right", &"move_forward", &"move_back", STICK_DEADZONE)
 	var basis := director.input_basis(input != Vector2.ZERO)
 	var dir := basis * Vector3(input.x, 0.0, input.y)
 	dir.y = 0.0
@@ -508,26 +572,44 @@ func drive(delta: float) -> void:
 	if Input.is_action_just_pressed(&"attack") and not climbing:
 		intent.press(&"attack")
 	intent.hold(&"guard", Input.is_action_pressed(&"guard") and not climbing)
+	intent.hold(&"aim", Input.is_action_pressed(&"aim") and not climbing)
+	intent.hold(&"grab", Input.is_action_pressed(&"interact") and not climbing)
 
 	if global_position.y < -20.0:
 		ZoneManager.respawn_player()
 
 
-## Right stick orbits the camera like the mouse.
+## Right stick and mouse orbit the camera, every rendered frame (not on the physics tick:
+## 60 Hz steps beat against the frames and the pan juddered). The stick's turn rate eases in
+## and out (STICK_EASE); the mouse's movement is worked off over MOUSE_EASE, so uneven mouse
+## events don't show as jerks.
 func _turn_camera(delta: float) -> void:
-	var look := Input.get_vector(&"camera_left", &"camera_right", &"camera_up", &"camera_down")
-	if look == Vector2.ZERO:
+	var look := N64Stick.read(&"camera_left", &"camera_right", &"camera_up", &"camera_down", STICK_DEADZONE)
+	_stick_rate = _stick_rate.lerp(look * Vector2(STICK_TURN_SPEED, STICK_TURN_SPEED * 0.6), 1.0 - exp(-delta / STICK_EASE))
+	if look == Vector2.ZERO and _stick_rate.length() < 0.001:
+		_stick_rate = Vector2.ZERO
+	var take := _mouse_pending * (1.0 - exp(-delta / MOUSE_EASE))
+	_mouse_pending -= take
+	var turn := _stick_rate * delta + take
+	if turn == Vector2.ZERO:
 		return
-	if not _z_camera() and director.allows_turn():
-		_yaw.rotation.y -= look.x * STICK_TURN_SPEED * delta
+	if not _z_camera() and director.allows_turn():  # Z-targeting, the camera frames the target / holds behind
+		_yaw.rotation.y -= turn.x
 	if director.allows_pitch():
-		_pitch.rotation.x = clampf(_pitch.rotation.x - look.y * STICK_TURN_SPEED * 0.6 * delta, -1.2, 0.4)
+		var lim := director.pitch_limits()
+		_pitch.rotation.x = clampf(_pitch.rotation.x - turn.y, lim.x, lim.y)
 
 
 ## Z-targeting (TargetLock: MM's rules, Hold or Switch mode). Locked on, the player faces
 ## the target (left / right circle it); in Parallel (Z with nothing to lock) the facing
 ## holds. The CameraDirector frames it. No targeting while climbing.
 func _update_lock(delta: float, move: Vector3) -> void:
+	if has_tag(&"aiming"):
+		# Aiming: no lock (AimState holds the facing along the aim).
+		if lock.active() or lock.parallel:
+			lock.release()
+		face_target = null
+		return
 	# Stick held back (most of the way, within 45° of straight back): no next target.
 	var back := move.length() > 0.9 and move.normalized().dot(-facing) > cos(deg_to_rad(45.0))
 	lock.update(delta, Input.is_action_just_pressed(&"target"), Input.is_action_pressed(&"target"), back,
@@ -541,3 +623,20 @@ func _update_lock(delta: float, move: Vector3) -> void:
 ## and mouse don't turn it.
 func _z_camera() -> bool:
 	return lock.target != null or lock.parallel or lock.forced
+
+
+## Readability: the player's silhouette edge darkened a little by the video output's object
+## outline (one rendered pixel inside the silhouette, multiplied - not a drawn line), so a
+## pale tunic still separates from pale paving at midday. PLAYER_OUTLINE 0 turns it off.
+const PLAYER_OUTLINE := 0.6
+
+
+func _outline() -> void:
+	var e := RenderScale.video_out()
+	if e == null or PLAYER_OUTLINE <= 0.0:
+		return
+	e.set(&"outline_code", 64 + object_id)
+	e.set(&"outline_color", Color(0.45, 0.45, 0.55))
+	e.set(&"outline_flat", 0.0)
+	e.set(&"outline_mix", PLAYER_OUTLINE)
+

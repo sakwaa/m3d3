@@ -1,5 +1,5 @@
 shader_type spatial;
-render_mode diffuse_lambert, specular_disabled;
+render_mode diffuse_lambert, specular_disabled, vertex_lighting;
 // Merged level paint (the build's MaterialMerge): many plain base-textured surfaces of a
 // chunk drawn as one. Each vertex carries its material's index (UV2.x); the base textures
 // sit in one array (each upscaled by a whole number to the array's size, so every texel is
@@ -10,6 +10,8 @@ render_mode diffuse_lambert, specular_disabled;
 #include "res://addons/n64_runtime/shaders/n64_sampling.gdshaderinc"
 #include "res://addons/n64_runtime/shaders/n64_lod_fade.gdshaderinc"
 #include "res://addons/n64_runtime/shaders/n64_weather.gdshaderinc"
+#include "res://addons/n64_runtime/shaders/n64_ripples.gdshaderinc"
+#include "res://addons/n64_runtime/shaders/n64_coverage.gdshaderinc"
 
 uniform sampler2DArray base_array : source_color, filter_nearest_mipmap, repeat_enable;
 // Per material (column = index): row 0 tile, anti.x, anti.y, native size; 1 tint mode, dark;
@@ -27,9 +29,17 @@ uniform float bake_strength = 1.0;
 uniform float light_floor = 0.0;
 uniform bool timed_bake = false;
 
-varying vec3 key_light;
-varying vec2 n64_fogv;
-varying vec3 n64_fog_tintv;
+varying N64_SHADE vec3 key_light;
+varying flat float brush_code;
+// The baked light at this pixel (decoded from its display-value interpolation).
+#if N64_GAMMA_MIX
+#define KEY_LIGHT n64_dec(key_light)
+#else
+#define KEY_LIGHT key_light
+#endif
+varying N64_SHADE vec2 n64_fogv;
+varying N64_SHADE vec4 n64_colv;  // COLOR, affine
+varying N64_SHADE vec3 n64_fog_tintv;
 varying flat float mat_id;
 
 const vec3 LUMA = vec3(0.299, 0.587, 0.114);
@@ -48,17 +58,27 @@ vec3 n64_baked_shade(vec3 shade, vec3 paint, vec3 light) {
 }
 
 void vertex() {
+	n64_colv = COLOR;
 	VERTEX = n64_reflect_flatten(VERTEX, MODEL_MATRIX, CAMERA_POSITION_WORLD);
 	n64_fogv = n64_fog_vertex((MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz);
 	n64_fog_tintv = n64_fog_tint_vertex((MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz);
 	mat_id = UV2.x;
 	key_light = vec3(1.0);
+	brush_code = 7.0;
+	if (light_keys > 0) {
+		float bid = floor(CUSTOM0.a * 255.0 + 0.5) - 1.0;
+		brush_code = bid >= 0.0 && bid < 7.0 ? bid : 7.0;
+	}
 	if (light_keys > 0) {
 		vec4 k[4] = vec4[](CUSTOM0, CUSTOM1, CUSTOM2, CUSTOM3);
 		int a = clamp(int(n64_light_blend.x + 0.5), 0, light_keys - 1);
 		int b = clamp(int(n64_light_blend.y + 0.5), 0, light_keys - 1);
-		key_light = mix(k[a].rgb, k[b].rgb, clamp(n64_light_blend.z, 0.0, 1.0));
+		key_light = n64_shade8(mix(k[a].rgb, k[b].rgb, clamp(n64_light_blend.z, 0.0, 1.0)));
 	}
+#if N64_GAMMA_MIX
+	key_light = n64_enc(key_light);  // (interpolated across the triangle on display values: decoded per pixel)
+#endif
+	N64_SNAP_MODEL;
 }
 
 // --- The array read at a layer's native size (n64_sampling's functions, for the array) ---
@@ -211,6 +231,9 @@ vec3 apply_variation(vec3 c, vec2 uv, vec3 v, float vl) {
 
 void fragment() {
 	n64_lod_dither(CAMERA_POSITION_WORLD, MODEL_MATRIX, FRAGCOORD.xy);
+	if (!IN_SHADOW_PASS) {
+		n64_see_through_dither((INV_VIEW_MATRIX * vec4(VERTEX, 1.0)).xyz, CAMERA_POSITION_WORLD, FRAGCOORD.xy);  // (the sun's view: no holes)
+	}
 	int id = int(mat_id + 0.5);
 	vec4 p0 = texelFetch(params, ivec2(id, 0), 0);
 	vec4 p1 = texelFetch(params, ivec2(id, 1), 0);
@@ -225,13 +248,18 @@ void fragment() {
 	vec3 c = m_texture_tiled(tuv, p0.yz, layer, size).rgb;
 	if (p2.x > 0.5) {
 		float mean = dot(textureLod(base_array, vec3(0.5, 0.5, layer), 16.0).rgb, LUMA);
-		vec3 picked = pow(max(COLOR.rgb * vertex_color_scale, vec3(0.0)), vec3(2.2));
+		vec3 picked = pow(max(n64_colv.rgb * vertex_color_scale, vec3(0.0)), vec3(2.2));
 		c = picked * (dot(c, LUMA) / max(mean, 0.05)) * tint.rgb;
 	} else {
 		c = n64_tint(c, p1.x, p1.yzw, p2.yzw, p3.xyz) * tint.rgb;
 	}
 	c = colour_adjust(c, texelFetch(params, ivec2(id, 6), 0), texelFetch(params, ivec2(id, 7), 0), texelFetch(params, ivec2(id, 8), 0), texelFetch(params, ivec2(id, 9), 0));
 	c = apply_variation(c, UV, var.xyz, var.w);
+	if (soft_ground > 0.0) {
+		vec3 fw = (INV_VIEW_MATRIX * vec4(VERTEX, 1.0)).xyz;
+		float fup = smoothstep(0.5, 0.9, (INV_VIEW_MATRIX * vec4(NORMAL, 0.0)).y);
+		c = n64_footprints(c, fw.xz, CAMERA_POSITION_WORLD, n64_key_light.xz, fup);
+	}
 	if (n64_wetness > 0.0) {
 		vec3 world = (INV_VIEW_MATRIX * vec4(VERTEX, 1.0)).xyz;
 		float up = smoothstep(0.3, 0.8, (INV_VIEW_MATRIX * vec4(NORMAL, 0.0)).y);
@@ -239,12 +267,23 @@ void fragment() {
 		c = n64_wet(c, wet);
 		float graze = pow(1.0 - clamp(dot(normalize(NORMAL), VIEW), 0.0, 1.0), 4.0);
 		c += n64_fog_color.rgb * graze * up * wet * 0.15;
+		// Ripples on the wet ground: raindrops where it's open to the sky, and the ripple
+		// simulation (drips off the eaves, footsteps, landings) wherever it's wet. Crests catch
+		// the sky's light, troughs darken a little.
+		float rd = length(world - CAMERA_POSITION_WORLD);
+		float rip = n64_rain_rings(world.xz, n64_time, n64_rain.x, rd) * wet
+			+ n64_ripple_sim(world.xz, CAMERA_POSITION_WORLD) * n64_wetness * up * 1.6;
+		rip = clamp(rip, -1.0, 1.0) * up;
+		c += mix(n64_fog_color.rgb, vec3(1.0), 0.4) * max(rip, 0.0) * 0.6;
+		c *= 1.0 + min(rip, 0.0) * 0.35;
 	}
-	vec3 paint = p2.x > 0.5 ? vec3(1.0) : COLOR.rgb * vertex_color_scale;
-	vec3 vc = paint * mix(1.0, COLOR.a, n64_vertex_ao);
+	vec3 paint = p2.x > 0.5 ? vec3(1.0) : n64_colv.rgb * vertex_color_scale;
+	vec3 vc = paint * mix(1.0, n64_colv.a, n64_vertex_ao);
 	FOG = n64_fog_out(n64_fogv, n64_fog_tintv, VERTEX, INV_VIEW_MATRIX);
-	vec3 light = key_light * (timed_bake ? vec3(1.0) : n64_world_tint.rgb);
+	vec3 light = KEY_LIGHT * (timed_bake ? vec3(1.0) : n64_world_tint.rgb);
 	ALBEDO = c * vc * n64_weather_tint.rgb;
 	EMISSION = c * n64_baked_shade(vc * light, paint, light) * n64_weather_tint.rgb * bake_strength;
 	AO = clamp(1.0 - bake_strength, 0.0, 1.0);
+	N64_FOG_GAMMA;
+	N64_COVERAGE_BRUSH(brush_code);
 }

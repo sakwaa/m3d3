@@ -6,6 +6,7 @@ render_mode unshaded, cull_disabled, skip_vertex_transform;
 // quads turn around Y to face the camera; others keep their instance rotation (crossed
 // quads, flat heads on the ground). Instance colour = per-instance brightness variation.
 #include "res://addons/n64_runtime/shaders/n64_sampling.gdshaderinc"
+#include "res://addons/n64_runtime/shaders/n64_coverage.gdshaderinc"
 
 uniform sampler2D tex : source_color, filter_nearest_mipmap, repeat_disable;
 uniform bool billboard = false;
@@ -17,9 +18,9 @@ uniform float shade = 0.9;
 uniform int edge_mode = 1;
 uniform float edge_dark = 0.55;
 
-varying vec2 n64_fogv;
-varying vec3 n64_fog_tintv;
-varying vec3 tint;
+varying N64_SHADE vec2 n64_fogv;
+varying N64_SHADE vec3 n64_fog_tintv;
+varying N64_SHADE vec3 tint;
 
 void vertex() {
 	vec3 world;
@@ -38,6 +39,7 @@ void vertex() {
 	tint = COLOR.rgb;
 	VERTEX = (VIEW_MATRIX * vec4(world, 1.0)).xyz;
 	NORMAL = normalize((VIEW_MATRIX * vec4(0.0, 1.0, 0.0, 0.0)).xyz);
+	N64_SNAP_VIEW;
 }
 
 // Whether the texel at `uv` is on the cut-out's edge.
@@ -65,7 +67,12 @@ void fragment() {
 		c.rgb *= edge_dark;
 	}
 	ALBEDO = c.rgb * tint * shade * n64_world_tint.rgb * n64_weather_tint.rgb;
-	ALPHA = c.a;
-	ALPHA_SCISSOR_THRESHOLD = 0.5;
+	// The RDP's alpha compare (discard: ALPHA + scissor with MSAA breaks the coverage tag)
+	if (c.a < 0.5) {
+		discard;
+	}
 	FOG = n64_fog_out(n64_fogv, n64_fog_tintv, VERTEX, INV_VIEW_MATRIX);
+	// Texture edge (G_RM_AA_TEX_EDGE): coverage x texel alpha.
+	N64_FOG_GAMMA;
+	COVERAGE_TEXEDGE;
 }

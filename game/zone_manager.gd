@@ -41,7 +41,10 @@ func _ready() -> void:
 	_adopt_current_scene(GameState.current_spawn)
 
 
-func travel(zone_path: String, spawn_id: StringName = &"", return_spawn: StringName = &"") -> void:
+## `warp` >= 0: instead of the fade to black, the old place's picture is held while the next
+## loads, then carried away (N64VideoOut.Warp: 0 crossfade, 1 spin-zoom, 2 ripple) - warp
+## songs, magic doors, falling into a dream.
+func travel(zone_path: String, spawn_id: StringName = &"", return_spawn: StringName = &"", warp := -1) -> void:
 	if busy:
 		return
 	if zone_path.is_empty() or not ResourceLoader.exists(zone_path):
@@ -60,7 +63,12 @@ func travel(zone_path: String, spawn_id: StringName = &"", return_spawn: StringN
 	# The player keeps walking the way they were going while it fades (a door has already
 	# taken them over and walks them itself).
 	var walked := _walk_out()
-	await _loading.fade_in(FADE_OUT_TIME)
+	if warp >= 0:
+		RenderScale.hold_snapshot()
+		await get_tree().process_frame
+		await get_tree().process_frame  # (the copy is taken on the next drawn frame)
+	else:
+		await _loading.fade_in(FADE_OUT_TIME)
 	if player:
 		if walked:
 			player.intent.clear()
@@ -92,7 +100,11 @@ func travel(zone_path: String, spawn_id: StringName = &"", return_spawn: StringN
 		await get_tree().scene_changed
 		_adopt_current_scene(spawn_id)
 
-	await _loading.fade_out(FADE_IN_TIME)
+	if warp >= 0:
+		await get_tree().process_frame
+		RenderScale.release_snapshot(warp, 1.2)
+	else:
+		await _loading.fade_out(FADE_IN_TIME)
 	busy = false
 
 
@@ -103,6 +115,57 @@ func preload_zone(zone_path: String) -> void:
 		return
 	if ResourceLoader.load_threaded_request(zone_path) == OK:
 		_requested[zone_path] = true
+
+
+## A preloaded zone was taken by someone else (DropPortal's preview): ask again next time.
+func forget_preload(zone_path: String) -> void:
+	_requested.erase(zone_path)
+
+
+## DropPortal: the player fell through `portal`'s hole. Swaps to its zone with them carried
+## across - the same place relative to the exit in the other zone's sky, the same fall,
+## facing and camera turn - under a held frame: SEAMLESS crossfades quickly (the next frame
+## shows what the hole did), RDP goes through the ripple warp. The landing does no harm.
+func drop_through(portal: DropPortal, body: Node3D) -> void:
+	if busy or body != player:
+		return
+	busy = true
+	var xf := portal.crossing()
+	var turn := xf.basis.get_euler().y
+	var at := xf * player.global_transform
+	var vel := xf.basis * player.velocity
+	var cam_yaw: float = player._yaw.rotation.y + turn if "_yaw" in player else 0.0
+	var cam_pitch: float = player._pitch.rotation.x if "_pitch" in player else 0.0
+	var actor := player as Actor
+	var facing := xf.basis * actor.facing if actor else Vector3.FORWARD
+	var zone_path := portal.target_zone
+	var scene: PackedScene = portal.scene if portal.scene else load(zone_path) as PackedScene
+	if scene == null:
+		busy = false
+		travel(zone_path)
+		return
+	previous_zone_path = GameState.current_zone_path
+	previous_spawn = &""
+	var seamless := portal.style == DropPortal.Style.SEAMLESS
+	RenderScale.hold_snapshot()
+	await get_tree().process_frame
+	await get_tree().process_frame  # (the copy is taken on the next drawn frame)
+	player.process_mode = Node.PROCESS_MODE_DISABLED
+	GameState.clear_temp_flags()
+	get_tree().change_scene_to_packed(scene)
+	await get_tree().scene_changed
+	_adopt_current_scene(&"", true)
+	player.teleport(Transform3D(Basis.IDENTITY, at.origin))
+	player.velocity = vel
+	if "_yaw" in player:
+		player._yaw.rotation.y = cam_yaw
+		player._pitch.rotation.x = cam_pitch
+	if actor:
+		actor.facing = facing
+		actor.cushion_landing = true
+	await get_tree().process_frame
+	RenderScale.release_snapshot(0 if seamless else 2, 0.3 if seamless else 1.2)
+	busy = false
 
 
 ## Exits: the player carries on the way they were going (at their pace, at least a walk)
@@ -128,7 +191,8 @@ func respawn_player() -> void:
 		_place_player(zone.find_spawn(GameState.current_spawn))
 
 
-func _adopt_current_scene(spawn_id: StringName) -> void:
+## `dropped`: the caller places the player (DropPortal) - no spawn arrival, no intro.
+func _adopt_current_scene(spawn_id: StringName, dropped := false) -> void:
 	zone = get_tree().current_scene as Zone
 	if zone == null:
 		if player:
@@ -147,12 +211,12 @@ func _adopt_current_scene(spawn_id: StringName) -> void:
 	var found := spawn
 	# Editor "Play here": start where the designer was looking (editor runs only; the
 	# helper lives in the level tools, which never ship).
-	if OS.has_feature("editor") and ResourceLoader.exists(PLAY_HERE):
+	if OS.has_feature("editor") and ResourceLoader.exists(PLAY_HERE) and not dropped:
 		spawn = load(PLAY_HERE).take_spawn(zone, spawn)
 	_place_player(spawn)
 	zone.room_changed.connect(func(room): room_changed.emit(room))
 	zone.begin(player, spawn)
-	if spawn and spawn.has_method(&"play_arrival"):
+	if spawn and spawn.has_method(&"play_arrival") and not dropped:
 		spawn.play_arrival(player)
 
 	GameState.current_zone_path = zone.scene_file_path
@@ -160,7 +224,7 @@ func _adopt_current_scene(spawn_id: StringName) -> void:
 	GameState.time_running = zone.time_flows
 	zone_changed.emit(zone)
 	# The area's intro the first time here (not when the editor's "Play here" put us down).
-	if spawn == found:
+	if spawn == found and not dropped:
 		zone.play_intro()
 
 

@@ -1,0 +1,42 @@
+[gd_resource type="ShaderMaterial" format=3]
+
+[ext_resource type="Shader" path="res://addons/n64_runtime/shaders/n64_magic.gdshader" id="1_th8oa"]
+
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_dhk2s"]
+noise_type = 3
+seed = 3
+frequency = 0.035
+
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_260l7"]
+width = 64
+height = 64
+noise = SubResource("FastNoiseLite_dhk2s")
+seamless = true
+
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_oy50s"]
+noise_type = 2
+seed = 9
+frequency = 0.06
+
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_hypwp"]
+width = 64
+height = 64
+noise = SubResource("FastNoiseLite_oy50s")
+seamless = true
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_th8oa")
+shader_parameter/texture0 = SubResource("NoiseTexture2D_260l7")
+shader_parameter/texture1 = SubResource("NoiseTexture2D_hypwp")
+shader_parameter/texture0_scale = null
+shader_parameter/texture0_scroll = null
+shader_parameter/texture1_scale = null
+shader_parameter/texture1_scroll = null
+shader_parameter/recipe = 2
+shader_parameter/alpha_mode = 2
+shader_parameter/prim = Color(0.85, 0.95, 1, 0.85)
+shader_parameter/env = Color(0.1, 0.35, 0.8, 1)
+shader_parameter/k = 0.5
+shader_parameter/strength = null
+shader_parameter/alpha_from_intensity = null

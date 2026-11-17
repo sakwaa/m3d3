@@ -82,5 +82,6 @@ func _update_label() -> void:
 		_label.font_size = 24
 		_label.modulate = Color(0.55, 0.8, 1.0)
 		add_child(_label, false, INTERNAL_MODE_BACK)
+		WorldPreview.register_label(_label)
 	_label.text = "path: %s" % path_id
 	_label.position = (curve.get_point_position(0) if curve and curve.point_count > 0 else Vector3.ZERO) + Vector3.UP * 1.2

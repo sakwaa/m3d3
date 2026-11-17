@@ -41,9 +41,18 @@ const SHADER := preload("res://addons/n64_runtime/shaders/n64_mountains.gdshader
 		sharpness = v
 		_queue()
 ## Colours: foot (dark slopes), rock, and snow above `snow_line` (share of the layer's max).
-@export var foot_color := Color(0.2, 0.26, 0.16)
-@export var rock_color := Color(0.5, 0.44, 0.37)
-@export var snow_color := Color(0.92, 0.93, 0.96)
+@export var foot_color := Color(0.2, 0.26, 0.16):
+	set(v):
+		foot_color = v
+		_queue()
+@export var rock_color := Color(0.5, 0.44, 0.37):
+	set(v):
+		rock_color = v
+		_queue()
+@export var snow_color := Color(0.92, 0.93, 0.96):
+	set(v):
+		snow_color = v
+		_queue()
 @export_range(0.0, 1.5, 0.05) var snow_line := 0.68:
 	set(v):
 		snow_line = v
@@ -58,36 +67,80 @@ const SHADER := preload("res://addons/n64_runtime/shaders/n64_mountains.gdshader
 @export var foot_texture: Texture2D = preload("res://textures/grass/1_moss.res"):
 	set(v):
 		foot_texture = v
-		_queue()
+		_apply_material()
 @export var rock_texture: Texture2D = preload("res://textures/rock/stone_wall_rubble.res"):
 	set(v):
 		rock_texture = v
-		_queue()
+		_apply_material()
 @export var snow_texture: Texture2D = preload("res://textures/rock/marble_1.res"):
 	set(v):
 		snow_texture = v
-		_queue()
+		_apply_material()
 @export_range(8.0, 300.0, 1.0, "suffix:m") var texture_scale := 45.0:
 	set(v):
 		texture_scale = v
-		_queue()
+		_apply_material()
 ## How strongly the textures show (0 = flat colour).
 @export_range(0.0, 1.0, 0.05) var texture_detail := 0.8:
 	set(v):
 		texture_detail = v
-		_queue()
+		_apply_material()
 ## Pushes the textures' light and dark apart (soft photos read at a distance).
 @export_range(0.5, 4.0, 0.1) var texture_contrast := 1.8:
 	set(v):
 		texture_contrast = v
-		_queue()
+		_apply_material()
+## Two-scale ground on the foot and rock faces (OoT's Hyrule Field look; empty = the
+## textures above): a detail texture (dirt) tiled every `ground_scale` metres, mottled by a
+## blend texture tiled every `blend_scale` metres (`blend_amount` of it).
+@export var ground_texture: Texture2D:
+	set(v):
+		ground_texture = v
+		_apply_material()
+@export var blend_texture: Texture2D:
+	set(v):
+		blend_texture = v
+		_apply_material()
+@export_range(2.0, 100.0, 0.5, "suffix:m") var ground_scale := 14.0:
+	set(v):
+		ground_scale = v
+		_apply_material()
+@export_range(20.0, 600.0, 5.0, "suffix:m") var blend_scale := 160.0:
+	set(v):
+		blend_scale = v
+		_apply_material()
+@export_range(0.0, 1.0, 0.05) var blend_amount := 0.7:
+	set(v):
+		blend_amount = v
+		_apply_material()
+## Far translation (Ocarina of Time's backgrounds): how much the range moves with the camera
+## (1 = fully: it stays as far as it was built whatever the player does - infinitely far,
+## no parallax; 0 = fixed in the world). A little under 1 keeps a hint of parallax.
+@export_range(0.0, 1.0, 0.01) var follow_camera := 1.0:
+	set(v):
+		follow_camera = v
+		_apply_material()
+## ... and its height (0: the range stays on the ground - climbing shows more of it, never
+## its underside).
+@export_range(0.0, 1.0, 0.01) var follow_height := 0.0:
+	set(v):
+		follow_height = v
+		_apply_material()
 ## Where the light comes from (for the flat shading; doesn't move with the time of day).
-@export var sun_direction := Vector3(-0.5, 0.8, 0.35)
+@export var sun_direction := Vector3(-0.5, 0.8, 0.35):
+	set(v):
+		sun_direction = v
+		_queue()
 
 var _queued := false
+## The generated mountains: an internal child (never saved, so rebuilding them doesn't
+## touch this node's own properties - the inspector stays put while a slider drags).
+var _mi: MeshInstance3D
+var _mat: ShaderMaterial
 
 
 func _ready() -> void:
+	mesh = null  # (scenes saved before: the mesh lived here; it's the child's now)
 	rebuild()
 
 
@@ -100,28 +153,56 @@ func _queue() -> void:
 		rebuild()).call_deferred()
 
 
+## The shader's settings (textures, scales, blend): no rebuild needed.
+func _apply_material() -> void:
+	if _mat == null:
+		_mat = ShaderMaterial.new()
+		_mat.shader = SHADER
+	_mat.set_shader_parameter(&"foot_tex", foot_texture)
+	_mat.set_shader_parameter(&"rock_tex", rock_texture)
+	_mat.set_shader_parameter(&"snow_tex", snow_texture)
+	_mat.set_shader_parameter(&"tex_scale", texture_scale)
+	_mat.set_shader_parameter(&"detail", texture_detail)
+	_mat.set_shader_parameter(&"tex_contrast", texture_contrast)
+	_mat.set_shader_parameter(&"use_ground", ground_texture != null)
+	_mat.set_shader_parameter(&"ground_tex", ground_texture)
+	_mat.set_shader_parameter(&"blend_tex", blend_texture if blend_texture else ground_texture)
+	_mat.set_shader_parameter(&"ground_scale", ground_scale)
+	_mat.set_shader_parameter(&"blend_scale", blend_scale)
+	_mat.set_shader_parameter(&"blend_amount", blend_amount if blend_texture else 0.0)
+	# The zone's own fog (the parent Zone's FogSettings): the haze per layer is measured
+	# against it, so the time of day's fog moves the mountains like everything else.
+	var zf = get_parent().get(&"fog") if get_parent() else null
+	var ref := Vector2(90.0, 220.0)
+	if zf is FogSettings and (zf as FogSettings).end > (zf as FogSettings).start:
+		ref = Vector2((zf as FogSettings).start, (zf as FogSettings).end)
+	_mat.set_shader_parameter(&"fog_ref", ref)
+	_mat.set_shader_parameter(&"follow", follow_camera)
+	_mat.set_shader_parameter(&"follow_height", follow_height)
+
+
 func rebuild() -> void:
+	if not is_inside_tree():
+		return
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var sun := sun_direction.normalized()
 	for li in layer_radius.size():
 		_layer(st, li, sun)
 	var m := st.commit()
-	if m.get_surface_count() > 0:
-		var mat := ShaderMaterial.new()
-		mat.shader = SHADER
-		mat.set_shader_parameter(&"foot_tex", foot_texture)
-		mat.set_shader_parameter(&"rock_tex", rock_texture)
-		mat.set_shader_parameter(&"snow_tex", snow_texture)
-		mat.set_shader_parameter(&"tex_scale", texture_scale)
-		mat.set_shader_parameter(&"detail", texture_detail)
-		mat.set_shader_parameter(&"tex_contrast", texture_contrast)
-		m.surface_set_material(0, mat)
-	mesh = m
-	cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_apply_material()
+	if _mi == null:
+		_mi = MeshInstance3D.new()
+		_mi.name = "Ridges"
+		_mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(_mi, false, Node.INTERNAL_MODE_BACK)
+	_mi.mesh = m
+	_mi.material_override = _mat
 	# (Always "visible": the camera is inside the ring.)
 	var r := (layer_radius[layer_radius.size() - 1] if not layer_radius.is_empty() else 100.0) * 1.3
-	custom_aabb = AABB(Vector3(-r, -50, -r), Vector3(r * 2, 400, r * 2))
+	_mi.custom_aabb = AABB(Vector3(-r, -50, -r), Vector3(r * 2, 400, r * 2))
+	# (It follows the camera in its shader: never culled however far the camera goes.)
+	_mi.extra_cull_margin = 16384.0
 
 
 func _layer(st: SurfaceTool, li: int, sun: Vector3) -> void:
@@ -135,9 +216,11 @@ func _layer(st: SurfaceTool, li: int, sun: Vector3) -> void:
 	noise.fractal_octaves = 3
 	var depth := radius * 0.35
 	var n := segments
-	# Rows outwards: foot (below the horizon), shoulder, ridge, back.
+	# Rows outwards: skirt (well below the horizon, a little inwards: looking down from high up
+	# - a tower, a cliff, the range following the camera - still lands on mountain), foot
+	# (below the horizon), shoulder, ridge, back.
 	var rows := []
-	for row in 4:
+	for row in 5:
 		var pts := PackedVector3Array()
 		for i in n:
 			var a := TAU * i / n
@@ -145,11 +228,11 @@ func _layer(st: SurfaceTool, li: int, sun: Vector3) -> void:
 			var v := (noise.get_noise_2d(cos(a) * 2.2, sin(a) * 2.2) + 1.0) * 0.5
 			var peak := h_min + (h_max - h_min) * pow(clampf(v, 0.0, 1.0), sharpness)
 			var jitter := (noise.get_noise_2d(cos(a) * 9.0 + row, sin(a) * 9.0) * 0.5)
-			var out: float = [0.0, 0.3, 0.55, 1.0][row]
-			var up: float = [-25.0, peak * (0.45 + jitter * 0.2), peak, peak * (0.35 + jitter * 0.2)][row]
-			pts.append(dir * (radius + depth * out + jitter * depth * 0.1 * float(row > 0)) + Vector3(0, up, 0))
+			var out: float = [-0.4, 0.0, 0.3, 0.55, 1.0][row]
+			var up: float = [-radius * 0.45, -25.0, peak * (0.45 + jitter * 0.2), peak, peak * (0.35 + jitter * 0.2)][row]
+			pts.append(dir * (radius + depth * out + jitter * depth * 0.1 * float(row > 1)) + Vector3(0, up, 0))
 		rows.append([pts, h_max])
-	for row in 3:
+	for row in 4:
 		var a_pts: PackedVector3Array = rows[row][0]
 		var b_pts: PackedVector3Array = rows[row + 1][0]
 		for i in n:

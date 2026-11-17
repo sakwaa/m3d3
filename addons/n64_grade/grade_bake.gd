@@ -128,6 +128,16 @@ static func _extras(data: LevelData, g: ZoneGrade, extras: Dictionary, stats: Di
 		else:
 			sets.append(ls)
 	data.layer_sets = sets
+	# Decals.
+	var decals: Array[LevelDecal] = []
+	for d0 in data.decals:
+		if d0 and d0.texture and copy.has(d0.texture):
+			var d1 := d0.duplicate() as LevelDecal
+			d1.texture = copy[d0.texture]
+			decals.append(d1)
+		else:
+			decals.append(d0)
+	data.decals = decals
 	# Grass.
 	if data.grass:
 		var gs := data.grass.duplicate() as GrassSettings
@@ -389,7 +399,34 @@ static func _textures(data: LevelData, g: ZoneGrade, stats: Dictionary) -> void:
 ## Meta `grade_source`: the original (what the build matches textures by, e.g. grass faces).
 static func _texture_copy(base: Texture2D, img: Image, pretinted: bool) -> Texture2D:
 	var t: Texture2D
-	if base is N64Texture:
+	if base is N64PaletteSwap and (base as N64PaletteSwap).palette_texture:
+		# Palette variants grade their palette row (the N64 way: the TLUT recoloured), each
+		# entry taking the graded colour of a texel that uses it.
+		var swap := (base as N64PaletteSwap).duplicate() as N64PaletteSwap
+		var pal := swap.palette_texture
+		var idx := pal.index.get_image().duplicate() as Image
+		idx.clear_mipmaps()
+		var graded := img.duplicate() as Image
+		graded.clear_mipmaps()
+		graded.convert(Image.FORMAT_RGBA8)
+		var row: PackedColorArray = pal.palettes[swap.palette_row].duplicate()
+		var done := {}
+		for y in mini(idx.get_height(), graded.get_height()):
+			for x in mini(idx.get_width(), graded.get_width()):
+				var k := roundi(idx.get_pixel(x, y).r * 255.0)
+				if k < row.size() and not done.has(k):
+					done[k] = true
+					row[k] = graded.get_pixel(x, y)
+		var copy := N64PaletteTexture.new()
+		copy.index = pal.index
+		copy.palettes = [row]
+		swap.palette_texture = copy
+		swap.palette_row = 0
+		swap.set_image(img)
+		if pretinted:
+			swap.tint_mode = 0
+		t = swap
+	elif base is N64Texture:
 		t = (base as N64Texture).duplicate()
 		(t as N64Texture).set_image(img)
 		if pretinted:

@@ -28,6 +28,7 @@ const PIPELINE := [
 	"res://addons/n64_level_tools/level_brush.gd",
 	"res://addons/n64_level_tools/level_data.gd",
 	"res://addons/n64_grade/grade_bake.gd",
+	"res://addons/n64_level_tools/paint/decal_builder.gd",
 	"res://addons/n64_level_tools/paint/grass_builder.gd",
 	"res://addons/n64_grade/grade_processor.gd",
 	"res://addons/n64_grade/grade_vertex.gd",

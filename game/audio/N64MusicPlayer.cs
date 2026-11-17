@@ -28,7 +28,7 @@ public partial class N64MusicPlayer : Node
 	[Export(PropertyHint.Range, "0.25,4,0.01")] public double Speed
 	{
 		get => _seq.Speed;
-		set => _seq.Speed = value;
+		set { lock (SyncRoot) _seq.Speed = value; }
 	}
 	[Export] public StringName AudioBus = "Master";
 	[Export(PropertyHint.Range, "0.015,0.25,0.005")] public float Latency = 0.04f;
@@ -40,6 +40,9 @@ public partial class N64MusicPlayer : Node
 
 	/// <summary>The synth playing the music (reverb settings, channel gains, …).</summary>
 	public N64Synth Synth => _synth;
+
+	/// <summary>The synth's lock (it mixes on its own thread, stepping the sequence).</summary>
+	private object SyncRoot => _synth?.Sync ?? _seq;
 
 	/// <summary>The bank in sample RAM: the playing (last played) song's, else the one the next
 	/// song without its own would get (<see cref="BankSet"/>, <see cref="Bank"/>). Debugging /
@@ -77,19 +80,25 @@ public partial class N64MusicPlayer : Node
 			return;
 		Song = song;
 		_synth.Bank = song.PlayBank ?? BankSet?.SoundBank ?? Bank;
-		_synth.StopAll(true);
-		_seq.Start(_synth, song, from, fadeIn);
+		lock (SyncRoot)
+		{
+			_synth.StopAll(true);
+			_seq.Start(_synth, song, from, fadeIn);
+		}
 	}
 
-	public void Stop(float fadeOut = 0f) { if (_synth != null) _seq.Stop(_synth, fadeOut); }
+	public void Stop(float fadeOut = 0f) { if (_synth != null) lock (SyncRoot) _seq.Stop(_synth, fadeOut); }
 
-	public void FadeTo(float gain, float seconds) => _seq.FadeTo(gain, seconds);
+	public void FadeTo(float gain, float seconds) { lock (SyncRoot) _seq.FadeTo(gain, seconds); }
 
 	public void SetPaused(bool paused)
 	{
-		_seq.Paused = paused;
-		if (paused && _synth != null)
-			_synth.ReleaseAll();
+		lock (SyncRoot)
+		{
+			_seq.Paused = paused;
+			if (paused && _synth != null)
+				_synth.ReleaseAll();
+		}
 	}
 
 	public bool IsPaused() => _seq.Paused;
@@ -99,7 +108,7 @@ public partial class N64MusicPlayer : Node
 	/// <summary>Seconds into the song.</summary>
 	public double GetPosition() => _seq.Position;
 
-	public void Seek(double seconds) { if (_synth != null) _seq.Seek(_synth, seconds); }
+	public void Seek(double seconds) { if (_synth != null) lock (SyncRoot) _seq.Seek(_synth, seconds); }
 
 	/// <summary>Gain (0-1) of a MIDI channel on top of the song's own volumes.</summary>
 	public void SetChannelGain(int channel, float gain) => _synth?.SetChannelGain(channel, gain);

@@ -46,10 +46,22 @@ extends Resource
 ## Light hanging in the fog: lamps and windows tint more of the air round them and glow
 ## wider and brighter (0 = the zone's own settings).
 @export_range(0.0, 2.0, 0.05) var fog_glow := 0.0
+## Ground mist (GroundMist): a knee-deep blanket of mist on the ground that actors part
+## (0 none .. 1 full) and how high it reaches. Zones and rooms can override it.
+@export_range(0.0, 1.0, 0.05) var ground_mist := 0.0
+@export_range(0.1, 2.0, 0.05, "suffix:m") var ground_mist_height := 0.7
 ## Screen look while this weather lasts outdoors (over the zone's; a room's wins).
 @export var screen_look: ScreenLook
 @export_group("Effects")
 @export var lightning := false
+## Sandstorm (OoT's Haunted Wasteland layer; Sandstorm): 0 off, up to 1 full breathing
+## storm. `sandstorm_haze`: MM's neutral white-over-grey version (sea murk, snow haze, wind).
+@export_range(0.0, 1.0, 0.05) var sandstorm := 0.0
+@export var sandstorm_haze := false
+## Wind-blown dust in the world (WindDust): `dust` along the streets round the camera, `dust_far`
+## a band standing between the town and the mountains (0 off .. 1 strong).
+@export_range(0.0, 1.0, 0.05) var dust := 0.0
+@export_range(0.0, 1.0, 0.05) var dust_far := 0.0
 ## Rain intensity 0..1, for the rain system (not rendered yet).
 @export_range(0.0, 1.0, 0.05) var rain := 0.0
 ## Wind: multiplies the zone's wind (Zone.wind_strength; 1 = as the zone has it, 0 = still,

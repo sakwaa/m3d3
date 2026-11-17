@@ -43,14 +43,7 @@ static func merge(meshes: Array) -> Dictionary:
 			size = maxi(size, t.get_width())
 	var images: Array[Image] = []
 	for t: Texture2D in textures:
-		var img := t.get_image()
-		if img.is_compressed():
-			img.decompress()
-		img.convert(Image.FORMAT_RGBA8)
-		img.clear_mipmaps()
-		img.resize(size, size, Image.INTERPOLATE_NEAREST)
-		img.generate_mipmaps()
-		images.append(img)
+		images.append(_at_size_keep_mips(t.get_image(), size))
 	var array := Texture2DArray.new()
 	array.create_from_images(images)
 	# Base textures' own variation textures (not the shared noise): one array, layer + 1 in
@@ -121,6 +114,9 @@ static func _plain(mat: ShaderMaterial, shared: Dictionary) -> bool:
 	if not is_equal_approx(log(float(t.get_width())) / log(2.0), round(log(float(t.get_width())) / log(2.0))):
 		return false  # (whole-number upscales need powers of two)
 	if int(_param(mat, &"layer_count", 0)) != 0 or _param(mat, &"stair_on", false):
+		return false
+	# (paint_merged reads plain colour textures: not palette indices, wrap modes or detail)
+	if _param(mat, &"base_use_palette", false) or _param(mat, &"base_wrap", Vector2i.ZERO) != Vector2i.ZERO or int(_param(mat, &"base_lod_mode", 0)) != 0 or float(_param(mat, &"soft_ground", 0.0)) > 0.0:
 		return false
 	if not is_zero_approx((_param(mat, &"base_scroll", Vector4.ZERO) as Vector4).w) or float((_param(mat, &"base_flip", Vector4(1, 1, 1, 0)) as Vector4).z) > 1.5:
 		return false
@@ -224,3 +220,41 @@ static func _join(parts: Array) -> Array:
 		base += (p[Mesh.ARRAY_VERTEX] as PackedVector3Array).size()
 	out[Mesh.ARRAY_INDEX] = idx
 	return out
+
+
+## `src` as a size x size layer with a full mip chain, keeping the texture's own levels (N64
+## textures carry hand-made ones: N64TextureConverter.mip_chain): levels bigger than the
+## texture are it blown up texel for texel, the rest are its own levels. Non-square or odd
+## sizes fall back to generated levels.
+static func _at_size_keep_mips(src: Image, size: int) -> Image:
+	var img := src.duplicate() as Image
+	if img.is_compressed():
+		img.decompress()
+	img.convert(Image.FORMAT_RGBA8)
+	var w := img.get_width()
+	var k := size / maxi(w, 1)
+	if not img.has_mipmaps() or w != img.get_height() or k < 1 or k * w != size or (k & (k - 1)) != 0:
+		img.clear_mipmaps()
+		img.resize(size, size, Image.INTERPOLATE_NEAREST)
+		img.generate_mipmaps()
+		return img
+	if k == 1:
+		return img
+	var shift := int(round(log(k) / log(2.0)))
+	var base := img.get_region(Rect2i(0, 0, w, w))  # (level 0 alone)
+	base.clear_mipmaps()  # (get_region keeps them, and resize would rebuild them)
+	var data := PackedByteArray()
+	var n := Image.create_empty(size, size, true, Image.FORMAT_RGBA8).get_mipmap_count()
+	for m in n + 1:
+		var lsz := maxi(size >> m, 1)
+		if m < shift:
+			var up := base.duplicate() as Image
+			up.resize(lsz, lsz, Image.INTERPOLATE_NEAREST)
+			data.append_array(up.get_data())
+		else:
+			var own := m - shift
+			var off := img.get_mipmap_offset(own)
+			var bytes := lsz * lsz * 4
+			data.append_array(img.get_data().slice(off, off + bytes))
+	return Image.create_from_data(size, size, true, Image.FORMAT_RGBA8, data)
+

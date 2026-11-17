@@ -32,6 +32,22 @@ uniform vec3 disc_color : source_color = vec3(1.0, 0.95, 0.8);
 uniform float disc_size = 0.9994;
 uniform float disc_glow = 0.35;
 uniform float flash = 0.0;
+// Majora's Mask's stars (DynamicSky.mm_stars): dashes one N64 pixel tall (pixel_angle
+// radians) and 0.5-2.5 wide, no twinkle; one colour per block of the lavender-to-pink
+// palette, a few blue "constellation" stars and one orange.
+uniform bool star_mm = false;
+uniform float pixel_angle = 0.0045;
+// Majora's Mask's sky tint: out = env + (prim - env) x sky, per channel (display colours).
+uniform bool sky_tint_on = false;
+uniform vec3 sky_prim : source_color = vec3(1.0);
+uniform vec3 sky_env : source_color = vec3(0.0);
+
+const vec3 MM_PALETTE[16] = vec3[](vec3(64, 80, 112), vec3(96, 96, 128), vec3(128, 112, 144), vec3(160, 128, 160),
+	vec3(192, 144, 168), vec3(224, 160, 176), vec3(224, 160, 176), vec3(104, 104, 136), vec3(136, 120, 152),
+	vec3(168, 136, 168), vec3(200, 152, 184), vec3(232, 168, 184), vec3(224, 176, 184), vec3(240, 192, 192),
+	vec3(232, 184, 192), vec3(248, 200, 192));
+const vec3 MM_BRIGHT[8] = vec3[](vec3(65, 164, 255), vec3(131, 164, 230), vec3(98, 205, 255), vec3(82, 82, 255),
+	vec3(123, 164, 164), vec3(98, 205, 255), vec3(98, 164, 230), vec3(255, 90, 0));
 uniform bool dither = true;
 
 vec3 star_hash(vec3 p) {
@@ -77,6 +93,23 @@ vec3 star_field(vec3 d, float time) {
 			}
 			vec3 h2 = star_hash(vec3(cell.yx, f * 31.0 + 11.0));
 			vec2 p = (cell + 0.15 + 0.7 * h.xy) / star_density * 2.0 - 1.0;
+			if (star_mm) {
+				// A dash: 1 pixel tall, 0.5-2.5 wide (coverage-blended edges, as their AA lines).
+				vec3 sdir = normalize(face_dir(f, p));
+				vec3 hx = normalize(cross(vec3(0.0, 1.0, 0.0), sdir) + vec3(1e-5));
+				vec3 vy = cross(sdir, hx);
+				vec3 dd = d - sdir;
+				float px = dot(dd, hx) / pixel_angle;
+				float py = dot(dd, vy) / pixel_angle;
+				float w = (h2.z * h2.z * 8.0 + 2.0) / 4.0;
+				float cov = clamp(w * 0.5 + 0.5 - abs(px), 0.0, 1.0) * clamp(1.0 - abs(py), 0.0, 1.0);
+				if (cov <= 0.0 || dot(d, sdir) < 0.0) {
+					continue;
+				}
+				vec3 tint = h2.y < 0.03 ? MM_BRIGHT[int(h2.x * 8.0) % 8] / 255.0 : MM_PALETTE[int(h2.x * 16.0) % 16] / 255.0;
+				col += tint * cov;
+				continue;
+			}
 			float ang = length(cross(d, normalize(face_dir(f, p))));
 			// Mostly faint, a few bright (and slightly bigger) ones.
 			float bright = 0.25 + 0.75 * pow(h2.x, 3.0);
@@ -94,6 +127,13 @@ vec3 star_field(vec3 d, float time) {
 		}
 	}
 	return col;
+}
+
+vec3 mm_tint(vec3 c) {
+	vec3 g = pow(clamp(c, 0.0, 1.0), vec3(1.0 / 2.2));
+	vec3 e = pow(sky_env, vec3(1.0 / 2.2));
+	g = e + (pow(sky_prim, vec3(1.0 / 2.2)) - e) * g;
+	return pow(clamp(g, 0.0, 1.0), vec3(2.2));
 }
 
 void sky() {
@@ -121,6 +161,12 @@ void sky() {
 		col = mix(col, cloud_band, cloud_cover * 0.85 * (1.0 - near_horizon) * smoothstep(-0.15, 0.0, d.y));
 		float lit = clamp(n * 1.4 - 0.25 + 0.3 * dot(d, disc_dir) * step(0.0, disc_dir.y), 0.0, 1.0);
 		vec3 cloud = mix(cloud_dark, cloud_light, lit);
+		if (sky_tint_on) {
+			// (MM: the sky picture, clouds and all, remapped onto two colours; stars, sun and
+			// moon drawn on top untinted)
+			col = mm_tint(col);
+			cloud = mm_tint(cloud);
+		}
 
 		// Stars, turning about the zenith with the hour; faded near the horizon.
 		float sa = sin(star_angle);
@@ -137,7 +183,8 @@ void sky() {
 		col += disc_color * (disc + glow) * (1.0 - density * 0.9) * step(-0.05, disc_dir.y);
 
 		col = mix(col, cloud, density);
-		col = mix(col, vec3(0.85, 0.88, 1.0), flash * 0.55);
+		// Lightning: OoT's (200, 200, 255) fill over the sky at its flash alpha.
+		col = mix(col, vec3(0.578, 0.578, 1.0), clamp(flash, 0.0, 1.0));
 
 		if (dither) {
 			vec2 f = mod(floor(FRAGCOORD.xy), 2.0);

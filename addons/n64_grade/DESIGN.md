@@ -182,5 +182,13 @@ Colour adjust filters on the matching layers.
 - Shared grades: ZoneGrade.shared (a .tres in textures/_grade/shared); its filters first
   in every layer, the zone's on top; AO falls back to it; variants / AO layers per zone.
   Toolbar "Edit: this zone / shared grade"; shared file saved after edits.
+- Decals: LevelDecal (LevelData.decals; level-local position / normal / up, size, rotation,
+  depth, max angle) projected by DecalBuilder onto drawn brush faces in its box (clipped, lifted
+  0.008 m), each vertex sampling the face's paint / AO / light keys; paint shader cutout
+  material (texture once, no tiling / overlays). Editor: LevelRoot live node; build:
+  ExportBake -> LevelData.baked_decals (shown in game / exports). Paint tab: Decals layer,
+  Place mode + texture, click a decal to select, drag to move, R / [ ] / Delete; decal
+  textures graded as extras. Not yet: decals on props' own meshes; blended (non-cutout).
+- Main screen tab renamed "Paint" (was Grade).
 - Paint panel: NOT trimmed — Grade paints with the Paint panel's tool settings (size,
   strength, colour, tools), so the panel stays the shared settings panel for both screens.

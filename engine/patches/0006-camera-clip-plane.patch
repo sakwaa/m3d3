@@ -1,0 +1,200 @@
+diff --git a/scene/3d/camera_3d.cpp b/scene/3d/camera_3d.cpp
+index fa7cf3b..80cf4a4 100644
+--- a/scene/3d/camera_3d.cpp
++++ b/scene/3d/camera_3d.cpp
+@@ -649,6 +649,10 @@ void Camera3D::_bind_methods() {
+ 	ClassDB::bind_method(D_METHOD("get_near"), &Camera3D::get_near);
+ 	ClassDB::bind_method(D_METHOD("set_fov", "fov"), &Camera3D::set_fov);
+ 	ClassDB::bind_method(D_METHOD("set_frustum_offset", "offset"), &Camera3D::set_frustum_offset);
++	ClassDB::bind_method(D_METHOD("set_clip_plane", "plane"), &Camera3D::set_clip_plane);
++	ClassDB::bind_method(D_METHOD("get_clip_plane"), &Camera3D::get_clip_plane);
++	ClassDB::bind_method(D_METHOD("set_clip_plane_enabled", "enabled"), &Camera3D::set_clip_plane_enabled);
++	ClassDB::bind_method(D_METHOD("is_clip_plane_enabled"), &Camera3D::is_clip_plane_enabled);
+ 	ClassDB::bind_method(D_METHOD("set_size", "size"), &Camera3D::set_size);
+ 	ClassDB::bind_method(D_METHOD("set_far", "far"), &Camera3D::set_far);
+ 	ClassDB::bind_method(D_METHOD("set_near", "near"), &Camera3D::set_near);
+@@ -695,6 +699,10 @@ void Camera3D::_bind_methods() {
+ 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "fov", PROPERTY_HINT_RANGE, "1,179,0.1,degrees"), "set_fov", "get_fov");
+ 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "size", PROPERTY_HINT_RANGE, "0.001,100,0.001,or_greater,suffix:m"), "set_size", "get_size");
+ 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "frustum_offset", PROPERTY_HINT_NONE, "suffix:m"), "set_frustum_offset", "get_frustum_offset");
++	ADD_GROUP("Clip Plane", "clip_plane_");
++	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "clip_plane_enabled"), "set_clip_plane_enabled", "is_clip_plane_enabled");
++	ADD_PROPERTY(PropertyInfo(Variant::PLANE, "clip_plane"), "set_clip_plane", "get_clip_plane");
++	ADD_GROUP("", "");
+ 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "near", PROPERTY_HINT_RANGE, "0.001,10,0.001,or_greater,exp,suffix:m"), "set_near", "get_near");
+ 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "far", PROPERTY_HINT_RANGE, "0.01,4000,0.01,or_greater,exp,suffix:m"), "set_far", "get_far");
+ 
+@@ -751,6 +759,24 @@ void Camera3D::set_near(real_t p_near) {
+ 	_update_camera_mode();
+ }
+ 
++void Camera3D::set_clip_plane(const Plane &p_plane) {
++	clip_plane = p_plane;
++	RenderingServer::get_singleton()->camera_set_clip_plane(camera, clip_plane, clip_plane_enabled);
++}
++
++Plane Camera3D::get_clip_plane() const {
++	return clip_plane;
++}
++
++void Camera3D::set_clip_plane_enabled(bool p_enabled) {
++	clip_plane_enabled = p_enabled;
++	RenderingServer::get_singleton()->camera_set_clip_plane(camera, clip_plane, clip_plane_enabled);
++}
++
++bool Camera3D::is_clip_plane_enabled() const {
++	return clip_plane_enabled;
++}
++
+ void Camera3D::set_frustum_offset(Vector2 p_offset) {
+ 	frustum_offset = p_offset;
+ 	_update_camera_mode();
+diff --git a/scene/3d/camera_3d.h b/scene/3d/camera_3d.h
+index 7fd88f4..817cee8 100644
+--- a/scene/3d/camera_3d.h
++++ b/scene/3d/camera_3d.h
+@@ -68,6 +68,8 @@ private:
+ 	InterpolatedProperty<real_t> fov = 75.0;
+ 	InterpolatedProperty<real_t> size = 1.0;
+ 	InterpolatedProperty<Vector2> frustum_offset;
++	Plane clip_plane = Plane(Vector3(0, 0, -1), 0.0);
++	bool clip_plane_enabled = false;
+ 	// _ prefix to avoid conflict with Windows defines.
+ 	InterpolatedProperty<real_t> _near = 0.05;
+ 	InterpolatedProperty<real_t> _far = 4000.0;
+@@ -153,6 +155,11 @@ public:
+ 	real_t get_far() const;
+ 	real_t get_near() const;
+ 	Vector2 get_frustum_offset() const;
++	// m3d3: portal clip plane (an oblique near plane; world space, the normal's side kept).
++	void set_clip_plane(const Plane &p_plane);
++	Plane get_clip_plane() const;
++	void set_clip_plane_enabled(bool p_enabled);
++	bool is_clip_plane_enabled() const;
+ 
+ 	ProjectionType get_projection() const;
+ 
+diff --git a/servers/rendering/renderer_scene_cull.cpp b/servers/rendering/renderer_scene_cull.cpp
+index 26a7879..1d912cf 100644
+--- a/servers/rendering/renderer_scene_cull.cpp
++++ b/servers/rendering/renderer_scene_cull.cpp
+@@ -115,6 +115,34 @@ void RendererSceneCull::camera_set_frustum(RID p_camera, float p_size, Vector2 p
+ 	camera->zfar = p_z_far;
+ }
+ 
++void RendererSceneCull::camera_set_clip_plane(RID p_camera, const Plane &p_plane, bool p_enabled) {
++	Camera *camera = camera_owner.get_or_null(p_camera);
++	ERR_FAIL_NULL(camera);
++	camera->clip_plane = p_plane;
++	camera->clip_enabled = p_enabled;
++}
++
++// m3d3: the projection's near plane moved onto `p_view_plane` (view space, normal side kept,
++// the camera behind it) - Lengyel, "Oblique View Frustum Depth Projection and Clipping".
++// Godot's projection is OpenGL style here (depth -1..1; reversed later).
++static void _m3d3_oblique(Projection &r_proj, const Plane &p_view_plane) {
++	Vector4 c(p_view_plane.normal.x, p_view_plane.normal.y, p_view_plane.normal.z, -p_view_plane.d);
++	Vector4 q;
++	q.x = (SIGN(c.x) + r_proj.columns[2][0]) / r_proj.columns[0][0];
++	q.y = (SIGN(c.y) + r_proj.columns[2][1]) / r_proj.columns[1][1];
++	q.z = -1.0;
++	q.w = (1.0 + r_proj.columns[2][2]) / r_proj.columns[3][2];
++	real_t dq = c.dot(q);
++	if (Math::abs(dq) < CMP_EPSILON) {
++		return;
++	}
++	c *= 2.0 / dq;
++	r_proj.columns[0][2] = c.x - r_proj.columns[0][3];
++	r_proj.columns[1][2] = c.y - r_proj.columns[1][3];
++	r_proj.columns[2][2] = c.z - r_proj.columns[2][3];
++	r_proj.columns[3][2] = c.w - r_proj.columns[3][3];
++}
++
+ void RendererSceneCull::camera_set_transform(RID p_camera, const Transform3D &p_transform) {
+ 	Camera *camera = camera_owner.get_or_null(p_camera);
+ 	ERR_FAIL_NULL(camera);
+@@ -2731,6 +2759,13 @@ void RendererSceneCull::render_camera(const Ref<RenderSceneBuffers> &p_render_bu
+ 			} break;
+ 		}
+ 
++		if (camera->clip_enabled && !is_orthogonal) {
++			// (only with the camera behind the plane: in front, the plane would cut what it sees)
++			Plane view_plane = transform.affine_inverse().xform(camera->clip_plane);
++			if (view_plane.d > 0.0) {
++				_m3d3_oblique(projection, view_plane);
++			}
++		}
+ 		camera_data.set_camera(transform, projection, is_orthogonal, vaspect, jitter, taa_frame_count, camera->visible_layers);
+ #ifndef XR_DISABLED
+ 	} else {
+diff --git a/servers/rendering/renderer_scene_cull.h b/servers/rendering/renderer_scene_cull.h
+index 6d92798..408856c 100644
+--- a/servers/rendering/renderer_scene_cull.h
++++ b/servers/rendering/renderer_scene_cull.h
+@@ -89,6 +89,9 @@ public:
+ 		RID compositor;
+ 
+ 		Transform3D transform;
++		// m3d3: oblique near plane (world space, normal side kept).
++		bool clip_enabled = false;
++		Plane clip_plane;
+ 
+ 		Camera() {
+ 			visible_layers = 0xFFFFFFFF;
+@@ -110,6 +113,7 @@ public:
+ 	virtual void camera_set_perspective(RID p_camera, float p_fovy_degrees, float p_z_near, float p_z_far);
+ 	virtual void camera_set_orthogonal(RID p_camera, float p_size, float p_z_near, float p_z_far);
+ 	virtual void camera_set_frustum(RID p_camera, float p_size, Vector2 p_offset, float p_z_near, float p_z_far);
++	virtual void camera_set_clip_plane(RID p_camera, const Plane &p_plane, bool p_enabled);
+ 	virtual void camera_set_transform(RID p_camera, const Transform3D &p_transform);
+ 	virtual void camera_set_cull_mask(RID p_camera, uint32_t p_layers);
+ 	virtual void camera_set_environment(RID p_camera, RID p_env);
+diff --git a/servers/rendering/rendering_method.h b/servers/rendering/rendering_method.h
+index c06adc8..2d32624 100644
+--- a/servers/rendering/rendering_method.h
++++ b/servers/rendering/rendering_method.h
+@@ -53,6 +53,7 @@ public:
+ 	virtual void camera_set_perspective(RID p_camera, float p_fovy_degrees, float p_z_near, float p_z_far) = 0;
+ 	virtual void camera_set_orthogonal(RID p_camera, float p_size, float p_z_near, float p_z_far) = 0;
+ 	virtual void camera_set_frustum(RID p_camera, float p_size, Vector2 p_offset, float p_z_near, float p_z_far) = 0;
++	virtual void camera_set_clip_plane(RID p_camera, const Plane &p_plane, bool p_enabled) = 0;
+ 	virtual void camera_set_transform(RID p_camera, const Transform3D &p_transform) = 0;
+ 	virtual void camera_set_cull_mask(RID p_camera, uint32_t p_layers) = 0;
+ 	virtual void camera_set_environment(RID p_camera, RID p_env) = 0;
+diff --git a/servers/rendering/rendering_server.cpp b/servers/rendering/rendering_server.cpp
+index a61020c..517a37d 100644
+--- a/servers/rendering/rendering_server.cpp
++++ b/servers/rendering/rendering_server.cpp
+@@ -2839,6 +2839,7 @@ void RenderingServer::_bind_methods() {
+ 	ClassDB::bind_method(D_METHOD("camera_set_perspective", "camera", "fovy_degrees", "z_near", "z_far"), &RenderingServer::camera_set_perspective);
+ 	ClassDB::bind_method(D_METHOD("camera_set_orthogonal", "camera", "size", "z_near", "z_far"), &RenderingServer::camera_set_orthogonal);
+ 	ClassDB::bind_method(D_METHOD("camera_set_frustum", "camera", "size", "offset", "z_near", "z_far"), &RenderingServer::camera_set_frustum);
++	ClassDB::bind_method(D_METHOD("camera_set_clip_plane", "camera", "plane", "enabled"), &RenderingServer::camera_set_clip_plane);
+ 	ClassDB::bind_method(D_METHOD("camera_set_transform", "camera", "transform"), &RenderingServer::camera_set_transform);
+ 	ClassDB::bind_method(D_METHOD("camera_set_cull_mask", "camera", "layers"), &RenderingServer::camera_set_cull_mask);
+ 	ClassDB::bind_method(D_METHOD("camera_set_environment", "camera", "env"), &RenderingServer::camera_set_environment);
+diff --git a/servers/rendering/rendering_server.h b/servers/rendering/rendering_server.h
+index 4a5f852..12b2bbd 100644
+--- a/servers/rendering/rendering_server.h
++++ b/servers/rendering/rendering_server.h
+@@ -524,6 +524,8 @@ public:
+ 	virtual void camera_set_perspective(RID p_camera, float p_fovy_degrees, float p_z_near, float p_z_far) = 0;
+ 	virtual void camera_set_orthogonal(RID p_camera, float p_size, float p_z_near, float p_z_far) = 0;
+ 	virtual void camera_set_frustum(RID p_camera, float p_size, Vector2 p_offset, float p_z_near, float p_z_far) = 0;
++	// m3d3: an oblique near plane (world space; the normal's side is kept) - portal views.
++	virtual void camera_set_clip_plane(RID p_camera, const Plane &p_plane, bool p_enabled) = 0;
+ 	virtual void camera_set_transform(RID p_camera, const Transform3D &p_transform) = 0;
+ 	virtual void camera_set_cull_mask(RID p_camera, uint32_t p_layers) = 0;
+ 	virtual void camera_set_environment(RID p_camera, RID p_env) = 0;
+diff --git a/servers/rendering/rendering_server_default.h b/servers/rendering/rendering_server_default.h
+index 30d52d8..78c364e 100644
+--- a/servers/rendering/rendering_server_default.h
++++ b/servers/rendering/rendering_server_default.h
+@@ -711,6 +711,7 @@ public:
+ 	FUNC4(camera_set_perspective, RID, float, float, float)
+ 	FUNC4(camera_set_orthogonal, RID, float, float, float)
+ 	FUNC5(camera_set_frustum, RID, float, Vector2, float, float)
++	FUNC3(camera_set_clip_plane, RID, const Plane &, bool)
+ 	FUNC2(camera_set_transform, RID, const Transform3D &)
+ 	FUNC2(camera_set_cull_mask, RID, uint32_t)
+ 	FUNC2(camera_set_environment, RID, RID)

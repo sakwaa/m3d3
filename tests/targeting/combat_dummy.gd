@@ -107,8 +107,8 @@ func drive(delta: float) -> void:
 		intent.hold(&"guard", true)
 
 
-func take_hit(damage: int, by: Actor, knockback: float) -> void:
-	super.take_hit(damage, by, 0.0 if rooted else knockback)
+func take_hit(damage: int, by: Actor, knockback: float, hit := {}) -> void:
+	super.take_hit(damage, by, 0.0 if rooted else knockback, hit)
 
 
 func _back_up() -> void:

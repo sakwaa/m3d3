@@ -497,6 +497,7 @@ static func build(root: LevelRoot, s: GrassSettings) -> Array[Node3D]:
 	var mat_mat := ShaderMaterial.new()
 	mat_mat.shader = MAT_SHADER
 	mat_mat.set_shader_parameter(&"tex", s.top_texture)
+	mat_mat.set_shader_parameter(&"uv_tile", s.tile)  # (the top's UVs: world xz / tile)
 	var any_solid := s.any_solid()
 	var side_mat := ShaderMaterial.new()
 	side_mat.shader = MAT_SHADER
@@ -579,8 +580,42 @@ static func build(root: LevelRoot, s: GrassSettings) -> Array[Node3D]:
 				var tint := _tint(s, patches, p) * s.tuft_color * rng.randf_range(0.85, 1.12)
 				t.near.append([Transform3D(basis, p), tint])
 				t.far.append([Transform3D(Basis().scaled(Vector3(size * 1.1, tall, 1.0)), p), tint])
+	# The ground's baked light (the level's lighting keys) on every carpet vertex and tuft, so
+	# the grass darkens at night and sits in the same shadows and lamp pools as the ground.
+	var lit := _light_mode(root.data)
+	if lit.count > 0:
+		var cache := {}
+		var light_of := func(p: Vector3) -> Array[Color]:
+			var ck := Vector3i((p * 20.0).round())
+			if not cache.has(ck):
+				cache[ck] = hits.light_at(p, lit.count, lit.timed)
+			return cache[ck]
+		for key in tiles:
+			var t: Dictionary = tiles[key]
+			for part in ["mat", "side", "fringe", "rim"]:
+				if t.has(part):
+					var mb: _MatBuf = t[part]
+					mb.keys.resize(4)
+					for k in 4:
+						mb.keys[k] = PackedByteArray()
+					for v in mb.verts:
+						var ls: Array[Color] = light_of.call(v)
+						for k in 4:
+							LevelBrush.push_rgba8(mb.keys[k], ls[mini(k, ls.size() - 1)])
+			for list in [t.near, t.far]:
+				for item in list:
+					var ls: Array[Color] = light_of.call((item[0] as Transform3D).origin + Vector3.UP * 0.02)
+					var packed := Color()
+					for k in 4:
+						var lc := ls[mini(k, ls.size() - 1)]
+						packed[k] = float(clampi(roundi(lc.r * 255.0), 0, 255) * 65536 + clampi(roundi(lc.g * 255.0), 0, 255) * 256 + clampi(roundi(lc.b * 255.0), 0, 255))
+					item.append(packed)
+	for m in [mat_mat, side_mat, rim_mat]:
+		_light_params(m, root.data, lit)
 	var near_mat := _tuft_material(s, 0)
 	var far_mat := _tuft_material(s, 1)
+	_light_params(near_mat, root.data, lit)
+	_light_params(far_mat, root.data, lit)
 	var near_mesh := _tuft_mesh(true)
 	var far_mesh := _tuft_mesh(false)
 	var layers := root.level_layers()
@@ -954,6 +989,26 @@ static func _height(bins: Dictionary, x: float, z: float) -> float:
 	return best
 
 
+## How the level is lit, for the grass: {count = lighting keys to sample (0: none, world tint
+## only), timed = the time-of-day keys (else the single bake), shown = keys the shader blends}.
+static func _light_mode(data: LevelData) -> Dictionary:
+	match data.lighting_mode:
+		LevelData.LightingMode.BAKED_TIMED, LevelData.LightingMode.BAKED_TIMED_DYNAMIC:
+			var schedule := LightingSchedule.load_project()
+			var n := mini(schedule.sorted_keys().size(), 4) if schedule else 0
+			return {count = n, timed = true}
+		LevelData.LightingMode.BAKED_VERTEX, LevelData.LightingMode.BAKED_VERTEX_DYNAMIC:
+			return {count = 1, timed = false}
+	return {count = 0, timed = false}
+
+
+static func _light_params(m: ShaderMaterial, data: LevelData, lit: Dictionary) -> void:
+	m.set_shader_parameter(&"light_keys", lit.count)
+	m.set_shader_parameter(&"timed_bake", lit.timed)
+	m.set_shader_parameter(&"light_contrast", data.light_contrast)
+	m.set_shader_parameter(&"light_floor", data.light_floor)
+
+
 static func _tint(s: GrassSettings, patches: FastNoiseLite, p: Vector3) -> Color:
 	var k := 1.0 + patches.get_noise_2d(p.x, p.z) * s.patchiness * 0.6
 	return Color(s.color.r * k, s.color.g * k, s.color.b * k)
@@ -996,11 +1051,15 @@ static func _tufts(name: String, mesh: Mesh, mat: Material, items: Array, layers
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
 	mm.use_colors = true
+	var lit := not items.is_empty() and (items[0] as Array).size() > 2
+	mm.use_custom_data = lit
 	mm.mesh = mesh
 	mm.instance_count = items.size()
 	for i in items.size():
 		mm.set_instance_transform(i, items[i][0])
 		mm.set_instance_color(i, items[i][1])
+		if lit:
+			mm.set_instance_custom_data(i, items[i][2])
 	var mmi := MultiMeshInstance3D.new()
 	mmi.name = name
 	mmi.multimesh = mm
@@ -1036,6 +1095,7 @@ class _HitBins:
 				var pts := PackedVector3Array()
 				for i in ids:
 					pts.append(brush.transform * brush.vertices[i])
+				var start := brush.get_face_start(f)
 				var order := PolyUtil.triangulate(pts, PolyUtil.newell_normal(pts).normalized())
 				for k in range(0, order.size(), 3):
 					var a := pts[order[k]]
@@ -1043,7 +1103,8 @@ class _HitBins:
 					var c := pts[order[k + 2]]
 					if absf((b.x - a.x) * (c.z - a.z) - (b.z - a.z) * (c.x - a.x)) < 1e-6:
 						continue  # edge-on from above (a wall's side)
-					var tri := [a, b, c, brush, f]
+					# (+ the brush's corner indices, for its baked light)
+					var tri := [a, b, c, brush, f, start + order[k], start + order[k + 1], start + order[k + 2]]
 					for bx in range(floori(minf(a.x, minf(b.x, c.x)) / SIZE), floori(maxf(a.x, maxf(b.x, c.x)) / SIZE) + 1):
 						for bz in range(floori(minf(a.z, minf(b.z, c.z)) / SIZE), floori(maxf(a.z, maxf(b.z, c.z)) / SIZE) + 1):
 							var key := Vector2i(bx, bz)
@@ -1068,8 +1129,32 @@ class _HitBins:
 			var y: float = tri[0].y + (tri[1].y - tri[0].y) * u + (tri[2].y - tri[0].y) * v
 			if y <= from.y and y > best_y:
 				best_y = y
-				best = {brush = tri[3], face = tri[4], position = Vector3(from.x, y, from.z)}
+				best = {brush = tri[3], face = tri[4], position = Vector3(from.x, y, from.z),
+					corners = [tri[5], tri[6], tri[7]], weights = Vector3(1.0 - u - v, u, v)}
 		return best
+
+	## The ground's baked light under `p` for each of `count` keys (`timed`: the brushes'
+	## time-of-day keys, else their single bake): from just above p, else from well above;
+	## white where there's no ground.
+	func light_at(p: Vector3, count: int, timed: bool) -> Array[Color]:
+		var out: Array[Color] = []
+		var hit := down(p + Vector3.UP * 0.3)
+		if hit.is_empty():
+			hit = down(p + Vector3.UP * 3.0)
+		for s in count:
+			if hit.is_empty():
+				out.append(Color.WHITE)
+				continue
+			var brush: LevelBrush = hit.brush
+			var w: Vector3 = hit.weights
+			var c := Color(0, 0, 0)
+			for k in 3:
+				var corner: int = hit.corners[k]
+				var lc := brush.get_corner_key_light(s, corner) if timed else brush.get_corner_light(corner)
+				c += lc * w[k]
+			c.a = 1.0
+			out.append(c)
+		return out
 
 
 ## Segments in the quarter round at the carpet's edge.
@@ -1218,6 +1303,8 @@ class _MatBuf:
 	var uv2 := PackedVector2Array()
 	var colors := PackedColorArray()
 	var index := PackedInt32Array()
+	## The baked light keys per vertex (4 x RGBA8, CUSTOM0..3), or empty.
+	var keys: Array[PackedByteArray] = []
 
 	func add(p: Vector3, uv: Vector2, c: Color, move: float, h: float) -> int:
 		verts.append(p)
@@ -1245,7 +1332,12 @@ class _MatBuf:
 		a[Mesh.ARRAY_TEX_UV2] = uv2
 		a[Mesh.ARRAY_COLOR] = colors
 		a[Mesh.ARRAY_INDEX] = index
-		m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, a)
+		var flags := 0
+		if keys.size() == 4:
+			for k in 4:
+				a[Mesh.ARRAY_CUSTOM0 + k] = keys[k]
+			flags = LevelBrush.KEY_FORMAT
+		m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, a, [], {}, flags)
 		m.surface_set_material(m.get_surface_count() - 1, material)
 
 	## Its triangles as a flat list (3 points each), for collision.

@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://bea5edynxxdxb"
+path="res://.godot/imported/n64_video_frame.glsl-658e854c3695633611a663c741af54e3.res"
+
+[deps]
+
+source_file="res://addons/n64_runtime/post/n64_video_frame.glsl"
+dest_files=["res://.godot/imported/n64_video_frame.glsl-658e854c3695633611a663c741af54e3.res"]
+
+[params]
+

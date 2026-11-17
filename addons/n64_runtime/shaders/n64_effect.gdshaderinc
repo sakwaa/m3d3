@@ -16,6 +16,9 @@ uniform vec2 grid = vec2(1.0);
 uniform bool billboard = true;
 // Intensity texture (I4 / I8): colour from the tint, the texel only as alpha (N64Effect.intensity).
 uniform bool intensity = false;
+// Primitive depth (G_ZS_PRIM): the whole sprite at its centre's depth, pulled this share of
+// its size towards the camera, so it never slices into walls and floors (< 0: off).
+uniform float prim_depth = 0.5;
 varying vec2 n64_fogv;
 varying vec3 n64_fog_tintv;
 varying float frame;
@@ -35,6 +38,10 @@ void vertex() {
 	effect_light = n64_ambient_light.rgb + n64_rain_grid(world);
 	n64_fogv = n64_fog_vertex(world);
 	n64_fog_tintv = n64_fog_tint_vertex(world);
+	if (prim_depth >= 0.0) {
+		POSITION = n64_prim_depth(PROJECTION_MATRIX * (MODELVIEW_MATRIX * vec4(VERTEX, 1.0)), MODEL_MATRIX[3].xyz,
+			prim_depth * length(MODEL_MATRIX[0].xyz), VIEW_MATRIX, PROJECTION_MATRIX, VIEWPORT_SIZE);
+	}
 }
 
 vec4 effect_color(vec2 uv, vec4 tint) {

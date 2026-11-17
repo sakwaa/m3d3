@@ -1,0 +1,6 @@
+[gd_resource type="Resource" script_class="VideoTape" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://addons/n64_runtime/post/video_tape.gd" id="1"]
+
+[resource]
+script = ExtResource("1")

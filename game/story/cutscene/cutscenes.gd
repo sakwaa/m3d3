@@ -220,6 +220,7 @@ func _fire(c: CutsceneCue) -> void:
 				CutsceneCue.Action.TELEPORT:
 					_moves.erase(c.actor)
 					a.global_position = c.position
+					a.reset_physics_interpolation()
 					a.velocity = Vector3.ZERO
 					if a is Actor:
 						a.facing = Cutscene.facing_vector(c.facing)
@@ -393,6 +394,7 @@ func _skip() -> void:
 		var a := _actor(id)
 		if a:
 			a.global_position = _moves[id].target
+			a.reset_physics_interpolation()
 			if a is Actor:
 				a.facing = Cutscene.facing_vector(_moves[id].facing)
 	_moves.clear()
@@ -411,6 +413,7 @@ func _skip() -> void:
 				match c.action:
 					CutsceneCue.Action.WALK, CutsceneCue.Action.RUN, CutsceneCue.Action.TELEPORT:
 						a.global_position = c.position
+						a.reset_physics_interpolation()
 						if a is Actor:
 							a.facing = Cutscene.facing_vector(c.facing)
 					CutsceneCue.Action.SHOW:

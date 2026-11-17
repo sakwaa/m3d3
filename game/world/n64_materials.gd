@@ -20,6 +20,7 @@ static func textured(color: Color, texture: Texture2D = null, shine := Shine.NON
 	m.set_shader_parameter(&"albedo_color", color)
 	m.set_shader_parameter(&"albedo_texture", texture)
 	m.set_shader_parameter(&"has_texture", texture != null)
+	set_wrap(m, texture)
 	_set_shine(m, shine, strength, hilite)
 	return m
 
@@ -31,8 +32,25 @@ static func actor(color: Color, texture: Texture2D = null, shine := Shine.NONE, 
 	m.set_shader_parameter(&"albedo_color", color)
 	if texture:
 		m.set_shader_parameter(&"albedo_texture", texture)
+	set_wrap(m, texture)
 	_set_shine(m, shine, strength, hilite)
 	return m
+
+
+## The texture's tile wrap (N64Texture wrap_s / wrap_t: wrap, mirror, clamp) on `m`. Read
+## by name: N64Texture is editor tooling (not in exports, where the baked materials carry it).
+static func set_wrap(m: ShaderMaterial, texture: Texture2D) -> void:
+	var s = texture.get(&"wrap_s") if texture else null
+	var t = texture.get(&"wrap_t") if texture else null
+	m.set_shader_parameter(&"wrap_s", int(s) if s != null else 0)
+	m.set_shader_parameter(&"wrap_t", int(t) if t != null else 0)
+	var lm = texture.get(&"lod_mode") if texture else null
+	var dt = texture.get(&"detail_texture") if texture else null
+	var mode: int = int(lm) if lm != null and (int(lm) < 2 or dt) else 0
+	m.set_shader_parameter(&"lod_mode", mode)
+	if mode > 0:
+		m.set_shader_parameter(&"detail_texture", dt)
+		m.set_shader_parameter(&"detail", Vector2(texture.get(&"detail_repeats"), texture.get(&"detail_strength")))
 
 
 ## N64 version of a plain Godot material (albedo colour / texture; metallic becomes metal
@@ -60,3 +78,19 @@ static func _set_shine(m: ShaderMaterial, shine: Shine, strength: float, hilite:
 		m.set_shader_parameter(&"shine_strength", strength)
 		m.set_shader_parameter(&"shine_mode", 1 if shine == Shine.METAL else 0)
 	m.set_shader_parameter(&"hilite_strength", hilite)
+
+
+## Draws `m` (n64_textured / n64_actor) from a palette texture: its indices and palettes.
+static func use_palette(m: ShaderMaterial, pt: N64PaletteTexture) -> void:
+	m.set_shader_parameter(&"albedo_texture", pt.index)
+	m.set_shader_parameter(&"has_texture", true)
+	m.set_shader_parameter(&"palette_lut", pt.lut())
+	m.set_shader_parameter(&"use_palette", true)
+
+
+## The palette row (swap) every mesh under `node` draws with.
+static func set_palette_row(node: Node, row: int) -> void:
+	if node is GeometryInstance3D:
+		(node as GeometryInstance3D).set_instance_shader_parameter(&"palette_row", row)
+	for c in node.get_children():
+		set_palette_row(c, row)

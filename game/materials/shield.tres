@@ -1,0 +1,11 @@
+[gd_resource type="ShaderMaterial" format=3]
+
+[ext_resource type="Shader" path="res://addons/n64_runtime/shaders/n64_shield.gdshader" id="1_sh"]
+[ext_resource type="Texture2D" path="res://textures/water/water_ripple.res" id="2_sh"]
+[ext_resource type="Texture2D" path="res://textures/sky/clouds.res" id="3_sh"]
+
+[resource]
+render_priority = 1
+shader = ExtResource("1_sh")
+shader_parameter/tex_a = ExtResource("2_sh")
+shader_parameter/tex_b = ExtResource("3_sh")

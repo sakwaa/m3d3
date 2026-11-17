@@ -1,0 +1,6 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://tests/trees/zone_foliage.gd" id="1"]
+
+[node name="ZoneFoliage" type="Node3D"]
+script = ExtResource("1")

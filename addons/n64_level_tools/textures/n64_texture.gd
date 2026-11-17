@@ -22,6 +22,22 @@ extends ImageTexture
 ## Offset + Rotate: how far each cell may turn (1 = any angle). Full rotation reads as
 ## swirls on organic textures; small angles hide repetition without it.
 @export_range(0.0, 1.0, 0.05) var anti_tiling_rotation := 0.15
+## How each axis repeats, as the RDP's tile settings: Wrap (repeat), Mirror (every other
+## repeat flipped: a symmetric texture - arches, panels, faces, gratings - stored at half
+## the size, seams always match; Rebuild From Source then converts only the source's first
+## half on that axis, so the texels go twice as far) or Clamp (the edge texel stretches on: signs, decals). Off
+## Wrap, anti-tiling is skipped.
+@export_enum("Wrap", "Mirror", "Clamp") var wrap_s := 0
+@export_enum("Wrap", "Mirror", "Clamp") var wrap_t := 0
+## Close up (a texel bigger than a pixel), as the RDP's texture LOD modes: Sharpen keeps
+## edges crisp instead of blurring; Detail blends `detail_texture` in, repeated
+## `detail_repeats` times per repeat of this one (Hyrule Field's ground grain); Hi-res:
+## `detail_texture` is a higher-resolution copy of this texture (detail_repeats 1), its finer
+## structure added close up while this one's colour stays (tests/tools/hires_detail.tscn).
+@export_enum("Off", "Sharpen", "Detail", "Hi-res") var lod_mode := 0
+@export var detail_texture: Texture2D
+@export_range(1.0, 16.0, 0.5) var detail_repeats := 4.0
+@export_range(0.0, 1.0, 0.05) var detail_strength := 0.6
 @export_group("Tint")
 ## Colour combiner: None, Multiply (texel x light), Gradient (lerp dark -> light by texel).
 @export var tint_mode := N64TextureConverter.TintMode.NONE
@@ -203,7 +219,7 @@ func get_settings() -> Dictionary:
 		anti_tiling = anti_tiling, anti_tiling_scale = anti_tiling_scale, anti_tiling_rotation = anti_tiling_rotation,
 		tint_mode = tint_mode, tint_auto = tint_auto, tint_dark = tint_dark, tint_light = tint_light,
 		tint_amount = tint_amount, tint_range = tint_range, object = object, mirror = mirror, holes = holes,
-		sharpen = sharpen, keep_lines = keep_lines,
+		sharpen = sharpen, keep_lines = keep_lines, wrap_s = wrap_s, wrap_t = wrap_t,
 		cycle_count = cycle_count if flip_frames <= 1 else 0, cycle_from = cycle_from,
 		grade = _grade_settings(),
 	}
@@ -245,6 +261,8 @@ func apply_settings(s: Dictionary) -> void:
 	tint_range = s.get("tint_range", Vector2(0.0, 1.0))
 	object = s.get("object", N64ObjectExtract.Kind.NONE)
 	mirror = s.get("mirror", false)
+	wrap_s = s.get("wrap_s", 0)
+	wrap_t = s.get("wrap_t", 0)
 	holes = s.get("holes", N64ObjectExtract.Holes.GLASS)
 	sharpen = s.get("sharpen", 0.0)
 	keep_lines = s.get("keep_lines", 0.0)
@@ -264,7 +282,27 @@ func rebuild() -> Error:
 	tint_dark = result.tint_dark
 	tint_light = result.tint_light
 	tint_range = result.tint_range
-	set_image(N64TextureLibrary.with_mipmaps(result.image))
-	if not resource_path.is_empty() and not resource_path.contains("::"):
-		return ResourceSaver.save(self)
-	return OK
+	var img: Image = result.mips if result.has("mips") else N64TextureLibrary.with_mipmaps(result.image)
+	set_image(img)
+	if resource_path.is_empty() or resource_path.contains("::"):
+		return OK
+	if DisplayServer.get_name() == "headless":
+		# Headless, an ImageTexture keeps only the first image it was given (the dummy
+		# renderer drops later ones): this one would save its old pixels and mips. A fresh
+		# copy with the same settings is saved instead, under the same UID.
+		return _save_fresh(img)
+	return ResourceSaver.save(self)
+
+
+func _save_fresh(img: Image) -> Error:
+	var fresh := N64Texture.new()
+	for p in get_property_list():
+		if p.usage & PROPERTY_USAGE_STORAGE and not p.name in ["script", "resource_path", "resource_name", "image", "_image"]:
+			fresh.set(p.name, get(p.name))
+	fresh.set_image(img)
+	var path := resource_path
+	var uid := ResourceLoader.get_resource_uid(path)
+	var err := ResourceSaver.save(fresh, path)
+	if uid != ResourceUID.INVALID_ID:
+		ResourceSaver.set_uid(path, uid)
+	return err

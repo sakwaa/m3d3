@@ -25,3 +25,4 @@ shader_parameter/layer_b_scale = null
 shader_parameter/wave_height = null
 shader_parameter/wave_speed = null
 shader_parameter/wave_tilt = null
+shader_parameter/glisten = 0.8

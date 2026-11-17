@@ -270,7 +270,8 @@ static func tmem_bytes(format: Format, size: Vector2i) -> int:
 static func convert(source: Image, s: Dictionary) -> Dictionary:
 	var format: Format = s.format
 	var size: Vector2i = s.size
-	if not fits(format, size):
+	# (no_budget: the close-up hi-res copies (N64Texture lod_mode Hi-res) - not N64 data)
+	if not fits(format, size) and not s.get("no_budget", false):
 		size = size_options(format)[0]
 	var img := source.duplicate() as Image
 	if img.is_compressed():
@@ -280,6 +281,14 @@ static func convert(source: Image, s: Dictionary) -> Dictionary:
 		img = N64ObjectExtract.extract(img, s.object, s.get("mirror", false), s.get("holes", 0))
 
 	var tiling: Tiling = s.tiling
+	# Mirrored axes (the RDP flips every other repeat): only the source's first half is
+	# stored, and that axis needs no seam blending (a mirror never shows a seam).
+	if int(s.get("wrap_s", 0)) == 1:
+		img = img.get_region(Rect2i(0, 0, maxi(img.get_width() / 2, 1), img.get_height()))
+		tiling = {Tiling.SEAMLESS: Tiling.SEAMLESS_V, Tiling.SEAMLESS_U: Tiling.NONE}.get(tiling, tiling)
+	if int(s.get("wrap_t", 0)) == 1:
+		img = img.get_region(Rect2i(0, 0, img.get_width(), maxi(img.get_height() / 2, 1)))
+		tiling = {Tiling.SEAMLESS: Tiling.SEAMLESS_U, Tiling.SEAMLESS_V: Tiling.NONE}.get(tiling, tiling)
 	var zoom: float = maxf(s.get("zoom", 1.0), 1.0)
 	var source_tiles: bool = s.seam_blend <= 0.0
 	if tiling == Tiling.NONE:
@@ -292,12 +301,14 @@ static func convert(source: Image, s: Dictionary) -> Dictionary:
 		var blend: float = s.seam_blend if s.seam_blend > 0.0 else DEFAULT_SEAM_BLEND
 		img = _tileable_region(img, size * WORK_SCALE, tiling, zoom, s.get("crop_center", Vector2(0.5, 0.5)), blend, source_tiles)
 	_adjust(img, s.saturation, s.contrast, s.brightness)
+	var work := img  # (the work-scale picture: the mip levels are made from it too)
 	img = _box_down(img, WORK_SCALE, s.get("keep_lines", 0.0))
 	var grade: Dictionary = s.get("grade", {})
 	if not grade.is_empty():
 		apply_grade(img, grade)
 	if s.get("sharpen", 0.0) > 0.0:
 		_sharpen(img, s.sharpen, tiling)
+	var level0 := img.duplicate() as Image  # (before quantising: the mips' contrast target)
 
 	var info: Dictionary = FORMAT_INFO[format]
 	var tint_dark: Color = s.get("tint_dark", Color(0.2, 0.2, 0.2))
@@ -326,7 +337,105 @@ static func convert(source: Image, s: Dictionary) -> Dictionary:
 		_quantize_direct(img, format)
 		if not format in [Format.I8, Format.I4]:
 			bleed_alpha(img)  # (intensity's alpha is its grey: nothing to bleed into)
-	return {image = img, palette = palette, tint_dark = tint_dark, tint_light = tint_light, tint_range = tint_range}
+	var out := {image = img, palette = palette, tint_dark = tint_dark, tint_light = tint_light, tint_range = tint_range}
+	if s.get("cycle_count", 0) <= 1 and img.get_size() == size:
+		var gray_stretch: bool = info.gray and s.get("tint_mode", TintMode.NONE) == TintMode.GRADIENT
+		out.mips = mip_chain(img, work, level0, s, tiling, format, palette, gray_stretch, tint_dark, tint_light)
+	return out
+
+
+## The texture with its own mip levels, as N64 tools made them offline: each level from the
+## work-scale picture (not by averaging the finished texture again), graded and sharpened as
+## level 0, its contrast lifted back towards level 0's (averaging washes out fine lines -
+## shingle rows, mortar - long before they're too small to see), and quantised to the
+## texture's own format / palette. Returns an RGBA8 image with a full mip chain.
+static func mip_chain(level0_q: Image, work: Image, level0: Image, s: Dictionary, tiling: Tiling, format: Format,
+		palette: PackedColorArray, gray_stretch: bool, tint_dark: Color, tint_light: Color) -> Image:
+	var w := level0_q.get_width()
+	var h := level0_q.get_height()
+	var grade: Dictionary = s.get("grade", {})
+	var target := _luma_spread(level0)
+	var data := level0_q.get_data()
+	var n := Image.create_empty(w, h, true, Image.FORMAT_RGBA8).get_mipmap_count()
+	for m in range(1, n + 1):
+		var lw := maxi(w >> m, 1)
+		var lh := maxi(h >> m, 1)
+		# (exact halvings down to twice the level - each a 2 x 2 average, never across the
+		# edge, so tiling stays seamless - then level 0's averaging, keep-lines and all)
+		var lv := work.duplicate() as Image
+		while lv.get_width() > lw * 2 or lv.get_height() > lh * 2:
+			lv.resize(maxi(lv.get_width() / 2, lw * 2), maxi(lv.get_height() / 2, lh * 2), Image.INTERPOLATE_BILINEAR)
+		lv = _box_down(lv, 2, s.get("keep_lines", 0.0))
+		if not grade.is_empty():
+			apply_grade(lv, grade)
+		if s.get("sharpen", 0.0) > 0.0 and mini(lw, lh) >= 4:
+			_sharpen(lv, s.sharpen, tiling)
+		if lw * lh >= 4:
+			var spread := _luma_spread(lv)
+			if spread > 0.001:
+				_lift_contrast(lv, clampf(lerpf(1.0, target / spread, MIP_CONTRAST), 1.0, 1.6))
+		if gray_stretch:
+			_stretch_to_gradient(lv, tint_dark, tint_light)
+		if palette.size() > 0:
+			for y in lh:
+				for x in lw:
+					var c := lv.get_pixel(x, y)
+					lv.set_pixel(x, y, Color(0, 0, 0, 0) if c.a < 0.5 else _nearest(palette, Vector3(c.r, c.g, c.b)))
+		else:
+			_quantize_direct(lv, format)
+			if not format in [Format.I8, Format.I4]:
+				bleed_alpha(lv)
+		lv.convert(Image.FORMAT_RGBA8)
+		data.append_array(lv.get_data())
+	return Image.create_from_data(w, h, true, Image.FORMAT_RGBA8, data)
+
+
+## How far a level's contrast is lifted back towards level 0's (0: none - levels are still
+## made from the work-scale picture and quantised to the palette, which keeps most of the
+## detail; 0.7 kept a little more but mid-distance textures shimmered as the camera panned).
+const MIP_CONTRAST := 0.0
+
+
+## Standard deviation of the opaque texels' luminance.
+static func _luma_spread(img: Image) -> float:
+	var sum := 0.0
+	var sum2 := 0.0
+	var count := 0
+	for y in img.get_height():
+		for x in img.get_width():
+			var c := img.get_pixel(x, y)
+			if c.a < 0.5:
+				continue
+			var l := c.get_luminance()
+			sum += l
+			sum2 += l * l
+			count += 1
+	if count == 0:
+		return 0.0
+	var mean := sum / count
+	return sqrt(maxf(sum2 / count - mean * mean, 0.0))
+
+
+## Pushes each texel away from the image's mean colour by `gain`.
+static func _lift_contrast(img: Image, gain: float) -> void:
+	if gain <= 1.0001:
+		return
+	var mean := Vector3.ZERO
+	var count := 0
+	for y in img.get_height():
+		for x in img.get_width():
+			var c := img.get_pixel(x, y)
+			if c.a >= 0.5:
+				mean += Vector3(c.r, c.g, c.b)
+				count += 1
+	if count == 0:
+		return
+	mean /= count
+	for y in img.get_height():
+		for x in img.get_width():
+			var c := img.get_pixel(x, y)
+			var v := (mean + (Vector3(c.r, c.g, c.b) - mean) * gain).clamp(Vector3.ZERO, Vector3.ONE)
+			img.set_pixel(x, y, Color(v.x, v.y, v.z, c.a))
 
 
 ## Two-colour palette for a gradient tint: average colours of the darkest and lightest

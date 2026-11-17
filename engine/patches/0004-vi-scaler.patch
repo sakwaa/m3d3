@@ -1,0 +1,91 @@
+diff --git a/servers/rendering/renderer_rd/effects/tone_mapper.cpp b/servers/rendering/renderer_rd/effects/tone_mapper.cpp
+index 3ee5b78..e0e5102 100644
+--- a/servers/rendering/renderer_rd/effects/tone_mapper.cpp
++++ b/servers/rendering/renderer_rd/effects/tone_mapper.cpp
+@@ -169,6 +169,7 @@ void ToneMapper::tonemapper(RID p_source_color, RID p_dst_framebuffer, const Ton
+ 	tonemap.push_constant.pixel_size[1] = 1.0 / p_settings.texture_size.y;
+ 
+ 	tonemap.push_constant.flags |= p_settings.convert_to_srgb ? TONEMAP_FLAG_CONVERT_TO_SRGB : 0;
++	tonemap.push_constant.flags |= p_settings.vi_scale ? TONEMAP_FLAG_M3D3_VI_SCALE : 0; // m3d3 patch (VI scaler)
+ 
+ 	if (p_settings.view_count > 1) {
+ 		// Use USE_MULTIVIEW versions
+diff --git a/servers/rendering/renderer_rd/effects/tone_mapper.h b/servers/rendering/renderer_rd/effects/tone_mapper.h
+index 68b6da1..bffc4ec 100644
+--- a/servers/rendering/renderer_rd/effects/tone_mapper.h
++++ b/servers/rendering/renderer_rd/effects/tone_mapper.h
+@@ -75,6 +75,7 @@ private:
+ 		TONEMAP_FLAG_USE_FXAA = (1 << 4),
+ 		TONEMAP_FLAG_USE_8_BIT_DEBANDING = (1 << 5),
+ 		TONEMAP_FLAG_CONVERT_TO_SRGB = (1 << 6),
++		TONEMAP_FLAG_M3D3_VI_SCALE = (1 << 7), // m3d3 patch (VI scaler)
+ 	};
+ 
+ 	enum FlagsMobile {
+@@ -205,6 +206,7 @@ public:
+ 		Vector2i dest_texture_size;
+ 		uint32_t view_count = 1;
+ 		bool bilinear_filtering = true;
++		bool vi_scale = false; // m3d3 patch (VI scaler): linear along the line, lines repeated
+ 
+ 		bool convert_to_srgb = false;
+ 	};
+diff --git a/servers/rendering/renderer_rd/renderer_scene_render_rd.cpp b/servers/rendering/renderer_rd/renderer_scene_render_rd.cpp
+index fb4d422..4e6a87a 100644
+--- a/servers/rendering/renderer_rd/renderer_scene_render_rd.cpp
++++ b/servers/rendering/renderer_rd/renderer_scene_render_rd.cpp
+@@ -789,6 +789,8 @@ void RendererSceneRenderRD::_render_buffers_post_process_and_tonemap(const Rende
+ 
+ 			tonemap.dest_texture_size = texture_storage->render_target_get_size(render_target);
+ 			tonemap.bilinear_filtering = scale_mode != RSE::VIEWPORT_SCALING_3D_MODE_NEAREST;
++			// m3d3 patch (VI scaler): stretched like the N64's video interface.
++			tonemap.vi_scale = tonemap.bilinear_filtering && GLOBAL_GET_CACHED(bool, "rendering/m3d3/vi_upscale");
+ 		}
+ 
+ 		tonemap.debanding_mode = RendererRD::ToneMapper::TonemapSettings::DebandingMode::DEBANDING_MODE_DISABLED;
+diff --git a/servers/rendering/renderer_rd/shaders/effects/tonemap.glsl b/servers/rendering/renderer_rd/shaders/effects/tonemap.glsl
+index 0d66592..996b68b 100644
+--- a/servers/rendering/renderer_rd/shaders/effects/tonemap.glsl
++++ b/servers/rendering/renderer_rd/shaders/effects/tonemap.glsl
+@@ -62,6 +62,7 @@ layout(set = 3, binding = 0) uniform sampler3D source_color_correction;
+ #define FLAG_USE_FXAA (1 << 4)
+ #define FLAG_USE_8_BIT_DEBANDING (1 << 5)
+ #define FLAG_CONVERT_TO_SRGB (1 << 6)
++#define FLAG_M3D3_VI_SCALE (1 << 7)
+ 
+ layout(push_constant, std430) uniform Params {
+ 	vec3 bcs;
+@@ -852,10 +853,17 @@ vec3 screen_space_dither(vec2 frag_coord, float bit_alignment_diviser) {
+ }
+ 
+ void main() {
++	vec2 src_uv = uv_interp;
++	if (bool(params.flags & FLAG_M3D3_VI_SCALE)) {
++		// m3d3 patch (VI scaler): the N64's video interface resampled along the line (linear)
++		// but repeated whole lines down the screen: the source row's centre, no vertical blend.
++		float rows = 1.0 / params.pixel_size.y;
++		src_uv.y = (floor(src_uv.y * rows) + 0.5) / rows;
++	}
+ #ifdef USE_MULTIVIEW
+-	vec4 color = textureLod(source_color, vec3(uv_interp, ViewIndex), 0.0f);
++	vec4 color = textureLod(source_color, vec3(src_uv, ViewIndex), 0.0f);
+ #else
+-	vec4 color = textureLod(source_color, uv_interp, 0.0f);
++	vec4 color = textureLod(source_color, src_uv, 0.0f);
+ #endif
+ 	color.rgb *= params.luminance_multiplier;
+ 
+diff --git a/servers/rendering/rendering_server.cpp b/servers/rendering/rendering_server.cpp
+index d2b235f..e21ed26 100644
+--- a/servers/rendering/rendering_server.cpp
++++ b/servers/rendering/rendering_server.cpp
+@@ -3767,6 +3767,9 @@ void RenderingServer::init() {
+ 		GLOBAL_DEF_NOVAL(PropertyInfo(Variant::INT, "rendering/scaling_3d/mode.macos", PROPERTY_HINT_ENUM, mode_hints_metal), 0);
+ 	}
+ 	GLOBAL_DEF(PropertyInfo(Variant::FLOAT, "rendering/scaling_3d/scale", PROPERTY_HINT_RANGE, "0.1,2.0,0.0001"), 1.0);
++	// m3d3 patch (VI scaler): the 3D picture stretched to the screen as the N64's VI did it -
++	// interpolated along each line, lines repeated (no vertical filter). Bilinear scaling only.
++	GLOBAL_DEF("rendering/m3d3/vi_upscale", false);
+ 	GLOBAL_DEF(PropertyInfo(Variant::FLOAT, "rendering/scaling_3d/fsr_sharpness", PROPERTY_HINT_RANGE, "0,2,0.01"), 0.2f);
+ 
+ 	GLOBAL_DEF(PropertyInfo(Variant::FLOAT, "rendering/textures/default_filters/texture_mipmap_bias", PROPERTY_HINT_RANGE, "-2,2,0.001"), 0.0f);

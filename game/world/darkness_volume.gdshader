@@ -22,6 +22,10 @@ uniform vec4 opening = vec4(0.0);
 // Arched opening: x = 1 round / 2 pointed (0 flat), y = springing height; round: z = half
 // width, w = rise; pointed: z = arc centre x, w = radius.
 uniform vec4 opening_arch = vec4(0.0);
+// Metres over which the darkening eases in at the box's sides and top (0: a hard edge).
+// Passages use their margin: inside a corridor it's within the walls (unseen); in the open
+// it's a soft border instead of a dark rectangle cut into the ground.
+uniform float edge_soft = 0.0;
 
 bool outside_arch(vec3 p) {
 	if (opening_arch.x < 0.5 || p.y <= opening_arch.y) {
@@ -73,6 +77,10 @@ void fragment() {
 	// Half linear, half eased: darkening starts visibly at the front edge, no hard knee.
 	float t = clamp((into - fade_start) / max(fade_end - fade_start, 0.001), 0.0, 1.0);
 	float dark = mix(t, t * t * (3.0 - 2.0 * t), 0.5);
+	if (edge_soft > 0.0) {
+		float edge = min(min(p.x - box_min.x, box_max.x - p.x), box_max.y - p.y);
+		dark *= smoothstep(0.0, edge_soft, edge);
+	}
 	// Fogged pixel C = mix(S, fog, f); the same surface darkened by `dark`:
 	// mix(S * (1 - dark), fog, f) = C * (1 - dark) + fog * f * dark.
 	vec3 world = (MODEL_MATRIX * vec4(p, 1.0)).xyz;

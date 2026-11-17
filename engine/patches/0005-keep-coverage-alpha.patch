@@ -1,0 +1,33 @@
+diff --git a/servers/rendering/renderer_rd/forward_clustered/scene_shader_forward_clustered.cpp b/servers/rendering/renderer_rd/forward_clustered/scene_shader_forward_clustered.cpp
+index 0b1ff74..0ffc1ed 100644
+--- a/servers/rendering/renderer_rd/forward_clustered/scene_shader_forward_clustered.cpp
++++ b/servers/rendering/renderer_rd/forward_clustered/scene_shader_forward_clustered.cpp
+@@ -345,6 +345,14 @@ void SceneShaderForwardClustered::ShaderData::_create_pipeline(PipelineKey p_pip
+ 
+ 	// Color pass -> attachment 0: Color/Diffuse, attachment 1: Separate Specular, attachment 2: Motion Vectors
+ 	RD::PipelineColorBlendState::Attachment blend_attachment = blend_mode_to_blend_attachment(BlendMode(blend_mode));
++	if (blend_attachment.enable_blend && GLOBAL_GET_CACHED(bool, "rendering/m3d3/keep_coverage_alpha")) {
++		// m3d3 patch (coverage for see-through surfaces): blended surfaces leave the colour
++		// buffer's alpha alone - it holds the opaque pass's coverage tags (N64 coverage AA),
++		// so water, effects and darkness blend their colour over AA'd edges without erasing them.
++		blend_attachment.src_alpha_blend_factor = RD::BLEND_FACTOR_ZERO;
++		blend_attachment.dst_alpha_blend_factor = RD::BLEND_FACTOR_ONE;
++		blend_attachment.alpha_blend_op = RD::BLEND_OP_ADD;
++	}
+ 	RD::PipelineColorBlendState blend_state_color_blend;
+ 	blend_state_color_blend.attachments = { blend_attachment, RD::PipelineColorBlendState::Attachment(), RD::PipelineColorBlendState::Attachment() };
+ 	RD::PipelineColorBlendState blend_state_color_opaque = RD::PipelineColorBlendState::create_disabled(3);
+diff --git a/servers/rendering/rendering_server.cpp b/servers/rendering/rendering_server.cpp
+index e21ed26..a61020c 100644
+--- a/servers/rendering/rendering_server.cpp
++++ b/servers/rendering/rendering_server.cpp
+@@ -3770,6 +3770,9 @@ void RenderingServer::init() {
+ 	// m3d3 patch (VI scaler): the 3D picture stretched to the screen as the N64's VI did it -
+ 	// interpolated along each line, lines repeated (no vertical filter). Bilinear scaling only.
+ 	GLOBAL_DEF("rendering/m3d3/vi_upscale", false);
++	// m3d3 patch (coverage for see-through surfaces): blended 3D surfaces keep the colour
++	// buffer's alpha (the coverage tags). Off for viewports that need a transparent background.
++	GLOBAL_DEF_RST("rendering/m3d3/keep_coverage_alpha", false);
+ 	GLOBAL_DEF(PropertyInfo(Variant::FLOAT, "rendering/scaling_3d/fsr_sharpness", PROPERTY_HINT_RANGE, "0,2,0.01"), 0.2f);
+ 
+ 	GLOBAL_DEF(PropertyInfo(Variant::FLOAT, "rendering/textures/default_filters/texture_mipmap_bias", PROPERTY_HINT_RANGE, "-2,2,0.001"), 0.0f);

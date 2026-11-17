@@ -1,5 +1,5 @@
 shader_type spatial;
-render_mode diffuse_lambert, specular_disabled;
+render_mode diffuse_lambert, specular_disabled, vertex_lighting;
 // Level paint for Baked Vertex / Timed Dynamic lighting: the baked light (ambient, AO, static lights)
 // glows through EMISSION; dynamic scene lights add on top through ALBEDO. Godot's own
 // ambient is held back by AO as much as the bake shows (bake_strength), so it isn't

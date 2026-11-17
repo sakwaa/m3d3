@@ -387,16 +387,42 @@ func apply_xy(c: Color, _i: int, xy: Vector2i) -> Color:
 
 ## Display colour of an OKLab value (clamped into range).
 static func from_oklab(v: Vector3, alpha := 1.0) -> Color:
+	return oklab_linear(v, alpha).clamp().linear_to_srgb()
+
+
+## Linear RGB of an OKLab value (unclamped: outside 0..1 = outside the display's gamut).
+static func oklab_linear(v: Vector3, alpha := 1.0) -> Color:
 	var l_ := v.x + 0.3963377774 * v.y + 0.2158037573 * v.z
 	var m_ := v.x - 0.1055613458 * v.y - 0.0638541728 * v.z
 	var s_ := v.x - 0.0894841775 * v.y - 1.2914855480 * v.z
 	var l := l_ * l_ * l_
 	var m := m_ * m_ * m_
 	var s := s_ * s_ * s_
-	var lin := Color(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+	return Color(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
 		-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
 		-0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s, alpha)
-	return lin.clamp().linear_to_srgb()
+
+
+## Display colour of an OKLab value, brought into gamut by lowering its colourfulness (hue
+## and lightness kept), not by clipping channels (which shifts hue: blues to purple...).
+static func from_oklab_fit(v: Vector3, alpha := 1.0) -> Color:
+	var lin := oklab_linear(v, alpha)
+	if _in_gamut(lin):
+		return lin.linear_to_srgb()
+	var lo := 0.0
+	var hi := 1.0
+	for i in 12:
+		var k := (lo + hi) * 0.5
+		if _in_gamut(oklab_linear(Vector3(v.x, v.y * k, v.z * k), alpha)):
+			lo = k
+		else:
+			hi = k
+	return from_oklab(Vector3(v.x, v.y * lo, v.z * lo), alpha)
+
+
+static func _in_gamut(c: Color) -> bool:
+	const E := 0.0005
+	return c.r >= -E and c.g >= -E and c.b >= -E and c.r <= 1.0 + E and c.g <= 1.0 + E and c.b <= 1.0 + E
 
 
 ## OKLab of a display colour.

@@ -9,7 +9,7 @@ extends Resource
 ## from it at the brush (in the editor and in game, never saved with the scene; written out
 ## on export), like Door nodes from door brushes.
 
-enum Kind { SIGN, STALL, RAIN_DRIP, BIRD_FLOCK, NPC_SPOT, NPC_PATH, TREE, LADDER, ROOM }
+enum Kind { SIGN, STALL, RAIN_DRIP, BIRD_FLOCK, NPC_SPOT, NPC_PATH, TREE, LADDER, ROOM, PUSH_BLOCK, BALANCE, VINES }
 
 const SCRIPTS := {
 	Kind.SIGN: "res://game/world/props/signpost.gd",
@@ -21,9 +21,13 @@ const SCRIPTS := {
 	Kind.TREE: "res://game/world/props/world_tree.gd",
 	Kind.LADDER: "res://game/world/props/ladder.gd",
 	Kind.ROOM: "res://addons/n64_runtime/world/vis_room.gd",
+	Kind.PUSH_BLOCK: "res://game/world/props/push_block.gd",
+	Kind.BALANCE: "res://game/world/props/balance_lift.gd",
+	Kind.VINES: "res://game/world/props/world_vines.gd",
 }
 const NAMES := {Kind.SIGN: "Sign", Kind.STALL: "Stall", Kind.RAIN_DRIP: "RainDrip", Kind.BIRD_FLOCK: "Birds",
-	Kind.NPC_SPOT: "Spot", Kind.NPC_PATH: "Path", Kind.TREE: "Tree", Kind.LADDER: "Ladder", Kind.ROOM: "Room"}
+	Kind.NPC_SPOT: "Spot", Kind.NPC_PATH: "Path", Kind.TREE: "Tree", Kind.LADDER: "Ladder", Kind.ROOM: "Room",
+	Kind.PUSH_BLOCK: "PushBlock", Kind.BALANCE: "Balance", Kind.VINES: "Vines"}
 
 ## What the prop is. Changing it starts the new kind from its defaults.
 @export var kind := Kind.SIGN:
@@ -48,7 +52,7 @@ var _template: Node
 
 
 ## Kinds that move or change while playing (and trees: their own LOD cards): not batched.
-const UNBATCHED := [Kind.RAIN_DRIP, Kind.BIRD_FLOCK, Kind.NPC_SPOT, Kind.NPC_PATH, Kind.TREE, Kind.ROOM]
+const UNBATCHED := [Kind.RAIN_DRIP, Kind.BIRD_FLOCK, Kind.NPC_SPOT, Kind.NPC_PATH, Kind.TREE, Kind.ROOM, Kind.PUSH_BLOCK, Kind.BALANCE, Kind.VINES]
 
 
 ## The node for this prop, set up from the settings (not in the tree). Static kinds join

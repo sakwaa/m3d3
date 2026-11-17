@@ -1,0 +1,93 @@
+{
+ "name": "PushWait",
+ "fps": 30,
+ "length": 40,
+ "loop": true,
+ "root": "auto",
+ "source": "OoT push / pull (link_normal_pushing / pulling, push_wait) read by eye from gameplay; poses by convention, unmeasured. The hands are placed on the block by ClimbRig 'push' mode; the arms here only set the elbows' start.",
+ "measured": false,
+ "keys": [
+  {
+   "frame": 0,
+   "ease": "smooth",
+   "lean": 18,
+   "neck": 8,
+   "head": 4,
+   "thigh_L": 15,
+   "shin_L": 2,
+   "thigh_R": -18,
+   "shin_R": -22,
+   "upper_arm_L": [
+    75,
+    12
+   ],
+   "forearm_L": [
+    85,
+    8
+   ],
+   "upper_arm_R": [
+    75,
+    12
+   ],
+   "forearm_R": [
+    85,
+    8
+   ]
+  },
+  {
+   "frame": 20,
+   "ease": "smooth",
+   "lean": 19,
+   "neck": 8,
+   "head": 4,
+   "lift": -0.012,
+   "thigh_L": 15,
+   "shin_L": 1,
+   "thigh_R": -18,
+   "shin_R": -23,
+   "upper_arm_L": [
+    75,
+    12
+   ],
+   "forearm_L": [
+    85,
+    8
+   ],
+   "upper_arm_R": [
+    75,
+    12
+   ],
+   "forearm_R": [
+    85,
+    8
+   ]
+  },
+  {
+   "frame": 40,
+   "ease": "smooth",
+   "lean": 18,
+   "neck": 8,
+   "head": 4,
+   "thigh_L": 15,
+   "shin_L": 2,
+   "thigh_R": -18,
+   "shin_R": -22,
+   "upper_arm_L": [
+    75,
+    12
+   ],
+   "forearm_L": [
+    85,
+    8
+   ],
+   "upper_arm_R": [
+    75,
+    12
+   ],
+   "forearm_R": [
+    85,
+    8
+   ]
+  }
+ ]
+}

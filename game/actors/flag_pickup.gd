@@ -26,9 +26,27 @@ func _ready() -> void:
 	mesh.radial_segments = 8
 	mesh.rings = 4
 	mi.mesh = mesh
-	mi.material_override = N64Materials.actor(color, null, N64Materials.Shine.GLOSS, 0.7, 1.0)
+	mi.material_override = shiny_material(color)
 	add_child(mi)
 	body_entered.connect(_on_body_entered)
+
+
+## OoT / MM's shiny get-item look (rupees, tokens, the Boss Key: references/combiners/REPORT.md):
+## a reflection texture looked up by the normal (texgen), its contrast pushed about a pivot
+## ((T0 - PRIM) x k + T0), then mapped from a dark to a bright shade of `c`.
+static func shiny_material(c: Color) -> ShaderMaterial:
+	var m := ShaderMaterial.new()
+	m.shader = preload("res://addons/n64_runtime/shaders/n64_textured.gdshader")
+	m.set_shader_parameter(&"albedo_texture", preload("res://textures/shine/chrome.res"))
+	m.set_shader_parameter(&"cc_on", true)
+	m.set_shader_parameter(&"cc_texgen", true)
+	m.set_shader_parameter(&"cc_base", 7)  # (T0 - PRIM) * k + T0
+	m.set_shader_parameter(&"cc_tint", 4)  # mix(ENV, PRIM, COMBINED)
+	m.set_shader_parameter(&"cc_alpha", 1)
+	m.set_shader_parameter(&"cc_k", 0.8)
+	m.set_shader_parameter(&"cc_prim", c.lightened(0.55))
+	m.set_shader_parameter(&"cc_env", c.darkened(0.6))
+	return m
 
 
 func _on_body_entered(body: Node3D) -> void:

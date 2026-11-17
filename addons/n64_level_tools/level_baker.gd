@@ -220,6 +220,12 @@ static func bake(data: LevelData, merge_coplanar: bool, optimize := false) -> Di
 						for s in 4:
 							var arr: PackedColorArray = all_keys[s] if s < all_keys.size() else PackedColorArray()
 							kc.append(arr[i] if arr.size() == ids.size() else Color.WHITE)
+						# The brush's coverage ID (brush index mod 7, + 1; 255 = none) in key 0's
+						# alpha: the coverage AA counts one brush's triangles as one surface (the
+						# RDP summed a mesh's coverage), so its own creases stay crisp. (The brush
+						# index, as LevelBrush.build_painted_mesh and DecalBuilder write it: a
+						# decal shares its host brush's ID.)
+						kc[0] = Color(kc[0], (float(int(src.brush_index) % 7) + 1.0) / 255.0)
 					surf.idx.append(_weld(surf, pts[i], n, uv, uv2, col, kc))
 				if poly.collide:
 					# The ground's collision is simplified on its own below (optimize).
@@ -307,7 +313,9 @@ static func bake(data: LevelData, merge_coplanar: bool, optimize := false) -> Di
 	# Cracks: where one surface's vertex lies on another's edge (a T-junction, often between
 	# brushes or cells), the edge without it splits there, so no hairline opens.
 	BuildProgress.step("close cracks")
+	CrackClose.wall_zones = opening_zones(data)
 	var fixed := CrackClose.close(pending.map(func(e): return [e[2], e[1].range]))
+	CrackClose.wall_zones = []
 	stats.cracks_closed = fixed
 	# Triangles no one can see from the walkable ground, out (UnseenCull).
 	if unseen:
@@ -676,6 +684,30 @@ static func _cull_coincident(polys: Array[Dictionary], channel: String, stats: D
 ## Faces only merge when everything that affects shading matches; painted faces keep
 ## their own mask chart, so they never merge. Coloured faces merge only with faces of the
 ## very same single colour on every corner (and lighting key): nothing to interpolate.
+## Boxes (level space) round each passage's and door's opening: the wall about it, its
+## trim's reach and the first metre of the corridor (CrackClose splits walls there too).
+static func opening_zones(data: LevelData) -> Array[AABB]:
+	var out: Array[AABB] = []
+	for b in data.brushes:
+		if b == null:
+			continue
+		var spec: Resource = b.passage if b.is_passage() else (b.door if b.is_door() else null)
+		if spec == null:
+			continue
+		var hw: float = float(spec.get(&"width")) * 0.5 + 1.0
+		var h: float = float(spec.get(&"height")) + 1.0
+		var box := AABB()
+		var first := true
+		for x in [-hw, hw]:
+			for y in [-0.5, h]:
+				for z in [-1.5, 1.0]:
+					var p: Vector3 = b.transform * Vector3(x, y, z)
+					box = AABB(p, Vector3.ZERO) if first else box.expand(p)
+					first = false
+		out.append(box)
+	return out
+
+
 static func _merge_coplanar(sources: Array[Dictionary], polys: Array[Dictionary], stats: Dictionary) -> Array[Dictionary]:
 	var by_src := {}
 	for poly in polys:

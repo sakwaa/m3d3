@@ -215,6 +215,24 @@ static func set_base(mat: ShaderMaterial, base: Texture2D, data: LevelData, tint
 	mat.set_shader_parameter(&"base_tint", tint)
 	mat.set_shader_parameter(&"base_tile", look.tile if look and look.tile > 0.0 else base_tile_for(base, data))
 	mat.set_shader_parameter(&"base_anti", anti_tiling(base))
+	mat.set_shader_parameter(&"base_wrap", Vector2i(base.wrap_s, base.wrap_t) if base is N64Texture else Vector2i.ZERO)
+	# Palette variants: the shared indices in this row of the shared palette (N64PaletteSwap).
+	var swap := base as N64PaletteSwap
+	var pal := swap.palette_texture if swap else null
+	mat.set_shader_parameter(&"base_use_palette", pal != null)
+	if pal:
+		mat.set_shader_parameter(&"base_tex", pal.index)
+		mat.set_shader_parameter(&"base_palette_lut", pal.lut())
+		mat.set_shader_parameter(&"base_palette_row", swap.palette_row)
+		mat.set_shader_parameter(&"base_palette_mean", pal.mean_luma(swap.palette_row))
+	var lod_mode: int = base.lod_mode if base is N64Texture and (base.lod_mode < 2 or base.detail_texture) else 0
+	mat.set_shader_parameter(&"base_lod_mode", lod_mode)
+	# Soft ground takes footprints (the zone's footprint simulation): sand, snow, dirt / mud.
+	var src: Texture2D = base.get_meta(&"grade_source") if base and base.has_meta(&"grade_source") else base
+	var snd: int = src.surface() if src is N64Texture else 0
+	mat.set_shader_parameter(&"soft_ground", {Surface.Sound.SAND: 1.0, Surface.Sound.SNOW: 1.0, Surface.Sound.DIRT: 0.7}.get(snd, 0.0))
+	mat.set_shader_parameter(&"base_detail_tex", base.detail_texture if lod_mode >= 2 else null)
+	mat.set_shader_parameter(&"base_detail", Vector2(base.detail_repeats, base.detail_strength) if lod_mode > 0 else Vector2(4.0, 0.0))
 	var anim: Array = base.anim_params() if base is N64Texture else [Vector4.ZERO, Vector4(1, 1, 1, 0)]
 	mat.set_shader_parameter(&"base_scroll", anim[0])
 	mat.set_shader_parameter(&"base_flip", anim[1])

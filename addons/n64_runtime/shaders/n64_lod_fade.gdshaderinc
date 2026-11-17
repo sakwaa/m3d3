@@ -12,12 +12,13 @@
 instance uniform vec4 n64_lod_fade = vec4(0.0);
 instance uniform float n64_lod_fade_band = 0.0;
 
-// 4x4 Bayer threshold in (0, 1).
+// The RDP's alpha dither threshold in (0, 1): its 4x4 magic square (values 0..7, so a fade
+// steps through 8 patterns, as the N64's did). (Name kept: it was a Bayer matrix.)
 float n64_bayer4(vec2 frag) {
 	ivec2 p = ivec2(frag) & ivec2(3);
 	int i = p.x + p.y * 4;
-	const float m[16] = float[16](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
-	return (m[i] + 0.5) / 16.0;
+	const float m[16] = float[16](0.0, 6.0, 1.0, 7.0, 4.0, 2.0, 5.0, 3.0, 1.0, 7.0, 0.0, 6.0, 5.0, 3.0, 4.0, 2.0);
+	return (m[i] + 0.5) / 8.0;
 }
 
 void n64_lod_dither(vec3 camera, mat4 model, vec2 frag) {
@@ -31,3 +32,30 @@ void n64_lod_dither(vec3 camera, mat4 model, vec2 frag) {
 		discard;
 	}
 }
+
+
+// Camera see-through (CameraDirector sets it every frame): level and prop pixels right in
+// front of the lens (closer than ~0.8 m: an awning, a banner, a house corner the camera has
+// swung into), or inside a thin capsule from the camera to the player's chest (anything
+// between them), are dithered out with the 4 x 4 Bayer pattern, as faded actors are.
+// n64_see_through: player chest (xyz), capsule radius (w; 0 = off).
+global uniform vec4 n64_see_through;
+
+void n64_see_through_dither(vec3 world, vec3 camera, vec2 frag) {
+	if (n64_see_through.w <= 0.0) {
+		return;
+	}
+	float keep = smoothstep(0.3, 0.8, distance(world, camera));
+	vec3 seg = n64_see_through.xyz - camera;
+	float len = length(seg);
+	vec3 dir = seg / max(len, 1e-3);
+	float t = dot(world - camera, dir);
+	if (t > 0.0 && t < len - 0.5) {
+		float r = length(world - camera - dir * t);
+		keep = min(keep, smoothstep(n64_see_through.w * 0.55, n64_see_through.w, r));
+	}
+	if (keep < 1.0 && n64_bayer4(frag) >= keep) {
+		discard;
+	}
+}
+

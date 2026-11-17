@@ -198,8 +198,10 @@ public partial class N64SfxPlayer : Node
 	/// `key`, a MIDI note, when &gt;= 0), volume 0-1, pan -1..1. `maxInstances` (&gt; 0) caps
 	/// how many of this effect play at once (a new one stops the oldest); -1 =
 	/// <see cref="MaxInstances"/>, 0 = no limit. Returns a handle, 0 if nothing played (unknown
-	/// name: warned; no zone at the key).</summary>
-	public long Play(StringName name, float pitchSemitones = 0f, float volume = 1f, float pan = 0f, int key = -1, int maxInstances = -1)
+	/// name: warned; no zone at the key). `reverb` (&gt;= 0) replaces the reverb send,
+	/// `lowpass` (Hz, 0 off) dulls it: OoT's distance model (Sfx.play) sets both.</summary>
+	public long Play(StringName name, float pitchSemitones = 0f, float volume = 1f, float pan = 0f, int key = -1, int maxInstances = -1,
+		float reverb = -1f, float lowpass = 0f)
 	{
 		var (ins, set) = Lookup(name);
 		if (ins == null)
@@ -224,11 +226,19 @@ public partial class N64SfxPlayer : Node
 					n--;
 				}
 		}
-		long id = _synth.PlayNote(ins, key >= 0 ? key : NaturalKey(ins), 127, volume, pan);
-		if (id == 0)
-			return 0;
-		if (pitchSemitones != 0f)
-			_synth.SetNotePitch(id, pitchSemitones * 100f);
+		long id;
+		lock (_synth.Sync)  // (start, pitch, send and filter land in the same mix block)
+		{
+			id = _synth.PlayNote(ins, key >= 0 ? key : NaturalKey(ins), 127, volume, pan);
+			if (id == 0)
+				return 0;
+			if (pitchSemitones != 0f)
+				_synth.SetNotePitch(id, pitchSemitones * 100f);
+			if (reverb >= 0f)
+				_synth.SetNoteSend(id, reverb);
+			if (lowpass > 0f)
+				_synth.SetNoteFilter(id, lowpass);
+		}
 		_instances.Add(new Instance { Handle = id, Name = name, Set = set });
 		return id;
 	}
@@ -262,6 +272,12 @@ public partial class N64SfxPlayer : Node
 	public void SetVolume(long handle, float volume) => _synth?.SetNoteVolume(handle, volume);
 
 	public void SetPan(long handle, float pan) => _synth?.SetNotePan(handle, pan);
+
+	/// <summary>Reverb send (0-1) of a playing effect.</summary>
+	public void SetReverb(long handle, float send) => _synth?.SetNoteSend(handle, send);
+
+	/// <summary>Low-pass (Hz, 0 off) of a playing effect.</summary>
+	public void SetLowPass(long handle, float hz) => _synth?.SetNoteFilter(handle, hz);
 
 	/// <summary>Handles of the effects sounding now (fading ones included).</summary>
 	public long[] Handles()

@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://blcmehqrlybom"
+path="res://.godot/imported/n64_video_upscale.glsl-2d9424b6a0eeb5cbe69bc156146284b8.res"
+
+[deps]
+
+source_file="res://addons/n64_runtime/post/n64_video_upscale.glsl"
+dest_files=["res://.godot/imported/n64_video_upscale.glsl-2d9424b6a0eeb5cbe69bc156146284b8.res"]
+
+[params]
+

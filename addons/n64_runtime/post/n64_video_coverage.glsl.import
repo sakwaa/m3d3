@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://dtb8ik71ty2oe"
+path="res://.godot/imported/n64_video_coverage.glsl-fdfa3872e7ba6f95f79b7de6be49eda5.res"
+
+[deps]
+
+source_file="res://addons/n64_runtime/post/n64_video_coverage.glsl"
+dest_files=["res://.godot/imported/n64_video_coverage.glsl-fdfa3872e7ba6f95f79b7de6be49eda5.res"]
+
+[params]
+

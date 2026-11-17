@@ -86,7 +86,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			if OS.is_debug_build() and ResourceLoader.exists(CLIMB_SANDBOX):
 				ZoneManager.travel(CLIMB_SANDBOX)
 		KEY_F12:
-			RenderScale.toggle_video_out()
+			if event.shift_pressed:
+				_cycle_combiner()
+			else:
+				RenderScale.toggle_video_out()
 		KEY_F1:
 			RenderScale.toggle_value_view()
 		KEY_F11:
@@ -113,6 +116,7 @@ func _process(delta: float) -> void:
 		"Weather: %s%s" % [GameState.weather, "" if GameState.weather_blend >= 1.0 else " (from %s)" % GameState.weather_from],
 		"Flags: %s" % (", ".join(GameState.flags.keys()) if not GameState.flags.is_empty() else "none"),
 		"Items: %s" % (", ".join(GameState.items.keys().map(func(id): return "%s x%d" % [id, GameState.items[id]])) if not GameState.items.is_empty() else "none"),
+		("Combiner: %s  [Shift+F12] next" % _combiner_name) if _combiner_name != "" else "[Shift+F12] combiner test",
 		"[F3] hud  [T] fast time  [F2] save  [F4] load  [F6] weather  [F7] profiler  [F9] collision  [F10] wireframe  [F11] fullscreen  [F12] video out  [F1] values",
 	]
 	if _collision_view:
@@ -125,6 +129,28 @@ func _process(delta: float) -> void:
 			states.append("%s=%s" % [room.room_id, Room.State.keys()[room.state].to_lower()])
 		lines.insert(2, "Rooms: " + ", ".join(states))
 	_label.text = "\n".join(lines)
+
+
+# --- Screen combiner test (Shift+F12) ------------------------------------------------
+
+const COMBINER_DIR := "res://game/looks/combiners"
+var _combiner_i := -1
+var _combiner_name := ""
+
+
+## Cycles the screen combiner presets (game/looks/combiners), forced over the place's look:
+## off -> each preset -> off.
+func _cycle_combiner() -> void:
+	var files := Array(DirAccess.get_files_at(COMBINER_DIR)).map(func(f): return f.trim_suffix(".remap")).filter(func(f): return f.ends_with(".tres"))
+	files.sort()
+	_combiner_i += 1
+	if _combiner_i >= files.size():
+		_combiner_i = -1
+		_combiner_name = ""
+		RenderScale.release_look(0.3)
+		return
+	_combiner_name = files[_combiner_i].get_basename()
+	RenderScale.force_look(load(COMBINER_DIR + "/" + files[_combiner_i]), 0.3)
 
 
 # --- Profiler -----------------------------------------------------------------------
@@ -165,7 +191,9 @@ func _update_profile(delta: float) -> void:
 		"Triangles %s / %s   (peak %s)" % [_budget(tris, BUDGET_TRIANGLES, "%d"), _k(BUDGET_TRIANGLES),
 			_budget(_shown_peak_tris, BUDGET_TRIANGLES, "%d")],
 		"Draw calls %s / %d   objects %d" % [_budget(draws, BUDGET_DRAW_CALLS, "%d"), BUDGET_DRAW_CALLS, objects],
-		"VRAM %.0f MB  (textures %.1f, buffers %.1f)" % [vram, tex_mem, buf_mem],
+		# (The driver's texture count can go below zero - freed textures it never counted - and
+		# then wraps to ~2^64 bytes: shown as unknown rather than as a huge number.)
+		"VRAM %.0f MB  (textures %s, buffers %.1f)" % [vram, "%.1f" % tex_mem if tex_mem <= vram else "?", buf_mem],
 		"RAM %.0f MB   nodes %d" % [ram, nodes],
 		"Physics: %d active bodies, %d pairs" % [bodies, pairs],
 	]

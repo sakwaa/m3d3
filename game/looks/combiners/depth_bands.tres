@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="ScreenLook" format=3]
+
+[ext_resource type="Script" path="res://addons/n64_runtime/post/screen_combiner.gd" id="1_w7f44"]
+[ext_resource type="Script" path="res://addons/n64_runtime/post/screen_look.gd" id="2_3l88k"]
+
+[sub_resource type="Resource" id="Resource_c6ovf"]
+script = ExtResource("1_w7f44")
+cycles = 2
+c1_a = 15
+c1_c = 13
+c1_d = 14
+c2_a = 0
+c2_b = 2
+c2_c = 7
+c2_d = 2
+primitive = Color(1, 1, 1, 0.7)
+
+[resource]
+script = ExtResource("2_3l88k")
+mode = 3
+blend_time = 0.5
+palette = PackedColorArray()
+combiner = SubResource("Resource_c6ovf")

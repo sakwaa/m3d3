@@ -22,6 +22,7 @@ const WEATHER_PARAM := &"n64_weather_tint"
 const AO_PARAM := &"n64_vertex_ao"
 ## Animated textures' rate (1 = play, 0 = frozen while painting); the game always plays.
 const TIME_PARAM := &"n64_time"
+const DISTORT_PARAM := &"n64_distort"
 ## Shortcut modifier as Godot reads it (is_command_or_control_pressed): Cmd on macOS.
 static var MOD := "Cmd" if OS.get_name() == "macOS" else "Ctrl"
 const PICK_RADIUS := 10.0
@@ -39,6 +40,7 @@ const STATUS_OK := Color(0.45, 0.85, 0.45)
 const STATUS_STALE := Color(1.0, 0.75, 0.3)
 const STATUS_IDLE := Color(0.75, 0.75, 0.75, 0.8)
 
+var _world_menu: PopupMenu
 var panel: LevelPanel
 ## Set pieces: brushes made in Blender.
 var blender: LevelBlender
@@ -229,6 +231,12 @@ func _enter_tree() -> void:
 	world_menu.add_item("New Stair Texture (from selected texture)", 2)
 	world_menu.add_separator()
 	world_menu.add_item("Check Zone Links…", 3)
+	world_menu.add_separator()
+	world_menu.add_check_item("Show NPC Labels", 4)
+	var labels_on := bool(EditorInterface.get_editor_settings().get_project_metadata(SETTINGS_SECTION, "npc_labels", true))
+	world_menu.set_item_checked(world_menu.get_item_index(4), labels_on)
+	WorldPreview.set_labels(labels_on, get_tree())
+	_world_menu = world_menu
 	world_menu.id_pressed.connect(_on_world_menu)
 	add_tool_submenu_item(WORLD_MENU, world_menu)
 	# Other plugins (actor tools: new characters) add their items to this menu (ids 100+).
@@ -256,6 +264,10 @@ func _enter_tree() -> void:
 		RenderingServer.global_shader_parameter_add(AO_PARAM, RenderingServer.GLOBAL_VAR_TYPE_FLOAT, 1.0)
 	if not RenderingServer.global_shader_parameter_get_list().has(TIME_PARAM):
 		RenderingServer.global_shader_parameter_add(TIME_PARAM, RenderingServer.GLOBAL_VAR_TYPE_FLOAT, 0.0)
+	if not RenderingServer.global_shader_parameter_get_list().has(DISTORT_PARAM):
+		RenderingServer.global_shader_parameter_add(DISTORT_PARAM, RenderingServer.GLOBAL_VAR_TYPE_VEC4, Vector4(1, 0, 0, 1))
+	if not ProjectSettings.has_setting("shader_globals/" + String(DISTORT_PARAM)):
+		ProjectSettings.set_setting("shader_globals/" + String(DISTORT_PARAM), {"type": "vec4", "value": Vector4(1, 0, 0, 1)})
 	if not ProjectSettings.has_setting(LightingSchedule.SETTING):
 		ProjectSettings.set_setting(LightingSchedule.SETTING, LightingSchedule.DEFAULT_PATH)
 	ProjectSettings.set_initial_value(LightingSchedule.SETTING, LightingSchedule.DEFAULT_PATH)
@@ -670,6 +682,7 @@ func _store_build(root: LevelRoot, built: LevelData, key: int, bake_hash = null)
 	var data := root.data
 	data.baked_mesh = built.baked_mesh
 	data.baked_chunks = built.baked_chunks
+	data.baked_decals = built.baked_decals
 	data.baked_collision = null
 	data.baked_collision_parts = built.baked_collision_parts
 	data.baked_collision_surfaces = built.baked_collision_surfaces
@@ -898,6 +911,14 @@ func _on_world_menu(id: int) -> void:
 	if id == 2:
 		_new_stair_texture()
 		return
+	if id == 4:
+		# Name labels over NPC spots / paths in the 3D views, on / off (kept for this project).
+		var i := _world_menu.get_item_index(4)
+		var on := not _world_menu.is_item_checked(i)
+		_world_menu.set_item_checked(i, on)
+		WorldPreview.set_labels(on, get_tree())
+		EditorInterface.get_editor_settings().set_project_metadata(SETTINGS_SECTION, "npc_labels", on)
+		return
 	if id == 3:
 		# Every exit / zone door / passage must lead to an existing zone (also run on export).
 		var errors := ZoneLinks.report()
@@ -985,6 +1006,9 @@ func _on_action(action: StringName) -> void:
 		&"sign": _place_sign()
 		&"tree": _place_tree()
 		&"ladder": _place_prop(PropSpec.Kind.LADDER)
+		&"push_block": _place_prop(PropSpec.Kind.PUSH_BLOCK)
+		&"balance": _place_prop(PropSpec.Kind.BALANCE)
+		&"vines": _place_prop(PropSpec.Kind.VINES)
 		&"drips": _add_roof_drips()
 		&"house": _place_house()
 		&"shop": _place_house(true)
@@ -3644,6 +3668,13 @@ func grade_draw_paint(overlay: Control, camera: Camera3D) -> void:
 
 ## What the brush paints on `root`: LevelPaintTool.VERTEX_LAYER (painted colour) or
 ## overlay n (1..).
+## The Paint screen's Grid switch: the snap-grid checker on / off (the level panel's too).
+func grade_set_debug_view(on: bool) -> void:
+	LevelRoot.set_debug_view(on, get_tree())
+	if panel:
+		panel.set_debug_view(on)
+
+
 func grade_set_paint_layer(layer: int, root: LevelRoot) -> void:
 	if root and level != root:
 		_set_level(root)
@@ -4875,6 +4906,7 @@ func _on_project_settings_changed() -> void:
 
 func _set_preview_hour(hour: float) -> void:
 	EditorInterface.get_editor_settings().set_project_metadata(SETTINGS_SECTION, "preview_hour", hour)
+	_preview_sky_and_tint(hour)
 	var schedule := LightingSchedule.load_project()
 	if schedule:
 		var b := schedule.blend_for(hour)
@@ -4887,6 +4919,28 @@ func _set_preview_hour(hour: float) -> void:
 		var current = ProjectSettings.get_setting(key)
 		if not (current is Dictionary and current.get("value") == value):
 			ProjectSettings.set_setting(key, {"type": "vec4", "value": value})
+
+
+## The rest of what the hour changes in the game, previewed in the open scene: its
+## DynamicSky (sky, clouds, stars) and the night-blue world tint the DayNightSun sets at
+## runtime (from that sun's colours). Without it, night in the editor kept a noon sky.
+func _preview_sky_and_tint(hour: float) -> void:
+	var scene := EditorInterface.get_edited_scene_root()
+	if scene == null:
+		return
+	var tint_set := false
+	for n in [scene] + scene.find_children("*", "", true, false):
+		if n is WorldEnvironment and n.get(&"preview_hour") != null:
+			n.set(&"preview_hour", hour)
+		elif not tint_set and n is DirectionalLight3D and n.get(&"world_night") != null:
+			var c: Color = DayNightSun.world_tint(hour, n.get(&"world_day"), n.get(&"world_dusk"), n.get(&"world_night"))
+			RenderingServer.global_shader_parameter_set(&"n64_world_tint", c)
+			tint_set = true
+	if not tint_set:
+		RenderingServer.global_shader_parameter_set(&"n64_world_tint", Color.WHITE)
+	# The fog's colour and the ambient light at the hour (the far mountains haze into it;
+	# the fog distances only change in the Paint screen's Game view).
+	GamePreview.apply(scene, hour, null, false)
 
 
 func _set_paint_level_property(property: StringName, value: Variant) -> void:

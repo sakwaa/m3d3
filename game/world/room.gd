@@ -23,6 +23,13 @@ const ACTORS_NODE := "Actors"
 @export var fog_override: FogSettings
 ## Screen look while the player is in this room (over the weather's and the zone's).
 @export var screen_look: ScreenLook
+## Reverb in this room (N64Synth.SetReverbPreset: outdoor, room, hall, dungeon, cave, echo,
+## underwater, none); empty = the zone's.
+@export var reverb := ""
+## Muffles all sound in this room (low-pass, Hz; 0 = the zone's): underwater, a closet.
+@export_range(0.0, 16000.0, 10.0, "suffix:Hz") var muffle_hz := 0.0
+## Ground mist in this room (0..1; -1 = the zone's / weather's).
+@export_range(-1.0, 1.0, 0.05) var ground_mist := -1.0
 
 var state := State.GEOMETRY
 

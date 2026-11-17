@@ -37,6 +37,11 @@ const SHADER := preload("res://game/world/darkness_volume.gdshader")
 	set(value):
 		opening_arch = value
 		_rebuild()
+## Metres over which the darkening eases in at the sides and top (0 = hard edge).
+@export_range(0.0, 2.0, 0.05) var edge_soft := 0.0:
+	set(value):
+		edge_soft = value
+		_rebuild()
 ## Show black past the box's far end instead of whatever lies beyond (sky, void).
 @export var black_beyond := true:
 	set(value):
@@ -76,8 +81,10 @@ func _rebuild() -> void:
 		mat.shader = SHADER
 		material_override = mat
 	# Last of the transparent pass: anything drawn over the corridor afterwards (editor
-	# wires / grids, effects) would skip the darkening and glow in the black.
-	mat.render_priority = Material.RENDER_PRIORITY_MAX
+	# wires / grids, effects) would skip the darkening and glow in the black. Bar wind-blown
+	# dust (GroundMist open, at MAX), which hangs in the air in front of the doorway and should
+	# veil it.
+	mat.render_priority = Material.RENDER_PRIORITY_MAX - 1
 	mat.set_shader_parameter(&"box_min", box_min)
 	mat.set_shader_parameter(&"box_max", box_max)
 	mat.set_shader_parameter(&"fade_start", fade_start)
@@ -85,3 +92,4 @@ func _rebuild() -> void:
 	mat.set_shader_parameter(&"black_beyond", black_beyond)
 	mat.set_shader_parameter(&"opening", opening)
 	mat.set_shader_parameter(&"opening_arch", opening_arch)
+	mat.set_shader_parameter(&"edge_soft", edge_soft)

@@ -4,6 +4,25 @@ extends RefCounted
 ## children so they're never saved and never exist at runtime.
 
 
+## Editor name labels (NPC spots, paths...) shown or hidden together (World menu > Show
+## NPC Labels; kept in the project's editor settings).
+const LABEL_GROUP := &"editor_preview_labels"
+static var labels := true
+
+
+## Registers an editor label: in LABEL_GROUP, shown as the switch says.
+static func register_label(l: Label3D) -> void:
+	l.add_to_group(LABEL_GROUP)
+	l.visible = labels
+
+
+static func set_labels(on: bool, tree: SceneTree) -> void:
+	labels = on
+	if tree:
+		for n in tree.get_nodes_in_group(LABEL_GROUP):
+			(n as Node3D).visible = on
+
+
 static func box(parent: Node3D, size: Vector3, color: Color, arrow_z := 0) -> MeshInstance3D:
 	if not Engine.is_editor_hint():
 		return null

@@ -39,6 +39,25 @@ signal room_changed(room: Room)
 ## Screen look for the whole zone (ScreenLook: gradient map, palette or LUT); a room's or
 ## the weather's wins.
 @export var screen_look: ScreenLook
+## Reverb here (N64Synth.SetReverbPreset, Zelda's model); empty = outdoor under a sky, else
+## room. Rooms can override it.
+@export var reverb := ""
+## Muffles all sound (low-pass, Hz; 0 = off).
+@export_range(0.0, 16000.0, 10.0, "suffix:Hz") var muffle_hz := 0.0
+## The picture's warp while here (ScreenDistortion): Hot room = OoT's heat shimmer (Death
+## Mountain Crater, Fire Temple), Jabu = a breathing belly, Underwater = the slow sway.
+@export var distortion := ScreenDistortion.Kind.NONE
+@export_group("Ground mist")
+## Knee-deep mist on the ground that actors part (GroundMist): 0..1, or -1 = the weather's
+## (WeatherPreset.ground_mist: Misty has it). Rooms can override.
+@export_range(-1.0, 1.0, 0.05) var ground_mist := -1.0
+## Its height (metres; 0 = the weather's), steps each ray takes through it (more = smoother
+## tops, a little more cost), and dithered instead of blended.
+@export_range(0.0, 2.0, 0.05, "suffix:m") var ground_mist_height := 0.0
+@export_range(2, 12) var ground_mist_layers := 8
+## How far round the camera it's drawn (metres across; beyond, the regular fog takes over).
+@export_range(10.0, 120.0, 1.0, "suffix:m") var ground_mist_reach := 60.0
+@export var ground_mist_dither := false
 @export_group("Intro")
 ## The first time the player arrives (Majora's Mask style): a camera pan over the area and
 ## its name as a title card. Plays once (its cutscene's "seen" flag).
@@ -72,6 +91,8 @@ func _ready() -> void:
 	# Baked Vertex / Timed Dynamic levels: lights baked into them skip them live (before rooms unload).
 	LevelLights.apply(self)
 	PropBatch.add_auto(self)  # (static props without their own batching)
+	if distortion != ScreenDistortion.Kind.NONE and not Engine.is_editor_hint() and not DropPortal.is_preview(self):
+		ScreenDistortion.request(distortion, -1)
 	for room in rooms:
 		room.setup()
 	for portal in portals:
@@ -91,6 +112,280 @@ func _process(delta: float) -> void:
 	_update_fog(delta)
 	RenderScale.set_scene_mix(_screen_mix())
 	_update_key_light(delta)
+	_update_audio(delta)
+	_update_mist(delta)
+	_update_dust(delta)
+	_update_grass_sim(delta)
+	_update_ripples(delta)
+
+
+# --- Ground mist -----------------------------------------------------------------------------
+
+var _mist: GroundMist
+var _mist_amount := 0.0
+
+
+## The mist wanted here (room's, else zone's, else the weather's), eased in / out; the node
+## is made the first time any is wanted.
+func _update_mist(delta: float) -> void:
+	var w: Dictionary = GameState.weather_now
+	var want: float = float(w.get("ground_mist", 0.0)) if _sky() != null else 0.0
+	if ground_mist >= 0.0:
+		want = ground_mist
+	if current_room and current_room.ground_mist >= 0.0:
+		want = current_room.ground_mist
+	_mist_amount = move_toward(_mist_amount, want, delta / 3.0)
+	if _mist == null:
+		if _mist_amount <= 0.001:
+			return
+		_mist = GroundMist.new()
+		_mist.layer_count = ground_mist_layers
+		_mist.patch = ground_mist_reach
+		_mist.dither = ground_mist_dither
+		add_child(_mist, false, INTERNAL_MODE_BACK)
+	_mist.height = ground_mist_height if ground_mist_height > 0.0 else float(w.get("ground_mist_height", 0.7))
+	_mist.amount = _mist_amount
+
+
+# --- Wind-blown dust (a GroundMist made as dust) ----------------------------------------------
+
+## Dust blowing through town on a windy day (WeatherPreset.dust): the ground mist's billowing
+## columns, taller (DUST_HEIGHT), thinner, sand-coloured for the hour (WindDust.colours) and
+## blown quickly along the wind. The far band past the town is WindDust's (DynamicSky).
+const DUST_HEIGHT := 4.5
+var _dust: GroundMist
+var _dust_amount := 0.0
+var _dust_age := 0.0
+
+
+func _update_dust(delta: float) -> void:
+	var sky := _sky()
+	var want: float = float(GameState.weather_now.get("dust", 0.0)) if sky != null else 0.0
+	if current_room and current_room.ground_mist >= 0.0:
+		want = 0.0  # (rooms with their own mist setting are indoors / sheltered)
+	# (eased in / out as the weather turns; already there when the zone opens)
+	_dust_age += delta
+	_dust_amount = want if _dust_age < 0.5 else move_toward(_dust_amount, want, delta / 3.0)
+	if _dust == null:
+		if _dust_amount <= 0.001:
+			return
+		_dust = GroundMist.new()
+		_dust.name = "Dust"
+		_dust.simulate = false
+		_dust.layer_count = 6
+		_dust.patch = 80.0
+		_dust.height = DUST_HEIGHT
+		_dust.cloud_size = 40.0
+		_dust.churn = 2.4
+		_dust.density = 0.55
+		_dust.thickness = 0.45
+		_dust.top_light = 0.25
+		_dust.near_clear = 6.0
+		_dust.open = true
+		# (mostly a light cover, under half as thick, with thick clumps blowing through)
+		# (a clump every ~60 m of walking - some 12 s - ~30 m across, ~15% of the town)
+		_dust.bunch_size = 300.0
+		_dust.bunch_range = Vector2(0.55, 0.8)
+		_dust.bunch_floor = 0.3
+		_dust.bunch_peak = 2.6
+		add_child(_dust, false, INTERNAL_MODE_BACK)
+	var cols := WindDust.colours(GameState.time_of_day, false)
+	var c: Color = (cols[0] as Color).lerp(cols[1], 0.4)
+	# (a little greyed: thin airborne dust, not sand)
+	var grey := c.get_luminance()
+	c = c.lerp(Color(grey, grey, grey), 0.3)
+	c.a = 1.0
+	_dust.color = c
+	_dust.amount = _dust_amount
+
+
+# --- Grass wading (GroundSim) --------------------------------------------------------------
+
+const GRASS_MAT := "res://addons/n64_runtime/shaders/n64_grass_mat.gdshader"
+const GRASS_TUFT := "res://addons/n64_runtime/shaders/n64_grass_tuft.gdshader"
+const MIST_SIM := preload("res://addons/n64_runtime/shaders/n64_mist_sim.gdshader")
+var _grass_sim: GroundSim
+var _grass_mats: Array[ShaderMaterial] = []
+var _grass_scan := 0.0
+
+
+## The grass simulation (made when the zone has carpets / tufts): actors dent the carpet and
+## bend the tufts; it stays flattened ~3 s, then rises back slowly (~2 s). Its texture goes to every grass
+## material here once, its square (which follows the camera) each frame.
+func _update_grass_sim(delta: float) -> void:
+	_grass_scan -= delta
+	if _grass_scan <= 0.0:
+		_grass_scan = 2.0
+		var found: Array[ShaderMaterial] = []
+		_find_grass_mats(self, found)
+		if found.size() != _grass_mats.size():
+			_grass_mats = found
+			if not _grass_mats.is_empty() and _grass_sim == null:
+				_grass_sim = GroundSim.new(MIST_SIM, 64, 16.0)
+				_grass_sim.radius = 0.4
+				_grass_sim.radius_other = 0.34
+				_grass_sim.params = {press_hold = 3.0, fill_time = 1.6, return_rate = 0.25, snap_press = 0.85, stand_press = 0.55, spread = 0.03, carry = 0.0}
+				_grass_sim.process_priority = -10
+				add_child(_grass_sim, false, INTERNAL_MODE_BACK)
+			if _grass_sim:
+				for m in _grass_mats:
+					m.set_shader_parameter(&"field_map", _grass_sim.texture)
+	if _grass_sim:
+		var r := _grass_sim.rect()
+		for m in _grass_mats:
+			m.set_shader_parameter(&"field_rect", r)
+
+
+func _find_grass_mats(node: Node, out: Array[ShaderMaterial]) -> void:
+	var g := node as GeometryInstance3D
+	if g:
+		var mats: Array = [g.material_override]
+		var mesh: Mesh = null
+		if g is MeshInstance3D:
+			mesh = (g as MeshInstance3D).mesh
+		elif g is MultiMeshInstance3D and (g as MultiMeshInstance3D).multimesh:
+			mesh = (g as MultiMeshInstance3D).multimesh.mesh
+		if mesh:
+			for i in mesh.get_surface_count():
+				mats.append(mesh.surface_get_material(i))
+				if g is MeshInstance3D:
+					mats.append((g as MeshInstance3D).get_surface_override_material(i))
+		for m in mats:
+			var sm := m as ShaderMaterial
+			if sm and sm.shader and sm.shader.resource_path in [GRASS_MAT, GRASS_TUFT] and not sm in out:
+				out.append(sm)
+	for c in node.get_children(true):
+		_find_grass_mats(c, out)
+
+
+# --- Ripples (GroundSim) -------------------------------------------------------------------
+
+const RIPPLE_SIM := preload("res://addons/n64_runtime/shaders/n64_ripple_sim.gdshader")
+const RIPPLE_RES := 128
+const RIPPLE_SIZE := 12.0
+const RIPPLE_SHADERS := ["paint.gdshader", "paint_cutout.gdshader", "paint_hybrid.gdshader",
+	"paint_hybrid_cutout.gdshader", "paint_unshaded.gdshader", "paint_unshaded_cutout.gdshader",
+	"paint_merged.gdshader", "n64_water.gdshader"]
+var _ripple_sim: GroundSim
+## Footprints on soft ground (sand, snow, dirt): their own slow simulation, 128 texels over
+## 16 m round the camera (each print holds PRINT_HOLD seconds, then fades out over PRINT_FADE;
+## and as the camera leaves them).
+const PRINT_RES := 128
+const PRINT_SIZE := 16.0
+const PRINT_HOLD := 6.0
+const PRINT_FADE := 3.0
+var _print_sim: GroundSim
+var _print_mats := {}
+var _ripple_mats := {}  # ShaderMaterial -> true (bound)
+var _ripple_scan := 0.0
+var _drip_lines: Array = []  # [Vector3 a, Vector3 b] where each roof drip lands
+
+
+## The ripple simulation (outdoors, or with water): drips off the eaves while it rains,
+## actors' wakes and landings; its texture is bound once to the level's and water's materials
+## (its square each frame through the n64_ripple_rect / n64_print_rect shader globals).
+func _update_ripples(delta: float) -> void:
+	_ripple_scan -= delta
+	if _ripple_scan <= 0.0:
+		_ripple_scan = 3.0
+		var mats: Array[ShaderMaterial] = []
+		_find_shader_mats(self, RIPPLE_SHADERS, mats)
+		var water := mats.any(func(m): return m.shader.resource_path.ends_with("n64_water.gdshader"))
+		if _ripple_sim == null and (_sky() != null or water):
+			_ripple_sim = GroundSim.new(RIPPLE_SIM, RIPPLE_RES, RIPPLE_SIZE)
+			_ripple_sim.radius = 0.5
+			_ripple_sim.radius_other = 0.4
+			_ripple_sim.rect_global = &"n64_ripple_rect"
+			_ripple_sim.process_priority = -10
+			add_child(_ripple_sim, false, INTERNAL_MODE_BACK)
+		var soft := mats.any(func(m): return float(m.get_shader_parameter(&"soft_ground") if m.get_shader_parameter(&"soft_ground") != null else 0.0) > 0.0)
+		if _print_sim == null and soft:
+			_print_sim = GroundSim.new(MIST_SIM, PRINT_RES, PRINT_SIZE)
+			_print_sim.footprints = true
+			_print_sim.radius = 0.13
+			_print_sim.radius_other = 0.11
+			_print_sim.params = {hold_time = PRINT_HOLD, fade_time = PRINT_FADE, spread = 0.0, carry = 0.0}
+			_print_sim.rect_global = &"n64_print_rect"
+			_print_sim.process_priority = -10
+			add_child(_print_sim, false, INTERNAL_MODE_BACK)
+		for m in mats:
+			if _ripple_sim and not _ripple_mats.has(m):
+				_ripple_mats[m] = true
+				m.set_shader_parameter(&"ripple_map", _ripple_sim.texture)
+				m.set_shader_parameter(&"ripple_dims", Vector2(RIPPLE_SIZE, RIPPLE_RES))
+			if _print_sim and not _print_mats.has(m):
+				_print_mats[m] = true
+				m.set_shader_parameter(&"print_map", _print_sim.texture)
+				m.set_shader_parameter(&"print_dims", Vector2(PRINT_SIZE, PRINT_RES))
+		_drip_lines.clear()
+		for d in find_children("*", "Node3D", true, false).filter(func(n): return n is RainDrip):
+			var hw: float = float(d.get(&"width")) * 0.5
+			var drop: float = float(d.get(&"drop"))
+			var xf: Transform3D = d.global_transform
+			_drip_lines.append([xf * Vector3(-hw, -drop, 0.0), xf * Vector3(hw, -drop, 0.0)])
+	if _ripple_sim == null:
+		return
+	var rain: float = float(GameState.weather_now.get("rain", 0.0)) if _sky() != null else 0.0
+	var r := _ripple_sim.rect()
+	var lines := PackedVector4Array()
+	if rain > 0.0:
+		var centre := Vector2(r.x, r.y) + Vector2.ONE * r.z * 0.5
+		var near := _drip_lines.filter(func(l): return Vector2(l[0].x, l[0].z).distance_to(centre) < r.z * 0.8)
+		for l in near.slice(0, 16):
+			var a := (Vector2(l[0].x, l[0].z) - Vector2(r.x, r.y)) / r.z
+			var b := (Vector2(l[1].x, l[1].z) - Vector2(r.x, r.y)) / r.z
+			lines.append(Vector4(a.x, a.y, b.x, b.y))
+	var n := lines.size()
+	while lines.size() < 16:
+		lines.append(Vector4.ZERO)
+	_ripple_sim.params = {time = Time.get_ticks_msec() / 1000.0, rain = rain, drips = lines, drip_count = n}
+
+
+## ShaderMaterials under `node` whose shader file is one of `names`.
+func _find_shader_mats(node: Node, names: Array, out: Array[ShaderMaterial]) -> void:
+	var g := node as GeometryInstance3D
+	if g:
+		var mats: Array = [g.material_override]
+		var mesh: Mesh = null
+		if g is MeshInstance3D:
+			mesh = (g as MeshInstance3D).mesh
+		elif g is MultiMeshInstance3D and (g as MultiMeshInstance3D).multimesh:
+			mesh = (g as MultiMeshInstance3D).multimesh.mesh
+		if mesh:
+			for i in mesh.get_surface_count():
+				mats.append(mesh.surface_get_material(i))
+				if g is MeshInstance3D:
+					mats.append((g as MeshInstance3D).get_surface_override_material(i))
+		for m in mats:
+			var sm := m as ShaderMaterial
+			if sm and sm.shader and sm.shader.resource_path.get_file() in names and not sm in out:
+				out.append(sm)
+	for c in node.get_children(true):
+		_find_shader_mats(c, names, out)
+
+
+# --- Audio (Zelda reverb / muffling on every N64Synth) ---------------------------------------
+
+var _audio_key := ""
+var _audio_scan := 0.0
+
+
+## The current room's reverb and muffling, else the zone's, on every synth (music, effects):
+## sent when they change, and again when a synth appears.
+func _update_audio(delta: float) -> void:
+	_audio_scan -= delta
+	var preset := current_room.reverb if current_room and current_room.reverb != "" else reverb
+	if preset == "":
+		preset = "outdoor" if _sky() != null else "room"
+	var muffle := current_room.muffle_hz if current_room and current_room.muffle_hz > 0.0 else muffle_hz
+	var synths := get_tree().get_node_count_in_group(&"n64_synth")
+	var key := "%s|%s|%d" % [preset, muffle, synths]
+	if key == _audio_key or (synths == 0 and _audio_scan > 0.0):
+		return
+	_audio_scan = 1.0
+	_audio_key = key
+	get_tree().call_group(&"n64_synth", &"SetReverbPreset", preset)
+	get_tree().call_group(&"n64_synth", &"SetOutputLowPass", muffle)
 
 
 # --- Key light (shine glints) -----------------------------------------------------------
@@ -140,15 +435,23 @@ func _update_key_light(delta: float) -> void:
 ## The fog this place wants right now: the current room's override, else the zone's,
 ## else (outdoors) the weather's. {color, start, end, amount, curve, blend}.
 func fog_target() -> Dictionary:
-	var s: FogSettings = current_room.fog_override if current_room and current_room.fog_override else fog
-	var w: Dictionary = GameState.weather_now
-	var outdoor := _sky() != null and w.has("fog_end")
-	if outdoor and s == fog and float(w.get("fog_override", 0.0)) > 0.5:
+	var room_fog := current_room.fog_override if current_room and current_room.fog_override else null
+	return fog_for(room_fog if room_fog else fog, room_fog != null, _sky() != null, GameState.weather_now,
+		GameState.lighting_schedule, GameState.time_of_day)
+
+
+## The fog for settings `s` (the zone's, or a room's override when `is_room`), under a sky
+## or not, in weather `w` at `hour` (fog_target's core; also the editor's game preview).
+static func fog_for(s: FogSettings, is_room: bool, has_sky: bool, w: Dictionary, sched: LightingSchedule, hour: float) -> Dictionary:
+	var outdoor := has_sky and w.has("fog_end")
+	var zone_fog := not is_room
+	var lit_sky := has_sky and sched != null and zone_fog
+	var dist_k := sched.fog_distance_at(hour) if lit_sky else 1.0
+	if outdoor and zone_fog and float(w.get("fog_override", 0.0)) > 0.5:
 		s = null  # (the weather's fog takes over: below)
 	if s == null:
 		if outdoor:
-			var d := outdoor_fog_distance()
-			return {color = _weather_fog_color(w), start = w.fog_begin * d, end = w.fog_end * d, amount = w.fog_amount,
+			return {color = _weather_fog_color(w), start = w.fog_begin * dist_k, end = w.fog_end * dist_k, amount = w.fog_amount,
 				curve = FogSettings.FogCurve.N64_DEPTH, sampling = FogSettings.Sampling.SOFT_GRID, grid = 3.0, center = FogSettings.Center.CAMERA, tint = 0.3, halos = 0.6, lights = 4, light_sampling = FogSettings.LightSampling.FOLLOW_FOG, blend = 1.0}
 		return {color = Color.BLACK, start = 10.0, end = 60.0, amount = 0.0, curve = FogSettings.FogCurve.N64_DEPTH,
 			sampling = FogSettings.Sampling.SOFT_GRID, grid = 3.0, center = FogSettings.Center.CAMERA, tint = 0.3, halos = 0.6, lights = 4, light_sampling = FogSettings.LightSampling.FOLLOW_FOG, blend = 1.0}
@@ -156,14 +459,12 @@ func fog_target() -> Dictionary:
 		return {color = s.color, start = s.start, end = s.end, amount = 0.0, curve = s.curve, sampling = s.sampling, grid = s.grid_size, center = s.center, tint = s.light_tint, halos = s.light_halos, lights = s.max_fog_lights, light_sampling = s.light_sampling,
 			blend = s.blend_time}
 	if s.from_weather and outdoor:
-		var d := outdoor_fog_distance() if s == fog else 1.0
-		return {color = _weather_fog_color(w), start = w.fog_begin * d, end = w.fog_end * d, amount = w.fog_amount * s.amount,
+		return {color = _weather_fog_color(w), start = w.fog_begin * dist_k, end = w.fog_end * dist_k, amount = w.fog_amount * s.amount,
 			curve = s.curve, sampling = s.sampling, grid = s.grid_size, center = s.center, tint = s.light_tint, halos = s.light_halos, lights = s.max_fog_lights, light_sampling = s.light_sampling, blend = s.blend_time}
 	# A fixed colour under the open sky is lit like the level: dark and blue at night.
 	# ... and closes in when the keys say so (night hides the distance).
-	var lit := s.color * outdoor_light() * outdoor_fog_brightness() if s == fog else s.color
-	var dist := outdoor_fog_distance() if s == fog else 1.0
-	return {color = lit, start = s.start * dist, end = s.end * dist, amount = s.amount, curve = s.curve, sampling = s.sampling, grid = s.grid_size, center = s.center, tint = s.light_tint, halos = s.light_halos, lights = s.max_fog_lights, light_sampling = s.light_sampling,
+	var lit := s.color * sched.light_at(hour) * sched.fog_brightness_at(hour) if lit_sky else s.color
+	return {color = lit, start = s.start * dist_k, end = s.end * dist_k, amount = s.amount, curve = s.curve, sampling = s.sampling, grid = s.grid_size, center = s.center, tint = s.light_tint, halos = s.light_halos, lights = s.max_fog_lights, light_sampling = s.light_sampling,
 		blend = s.blend_time}
 
 
@@ -392,6 +693,8 @@ func _sky() -> DynamicSky:
 
 
 func _exit_tree() -> void:
+	if distortion != ScreenDistortion.Kind.NONE and not DropPortal.is_preview(self):
+		ScreenDistortion.release(distortion)
 	# The camera (the player's) outlives the zone: give it back its own draw distance.
 	for cam in _camera_far:
 		if is_instance_valid(cam):

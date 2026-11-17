@@ -20,14 +20,39 @@ uniform vec4 hilite_color : source_color = vec4(1.0);
 // xy = shine lookup, zw = glint position (per vertex, like texgen).
 varying vec4 n64_shine_v;
 
-// `view_normal`, `view_pos`: the vertex in view space; `view`: VIEW_MATRIX.
-vec4 n64_shine_vertex(vec3 view_normal, vec3 view_pos, mat4 view) {
-	vec3 n = normalize(view_normal);
+// Facets: the reflection looked up once per triangle from its face normal (crystals, cut
+// gems, low-poly armour: each face flashes on its own), instead of per vertex.
+uniform bool shine_facets = false;
+// Linear texgen (G_TEXTURE_GEN_LINEAR): the lookup spread evenly by angle (acos), so the
+// reflection's edge doesn't bunch up where the surface turns away; off = the plain
+// projection (G_TEXTURE_GEN).
+uniform bool shine_linear = false;
+
+// The lookup for normal `n` (view space) at `view_pos`: xy = shine, zw = glint.
+vec4 n64_shine_lookup(vec3 n, vec3 view_pos, mat4 view) {
+	n = normalize(n);
 	vec3 l = normalize((view * vec4(n64_key_light.xyz, 0.0)).xyz);
 	vec3 h = normalize(l + normalize(-view_pos));
 	// Glint: offset of the normal from the half vector, in glint radii (0.5 = centre).
 	vec2 g = dot(n, h) > 0.0 ? (n.xy - h.xy) / (2.0 * hilite_size) + 0.5 : vec2(-1.0);
-	return vec4(n.xy * vec2(0.5, -0.5) + 0.5, g);
+	vec2 s = shine_linear ? vec2(1.0) - acos(clamp(n.xy, -1.0, 1.0)) / 3.14159265 : n.xy * 0.5 + 0.5;
+	return vec4(s.x, 1.0 - s.y, g);
+}
+
+// `view_normal`, `view_pos`: the vertex in view space; `view`: VIEW_MATRIX.
+vec4 n64_shine_vertex(vec3 view_normal, vec3 view_pos, mat4 view) {
+	return n64_shine_lookup(view_normal, view_pos, view);
+}
+
+// In fragment(): the lookup to use (`sv` = n64_shine_v; `view_pos` = VERTEX): the face's own
+// with facets on.
+vec4 n64_shine_frag(vec4 sv, vec3 view_pos, mat4 view) {
+	if (!shine_facets) {
+		return sv;
+	}
+	vec3 n = normalize(cross(dFdy(view_pos), dFdx(view_pos)));
+	n = dot(n, view_pos) > 0.0 ? -n : n;
+	return n64_shine_lookup(n, view_pos, view);
 }
 
 // Applies shine to `albedo` (Metal) and returns the unlit part (Gloss + hilite) for EMISSION.

@@ -144,6 +144,7 @@ func set_goal(at: Vector3, face: Vector3, is_walking: bool, snap := false) -> vo
 	walking = is_walking
 	if snap and is_inside_tree():
 		global_position = at
+		reset_physics_interpolation()
 		velocity = Vector3.ZERO
 		if not face.is_zero_approx():
 			facing = face

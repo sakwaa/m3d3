@@ -4,6 +4,8 @@
 #include "res://addons/n64_runtime/shaders/n64_sampling.gdshaderinc"
 #include "res://addons/n64_runtime/shaders/n64_lod_fade.gdshaderinc"
 #include "res://addons/n64_runtime/shaders/n64_weather.gdshaderinc"
+#include "res://addons/n64_runtime/shaders/n64_ripples.gdshaderinc"
+#include "res://addons/n64_runtime/shaders/n64_coverage.gdshaderinc"
 
 uniform sampler2D base_tex : source_color, filter_nearest_mipmap, repeat_enable;
 uniform bool has_base = false;
@@ -27,6 +29,23 @@ uniform vec4 base_color : source_color = vec4(0.55, 0.55, 0.55, 1.0);
 // Multiplies the base texture (e.g. a converted StandardMaterial's albedo colour).
 uniform vec4 base_tint : source_color = vec4(1.0);
 uniform float base_tile = 1.0;
+// Decals (DecalBuilder): drawn on the surface itself and passed by depth as the RDP's
+// ZMODE_DEC did - the share of their distance they move towards the camera (0 = not a decal).
+uniform float decal_depth = 0.0;
+// The base texture's tile wrap per axis (the RDP's): 0 wrap, 1 mirror, 2 clamp.
+uniform ivec2 base_wrap = ivec2(0);
+// Close-up texture LOD (N64Texture lod_mode): 0 off, 1 sharpen, 2 detail texture; base_detail
+// = (detail repeats per base repeat, strength).
+uniform int base_lod_mode = 0;
+// Palette texture (N64PaletteSwap): base_tex holds the shared indices, this row of
+// base_palette_lut the colours (looked up per texel, then filtered, as the RDP did);
+// base_palette_mean = the row's average brightness (texel height's reference).
+uniform bool base_use_palette = false;
+uniform sampler2D base_palette_lut : source_color, filter_nearest, repeat_disable, hint_default_white;
+uniform int base_palette_row = 0;
+uniform float base_palette_mean = 0.5;
+uniform sampler2D base_detail_tex : source_color, filter_nearest_mipmap, repeat_enable, hint_default_white;
+uniform vec2 base_detail = vec2(4.0, 0.0);
 // Vertex colour range: 1 = modulate, 2 = modulate x 2 (meshes store colours halved).
 uniform float vertex_color_scale = 1.0;
 // Recolour (a texture look): the texture gives only brightness and the vertex colour the
@@ -70,7 +89,15 @@ uniform float light_floor = 0.0;
 // Baked Timed Dynamic: the keys already carry the time of day (no world tint on top).
 uniform bool timed_bake = false;
 
-varying vec3 key_light;
+varying N64_SHADE vec3 key_light;
+// The brush's coverage ID (0..6) from the bake (light key 0's alpha; 7 when none).
+varying flat float brush_code;
+// The baked light at this pixel (decoded from its display-value interpolation).
+#if N64_GAMMA_MIX
+#define KEY_LIGHT n64_dec(key_light)
+#else
+#define KEY_LIGHT key_light
+#endif
 
 // Baked shading on screen: `shade` (paint x AO x light) through the contrast curve, held
 // above light_floor of the painted colour alone, in the light's own hue (night stays blue).
@@ -87,8 +114,9 @@ vec3 n64_baked_shade(vec3 shade, vec3 paint, vec3 light) {
 	vec3 k = fl * 0.5;
 	return 0.5 * (s + fl + sqrt((s - fl) * (s - fl) + k * k));
 }
-varying vec2 n64_fogv;
-varying vec3 n64_fog_tintv;
+varying N64_SHADE vec2 n64_fogv;
+varying N64_SHADE vec4 n64_colv;  // COLOR, affine
+varying N64_SHADE vec3 n64_fog_tintv;
 
 // Painted-on stairs (N64StairTexture): a greyscale template shades the finished surface
 // (base + overlays, at their normal texel density) in UVs fitted to the ramp: stair_u /
@@ -137,6 +165,7 @@ vec3 grade_ao(float ao, int k) {
 }
 
 void vertex() {
+	n64_colv = COLOR;
 	VERTEX = n64_reflect_flatten(VERTEX, MODEL_MATRIX, CAMERA_POSITION_WORLD);
 	n64_fogv = n64_fog_vertex((MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz);
 	n64_fog_tintv = n64_fog_tint_vertex((MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz);
@@ -144,7 +173,10 @@ void vertex() {
 		stair_uv = vec2(dot(vec4(VERTEX, 1.0), stair_u), dot(vec4(VERTEX, 1.0), stair_v));
 	}
 	key_light = vec3(1.0);
+	brush_code = 7.0;
 	if (light_keys > 0) {
+		float bid = floor(CUSTOM0.a * 255.0 + 0.5) - 1.0;
+		brush_code = bid >= 0.0 && bid < 7.0 ? bid : 7.0;
 		vec4 k[4] = vec4[](CUSTOM0, CUSTOM1, CUSTOM2, CUSTOM3);
 		int a = clamp(int(n64_light_blend.x + 0.5), 0, light_keys - 1);
 		int b = clamp(int(n64_light_blend.y + 0.5), 0, light_keys - 1);
@@ -160,7 +192,15 @@ void vertex() {
 				lb *= grade_ao(COLOR.a, b);
 			}
 		}
-		key_light = mix(la, lb, clamp(n64_light_blend.z, 0.0, 1.0));
+		key_light = n64_shade8(mix(la, lb, clamp(n64_light_blend.z, 0.0, 1.0)));
+	}
+#if N64_GAMMA_MIX
+	key_light = n64_enc(key_light);  // (interpolated across the triangle on display values: decoded per pixel)
+#endif
+	if (decal_depth > 0.0) {
+		N64_SNAP_DECAL(decal_depth);
+	} else {
+		N64_SNAP_MODEL;
 	}
 }
 
@@ -480,6 +520,9 @@ vec2 scrolled_uv(vec4 flow, vec2 uv, vec3 view_pos, mat4 view, float time) {
 
 void fragment() {
 	n64_lod_dither(CAMERA_POSITION_WORLD, MODEL_MATRIX, FRAGCOORD.xy);
+	if (!IN_SHADOW_PASS) {
+		n64_see_through_dither((INV_VIEW_MATRIX * vec4(VERTEX, 1.0)).xyz, CAMERA_POSITION_WORLD, FRAGCOORD.xy);  // (the sun's view: no holes)
+	}
 	vec3 c = base_color.rgb;
 	float h = 0.0;
 	float ho = 0.0;
@@ -487,7 +530,15 @@ void fragment() {
 	float base_alpha = 1.0;
 	if (has_base) {
 		vec2 buv = scrolled_uv(base_scroll, UV, VERTEX, VIEW_MATRIX, time);
-		vec4 bs = anim_texture(base_tex, buv, base_tile, base_anti, base_flip, time);
+		vec4 bs = base_use_palette ? n64_texture_ci(base_tex, base_palette_lut, tile_uv(base_tex, buv, base_tile), base_palette_row, base_wrap)
+			: base_wrap != ivec2(0) ? n64_texture_wrap(base_tex, tile_uv(base_tex, buv, base_tile), base_wrap)
+			: anim_texture(base_tex, buv, base_tile, base_anti, base_flip, time);
+		if (base_lod_mode > 0 && !base_use_palette) {
+			// Sharpen reads mip 1 at the plain UV: not with anti-tiling's moved cells.
+			int mode = base_lod_mode == 1 && base_anti.x > 0.5 ? 0 : base_lod_mode;
+			vec2 tuv = tile_uv(base_tex, buv, base_tile);
+			bs = n64_lod_detail(bs, base_tex, tuv, mode, base_detail_tex, tuv * base_detail.x, base_detail.y);
+		}
 		c = bs.rgb;
 		base_alpha = bs.a;
 #if defined(N64_CUTOUT)
@@ -495,13 +546,13 @@ void fragment() {
 			base_alpha = cutout_alpha(base_tex, tile_uv(base_tex, buv, base_tile));
 		}
 #endif
-		h = texel_height(base_tex, c);
+		h = base_use_palette ? dot(c, LUMA) - base_palette_mean : texel_height(base_tex, c);
 		if (base_recolour) {
 			// Brightness relative to the texture's mean (its smallest mip): an average texel
 			// shows the painted colour itself, the texture adds light / dark detail around it.
 			// The painted colour is picked on screen (sRGB): to linear so it shows as picked.
-			float mean = dot(textureLod(base_tex, vec2(0.5), 16.0).rgb, LUMA);
-			vec3 picked = pow(max(COLOR.rgb * vertex_color_scale, vec3(0.0)), vec3(2.2));
+			float mean = base_use_palette ? base_palette_mean : dot(textureLod(base_tex, vec2(0.5), 16.0).rgb, LUMA);
+			vec3 picked = pow(max(n64_colv.rgb * vertex_color_scale, vec3(0.0)), vec3(2.2));
 			c = picked * (dot(c, LUMA) / max(mean, 0.05)) * base_tint.rgb;
 		} else {
 			c = n64_tint(c, base_tint_mode, base_tint_dark, base_tint_light, base_tint_extra) * base_tint.rgb;
@@ -537,6 +588,11 @@ void fragment() {
 	}
 	// Rain: surfaces open to the sky (RainCover) darken and saturate as they soak; the ground
 	// (walls much less) also picks up a dim sheen of the sky towards grazing angles.
+	if (soft_ground > 0.0) {
+		vec3 fw = (INV_VIEW_MATRIX * vec4(VERTEX, 1.0)).xyz;
+		float fup = smoothstep(0.5, 0.9, (INV_VIEW_MATRIX * vec4(NORMAL, 0.0)).y);
+		c = n64_footprints(c, fw.xz, CAMERA_POSITION_WORLD, n64_key_light.xz, fup);
+	}
 	if (n64_wetness > 0.0) {
 		vec3 world = (INV_VIEW_MATRIX * vec4(VERTEX, 1.0)).xyz;
 		float up = smoothstep(0.3, 0.8, (INV_VIEW_MATRIX * vec4(NORMAL, 0.0)).y);
@@ -544,18 +600,27 @@ void fragment() {
 		c = n64_wet(c, wet);
 		float graze = pow(1.0 - clamp(dot(normalize(NORMAL), VIEW), 0.0, 1.0), 4.0);
 		c += n64_fog_color.rgb * graze * up * wet * 0.15;
+		// Ripples on the wet ground: raindrops where it's open to the sky, and the ripple
+		// simulation (drips off the eaves, footsteps, landings) wherever it's wet. Crests catch
+		// the sky's light, troughs darken a little.
+		float rd = length(world - CAMERA_POSITION_WORLD);
+		float rip = n64_rain_rings(world.xz, n64_time, n64_rain.x, rd) * wet
+			+ n64_ripple_sim(world.xz, CAMERA_POSITION_WORLD) * n64_wetness * up * 1.6;
+		rip = clamp(rip, -1.0, 1.0) * up;
+		c += mix(n64_fog_color.rgb, vec3(1.0), 0.4) * max(rip, 0.0) * 0.6;
+		c *= 1.0 + min(rip, 0.0) * 0.35;
 	}
 	// Vertex colours (painted x baked lighting) shade the result, like the N64's per-vertex
 	// colour. Vertex-lit levels are unlit: the colour goes out through EMISSION so scene
 	// lights and ambient don't light them twice.
 	// Painted vertex colour x baked vertex AO (alpha), AO hideable in the editor.
 	// (Recoloured faces took their colour in the gradient; AO still shades them.)
-	vec3 paint = base_recolour ? vec3(1.0) : COLOR.rgb * vertex_color_scale;
+	vec3 paint = base_recolour ? vec3(1.0) : n64_colv.rgb * vertex_color_scale;
 	if (grade_vertex && grade_paint_on && !base_recolour) {
 		paint = grade_lut(grade_paint_lut, paint / vertex_color_scale, 0.0, 1.0) * vertex_color_scale;
 	}
 	// (Grade AO per key is in the key light already.)
-	vec3 vc = paint * mix(1.0, COLOR.a, grade_vertex && grade_ao_on && light_keys > 0 ? 0.0 : n64_vertex_ao);
+	vec3 vc = paint * mix(1.0, n64_colv.a, grade_vertex && grade_ao_on && light_keys > 0 ? 0.0 : n64_vertex_ao);
 	// N64 fog: flat colour blended in last (after lighting), amount from the vertices.
 	FOG = n64_fog_out(n64_fogv, n64_fog_tintv, VERTEX, INV_VIEW_MATRIX);
 #if defined(N64_CUTOUT)
@@ -567,22 +632,38 @@ void fragment() {
 	// Baked light (one key, or the time-of-day keys, in CUSTOM0..3) through EMISSION; live
 	// lights on ALBEDO. The
 	// scene's ambient comes back as the bake fades (AO only dims ambient, not lights).
-	vec3 light = key_light * (timed_bake ? vec3(1.0) : n64_world_tint.rgb);
+	vec3 light = KEY_LIGHT * (timed_bake ? vec3(1.0) : n64_world_tint.rgb);
 	ALBEDO = c * vc * n64_weather_tint.rgb;
 	EMISSION = c * n64_baked_shade(vc * light, paint, light) * n64_weather_tint.rgb * bake_strength;
 	AO = clamp(1.0 - bake_strength, 0.0, 1.0);
 #elif defined(N64_UNSHADED)
 	// Baked lighting variant: unshaded, colour through ALBEDO (decals such as character
 	// shadows then still apply; EMISSION would ignore them).
-	vec3 light = light_keys > 0 ? key_light : n64_world_tint.rgb;
+	vec3 light = light_keys > 0 ? KEY_LIGHT : n64_world_tint.rgb;
 	ALBEDO = c * n64_baked_shade(vc * light, paint, light) * n64_weather_tint.rgb;
 #else
 	if (vertex_lit) {
-		vec3 light = light_keys > 0 ? key_light : n64_world_tint.rgb;
+		vec3 light = light_keys > 0 ? KEY_LIGHT : n64_world_tint.rgb;
 		ALBEDO = vec3(0.0);
 		EMISSION = c * n64_baked_shade(vc * light, paint, light) * n64_weather_tint.rgb;
 	} else {
 		ALBEDO = c * vc;
+	}
+#endif
+	N64_FOG_GAMMA;
+#if defined(M3D3_COVERAGE) && CURRENT_RENDERER == RENDERER_FORWARD_PLUS
+	// Decals (CLR_ON_CVG / CVG_DST_WRAP): colour only - the surface under them keeps its
+	// coverage, so a decal's own edges and holes never get anti-aliased into a seam.
+	if (decal_depth > 0.0) {
+		COVERAGE = n64_coverage_tag(1.0, 1.0, n64_coverage_axis(VERTEX) * 8.0 + brush_code);
+	} else {
+#endif
+#if defined(N64_CUTOUT)
+	N64_COVERAGE_BRUSH_CUTOUT(brush_code);
+#else
+	N64_COVERAGE_BRUSH(brush_code);
+#endif
+#if defined(M3D3_COVERAGE) && CURRENT_RENDERER == RENDERER_FORWARD_PLUS
 	}
 #endif
 }

@@ -15,6 +15,10 @@ const CELL := 1.0
 static var enabled := true
 ## Walls too (not just the ground): costs many more triangles for cracks rarely seen.
 static var walls := false
+## Boxes (level space) where walls are split as well: round passage and door openings, where
+## the carve's and the trim's cuts meet the corridor's edges and a crack shows the sky
+## behind a thin wall as sparkles along the opening.
+static var wall_zones: Array[AABB] = []
 
 
 ## `entries`: [[surface arrays, visibility range (Vector2: begin, end)], ...], edited in place.
@@ -76,11 +80,16 @@ static func _close_surface(arrays: Array, grids: Dictionary) -> int:
 	for t in range(0, idx.size(), 3):
 		var tri := [idx[t], idx[t + 1], idx[t + 2]]
 		var up := _is_up(verts[tri[0]], verts[tri[1]], verts[tri[2]])
-		if not up and not walls:
+		var zoned := _in_zones(verts[tri[0]], verts[tri[1]], verts[tri[2]])
+		if not up and not walls and not zoned:
 			out_idx.append_array(PackedInt32Array(tri))
 			continue
 		var grid: Dictionary = grids[up]
 		var cache: Dictionary = edge_cache.get_or_add(up, {})
+		# Round an opening, ground and walls split for each other's points too (a corridor's
+		# ceiling, facing down, meets the wall above the opening).
+		var other: Dictionary = grids[not up]
+		var other_cache: Dictionary = edge_cache.get_or_add(&"other_up" if up else &"other_wall", {})
 		var ring := []  # [[vertex index or -1, [[vertex, weight]...]]] round the triangle
 		var any := false
 		for k in 3:
@@ -88,6 +97,17 @@ static func _close_surface(arrays: Array, grids: Dictionary) -> int:
 			var b: int = tri[(k + 1) % 3]
 			ring.append([a, [[a, 1.0]]])
 			var on := _on_edge(verts[a], verts[b], grid, cache, a, b)
+			if zoned:
+				var more := _on_edge(verts[a], verts[b], other, other_cache, a, b)
+				if not more.is_empty():
+					on = on + more
+					on.sort()
+					var kept := []
+					var len := verts[a].distance_to(verts[b])
+					for f in on:
+						if kept.is_empty() or (f - kept[-1]) * len > 0.001:
+							kept.append(f)
+					on = kept
 			for hit in on:
 				ring.append([-1, [[a, 1.0 - hit], [b, hit]]])
 				any = true
@@ -140,6 +160,16 @@ static func _close_surface(arrays: Array, grids: Dictionary) -> int:
 	_append_vertices(arrays, adds)
 	arrays[Mesh.ARRAY_INDEX] = out_idx
 	return count
+
+
+static func _in_zones(a: Vector3, b: Vector3, c: Vector3) -> bool:
+	if wall_zones.is_empty():
+		return false
+	var box := AABB(a, Vector3.ZERO).expand(b).expand(c)
+	for z in wall_zones:
+		if z.intersects(box):
+			return true
+	return false
 
 
 ## Fractions (0..1, sorted) along a -> b where points of `grid` sit on the edge.

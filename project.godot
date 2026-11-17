@@ -49,6 +49,8 @@ build/lod_cell_size=32.0
 build/unseen_cull=true
 textures/texels_per_metre=16
 render/target_lines=900
+render/integer_scale=true
+render/edge_upscale=false
 
 [physics]
 
@@ -57,12 +59,22 @@ render/target_lines=900
 [rendering]
 
 lights_and_shadows/directional_shadow/size=1024
-anti_aliasing/quality/msaa_3d=1
+anti_aliasing/quality/msaa_3d=2
 occlusion_culling/use_occlusion_culling=true
 lights_and_shadows/positional_shadow/atlas_size=1024
+m3d3/vi_upscale=true
+m3d3/keep_coverage_alpha=true
 
 [shader_globals]
 
+n64_print_rect={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}
+n64_ripple_rect={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}
 n64_rain_cover={
 "type": "sampler2D",
 "value": ""
@@ -147,6 +159,22 @@ n64_time={
 "type": "float",
 "value": 0.0
 }
+n64_actor_lift={
+"type": "vec4",
+"value": Vector4(1, 1, 1, 0)
+}
+n64_actor_rim={
+"type": "vec4",
+"value": Vector4(1, 1, 1, 0)
+}
+n64_see_through={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}
+n64_lod_shape={
+"type": "vec2",
+"value": Vector2(0, 0.5)
+}
 n64_three_point={
 "type": "bool",
 "value": true
@@ -214,6 +242,10 @@ n64_fog_lights={
 n64_reflect_cam={
 "type": "vec4",
 "value": Vector4(1000000000, 1000000000, 1000000000, 0)
+}
+n64_distort={
+"type": "vec4",
+"value": Vector4(1, 0, 0, 1)
 }
 level_grid_size={
 "type": "float",

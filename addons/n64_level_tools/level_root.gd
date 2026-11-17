@@ -24,6 +24,8 @@ static var debug_view := true
 			data.paint_changed.disconnect(_on_paint_changed)
 			data.materials_changed.disconnect(_on_materials_changed)
 			data.scatter_changed.disconnect(_queue_scatter)
+			if data.decals_changed.is_connected(_queue_decals):
+				data.decals_changed.disconnect(_queue_decals)
 			data.grass_changed.disconnect(_queue_grass)
 		data = value
 		if data:
@@ -32,6 +34,8 @@ static var debug_view := true
 			data.paint_changed.connect(_on_paint_changed)
 			data.materials_changed.connect(_on_materials_changed)
 			data.scatter_changed.connect(_queue_scatter)
+			data.decals_changed.connect(_queue_decals)
+			_queue_decals()
 			data.grass_changed.connect(_queue_grass)
 			_queue_scatter()
 			_queue_grass()
@@ -80,7 +84,7 @@ func _ready() -> void:
 	# Internal children are never saved, but clear any stray copies (e.g. from duplication).
 	for child in get_children(true):
 		if not child in get_children() and not child in _instances.values() \
-				and not child in _baked_meshes and not child in _baked_bodies and child != _baked_occluder and child != _rain_cover and not child in _backdrop and not _scatter_nodes.values().any(func(n): return child in n) and not child in _grass_nodes:
+				and not child in _baked_meshes and not child in _baked_bodies and child != _baked_occluder and child != _rain_cover and not child in _backdrop and not _scatter_nodes.values().any(func(n): return child in n) and not child in _grass_nodes and child != _decal_node:
 			child.queue_free()
 	if data == null:
 		data = LevelData.new()
@@ -262,6 +266,8 @@ func _sync_brushes() -> void:
 
 func _mark_dirty(brush: LevelBrush) -> void:
 	_dirty[brush] = true
+	if not data.decals.is_empty():
+		_queue_decals()  # (the surfaces under them may have changed)
 	if not _flush_queued:
 		_flush_queued = true
 		_flush.call_deferred()
@@ -1350,7 +1356,15 @@ func _sync_rope_node(brush: LevelBrush) -> void:
 		if brush.is_rope() else []
 	var lights: Array = _hang_list(brush).filter(func(h: RopeHang): return h.kind == RopeHang.Kind.LIGHTS) \
 		if brush.is_rope() else []
-	if scenes.is_empty() and lights.is_empty():
+	var wire_curves: Array[PackedVector3Array] = []
+	if brush.is_rope() and brush.rope_style and brush.rope_points.size() >= 2:
+		var half := brush.rope_style.width * 0.5
+		for i in brush.rope_points.size() - 1:
+			if not i in brush.rope_open:
+				wire_curves.append(RopeBuilder.section_curve(brush.rope_points[i] + Vector3.DOWN * half,
+					brush.rope_points[i + 1] + Vector3.DOWN * half, brush.rope_sag, brush.rope_style.segment_length,
+					brush.rope_style.max_bend))
+	if scenes.is_empty() and lights.is_empty() and wire_curves.is_empty():
 		if node and is_instance_valid(node):
 			node.queue_free()
 		_rope_nodes.erase(brush)
@@ -1367,7 +1381,8 @@ func _sync_rope_node(brush: LevelBrush) -> void:
 			bulbs.append(spot.position + Vector3.DOWN * (h.drop + h.bulb_size * 0.5))
 		strings.append([h, bulbs])
 	var key := hash([placed.map(func(p): return [p[0].resource_path, p[0].get_instance_id(), p[1]]),
-		strings.map(func(s): return [s[1], s[0].light_color, s[0].bulb_size, s[0].glow_size, s[0].flicker])])
+		strings.map(func(s): return [s[1], s[0].light_color, s[0].bulb_size, s[0].glow_size, s[0].flicker]), wire_curves,
+		brush.rope_style.width if brush.rope_style else 0.0])
 	if node == null or not is_instance_valid(node):
 		node = Node3D.new()
 		node.name = "RopeHangs"
@@ -1387,6 +1402,13 @@ func _sync_rope_node(brush: LevelBrush) -> void:
 			continue
 		inst.transform = p[1]
 		node.add_child(inst, true)
+	if not wire_curves.is_empty():
+		var w: Node3D = ROPE_WIRE.new()
+		w.name = "RopeWire"
+		w.curves = wire_curves
+		w.width = brush.rope_style.width
+		w.color = ROPE_WIRE.average_color(brush.rope_style.texture)
+		node.add_child(w, true)
 	for st in strings:
 		var h: RopeHang = st[0]
 		var sl: Node3D = STRING_LIGHTS.new()
@@ -1400,6 +1422,7 @@ func _sync_rope_node(brush: LevelBrush) -> void:
 
 
 const STRING_LIGHTS := preload("res://game/world/props/string_lights.gd")
+const ROPE_WIRE := preload("res://game/world/props/rope_wire.gd")
 
 
 ## Hung-scene nodes for every rope brush, dropping those whose brush went away.
@@ -1708,6 +1731,7 @@ var grade_vertex := {}
 func set_grade_vertex(params: Dictionary) -> void:
 	grade_vertex = params
 	_on_materials_changed()
+	_queue_decals()
 
 
 func set_grade_textures(textures: Dictionary, pretinted := {}) -> void:
@@ -1725,6 +1749,7 @@ func set_grade_plain(textures: Dictionary) -> void:
 	grade_plain = textures
 	_on_materials_changed()
 	_grade_plain_nodes()
+	_queue_decals()
 
 
 ## Grass and scatter materials (their `tex`), swapped for the graded copies (and back).
@@ -1902,6 +1927,38 @@ func build_grass_for_export() -> Array[Node3D]:
 	if data == null or data.grass == null or not data.grass.enabled:
 		return [] as Array[Node3D]
 	return GrassBuilder.build(self, data.grass)
+
+
+# --- Decals (editor: live; the game shows data.baked_decals) ------------------------------
+
+var _decal_node: MeshInstance3D
+var _decals_queued := false
+
+
+func _queue_decals() -> void:
+	if is_inside_tree() and Engine.is_editor_hint() and not _decals_queued:
+		_decals_queued = true
+		_rebuild_decals.call_deferred()
+
+
+func _rebuild_decals() -> void:
+	_decals_queued = false
+	if is_instance_valid(_decal_node):
+		_decal_node.queue_free()
+	_decal_node = null
+	if data == null or data.decals.is_empty() or not is_inside_tree():
+		return
+	var mesh := DecalBuilder.build(self)
+	if mesh == null:
+		return
+	for i in mesh.get_surface_count():
+		_grade_base(mesh.surface_get_material(i), null)
+	_decal_node = MeshInstance3D.new()
+	_decal_node.mesh = mesh
+	_decal_node.layers = level_layers()
+	_decal_node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(_decal_node, false, INTERNAL_MODE_BACK)
+	_decal_node.visible = not (preview_baked and data.has_bake())
 
 
 func _queue_scatter() -> void:
@@ -2086,6 +2143,14 @@ func _apply_bake() -> void:
 			apply_lod_range(mi, lod_at)
 			add_child(mi, false, INTERNAL_MODE_BACK)
 			_baked_meshes.append(mi)
+		if data.baked_decals:
+			var dm := MeshInstance3D.new()
+			dm.mesh = data.baked_decals
+			dm.layers = level_layers()
+			dm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			apply_lod_range(dm, lod_at)
+			add_child(dm, false, INTERNAL_MODE_BACK)
+			_baked_meshes.append(dm)
 	if data:
 		var c := data.baked_collision_set()
 		for body in Surface.build_bodies(c[0], c[1]):
@@ -2122,3 +2187,5 @@ func _update_visibility() -> void:
 		_instances[brush].visible = not show_baked and not _hidden.has(brush) and not fence_wall
 	for mi in _baked_meshes:
 		mi.visible = show_baked
+	if is_instance_valid(_decal_node):
+		_decal_node.visible = not show_baked

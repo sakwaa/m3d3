@@ -39,6 +39,7 @@ func _update_preview() -> void:
 		_label.modulate = Color(0.6, 1.0, 0.6)
 		_label.position.y = 2.0
 		add_child(_label, false, INTERNAL_MODE_BACK)
+		WorldPreview.register_label(_label)
 		var mark := WorldPreview.box(self, Vector3(0.6, 1.7, 0.6), Color(0.4, 0.9, 0.4), -1)
 		if mark:
 			mark.position.y = 0.85

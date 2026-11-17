@@ -10,6 +10,8 @@ extends RefCounted
 const PLAYER_GROUP := &"sfx_player"
 ## Metres: positional effects fade out by this distance from the camera.
 const REACH := 25.0
+## Metres: full volume, dry and bright within this (OoT's near range).
+const NEAR := 3.0
 const MIX_RATE := 22050
 
 static var _placeholders := {}
@@ -20,7 +22,9 @@ static func footstep(surface: int, at: Vector3, volume := 1.0) -> void:
 	play(StringName("step_" + Surface.sound_name(surface).to_lower()), at, volume * 0.6, randf_range(-0.6, 0.6))
 
 
-## Plays effect `name` at a world position (volume / pan from the camera), pitch in semitones.
+## Plays effect `name` at a world position, pitch in semitones. OoT's distance model:
+## panned by where it is on screen (behind the camera: to its side), full volume within
+## NEAR then easing out by REACH, and further away more reverb and a duller sound.
 static func play(name: StringName, at: Vector3, volume := 1.0, pitch := 0.0) -> void:
 	var tree := Engine.get_main_loop() as SceneTree
 	if tree == null or tree.root == null:
@@ -28,16 +32,21 @@ static func play(name: StringName, at: Vector3, volume := 1.0, pitch := 0.0) -> 
 	var camera := tree.root.get_camera_3d()
 	var falloff := 1.0
 	var pan := 0.0
+	var reverb := 0.15
+	var lowpass := 0.0
 	if camera:
 		var to := at - camera.global_position
 		var d := to.length()
 		if d > REACH:
 			return
-		falloff = 1.0 - d / REACH
-		pan = clampf(to.normalized().dot(camera.global_basis.x), -1.0, 1.0) if d > 0.01 else 0.0
+		var t := clampf((d - NEAR) / (REACH - NEAR), 0.0, 1.0)
+		falloff = pow(1.0 - t, 1.5)
+		reverb = 0.15 + 0.5 * t
+		lowpass = lerpf(16000.0, 2500.0, (t - 0.3) / 0.7) if t > 0.3 else 0.0
+		pan = screen_pan(camera, to)
 	var player := tree.get_first_node_in_group(PLAYER_GROUP)
 	if player and player.has_method(&"Has") and player.call(&"Has", name):
-		player.call(&"Play", name, pitch, volume * falloff, pan)
+		player.call(&"Play", name, pitch, volume * falloff, pan, -1, -1, reverb, lowpass)
 		return
 	var stream := _placeholder(name)
 	if stream == null:
@@ -60,7 +69,7 @@ static func _placeholder(name: StringName) -> AudioStreamWAV:
 	if _placeholders.has(name):
 		return _placeholders[name]
 	var key := String(name).trim_prefix("step_")
-	if not String(name).begins_with("step_"):
+	if not String(name).begins_with("step_") and not String(name).begins_with("block_"):
 		return null
 	# [length s, noise low-pass 0..1 (brightness), decay s, tone Hz (0 none), tone mix]
 	var spec: Array = {
@@ -69,6 +78,8 @@ static func _placeholder(name: StringName) -> AudioStreamWAV:
 		"sand": [0.14, 0.55, 0.06, 0.0, 0.0], "water": [0.2, 0.8, 0.08, 0.0, 0.0],
 		"metal": [0.18, 0.5, 0.015, 880.0, 0.5], "snow": [0.14, 0.12, 0.06, 0.0, 0.0],
 		"carpet": [0.06, 0.08, 0.02, 0.0, 0.0],
+		# Push blocks (OoT: the stone scraping along, the thud against a wall or landing).
+		"block_slide": [0.55, 0.3, 0.25, 0.0, 0.0], "block_bound": [0.3, 0.1, 0.07, 55.0, 0.6],
 	}.get(key, [0.07, 0.5, 0.02, 120.0, 0.3])
 	var frames := int(spec[0] * MIX_RATE)
 	var bytes := PackedByteArray()
@@ -92,3 +103,16 @@ static func _placeholder(name: StringName) -> AudioStreamWAV:
 	wav.data = bytes
 	_placeholders[name] = wav
 	return wav
+
+
+## Pan (-1..1) from where `to` (camera to sound) lands on screen, as OoT panned by the
+## projected x; behind the camera, to the side it's on.
+static func screen_pan(camera: Camera3D, to: Vector3) -> float:
+	var local := camera.global_basis.inverse() * to
+	if local.length() < 0.01:
+		return 0.0
+	if local.z < -0.1:
+		var vp := camera.get_viewport().get_visible_rect().size
+		var half_w := -local.z * tan(deg_to_rad(camera.fov) * 0.5) * (vp.x / maxf(vp.y, 1.0))
+		return clampf(local.x / maxf(half_w, 0.001), -1.0, 1.0) * 0.85
+	return 0.85 * signf(local.x) if absf(local.x) > 0.01 else 0.0

@@ -1,0 +1,21 @@
+extends SceneTree
+func _m1(img: Image) -> PackedByteArray:
+	var o := img.get_mipmap_offset(1)
+	return img.get_data().slice(o, o + 32 * 32 * 4)
+func _init() -> void:
+	var t: N64Texture = load("res://textures/roof/shingles_3.res")
+	var src := Image.load_from_file(t.source_path)
+	var r := N64TextureConverter.convert(src, t.get_settings())
+	var want := _m1(r.mips)
+	var it := ImageTexture.create_from_image(r.mips)
+	print("ImageTexture round trip keeps mips: ", _m1(it.get_image()) == want)
+	t.set_image(Image.create(1, 1, false, Image.FORMAT_RGBA8))
+	t.set_image(r.mips)
+	print("after 1x1 swap keeps mips: ", _m1(t.get_image()) == want, " mips ", t.get_image().get_mipmap_count())
+	var fresh := N64Texture.new()
+	fresh.set_image(r.mips)
+	print("fresh N64Texture keeps mips: ", _m1(fresh.get_image()) == want)
+	var it2 := ImageTexture.new()
+	it2.set_image(r.mips)
+	print("fresh ImageTexture.new keeps: ", _m1(it2.get_image()) == want)
+	quit()

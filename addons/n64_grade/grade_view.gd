@@ -32,6 +32,8 @@ var _highlight: MeshInstance3D
 var _view_mode: OptionButton
 var _game_out: CheckBox
 var _keys_box: HBoxContainer
+var _grid_btn: CheckButton
+var _game_btn: CheckButton
 var _hour: HSlider
 var _hour_label: Label
 var _level_label: Label
@@ -83,6 +85,11 @@ var _task := -1
 var _jobs: Array = []
 var _results: Array = []
 var _paint_btn: CheckButton
+# Decals: placing (click a surface), the selected one, a drag in progress.
+var _decal_place := false
+var _place_tex: Texture2D
+var _sel_decal: LevelDecal
+var _decal_drag := false
 var _edit_shared := false
 var _edit_target: OptionButton
 var _shared_box: VBoxContainer
@@ -154,7 +161,9 @@ func _ready() -> void:
 
 
 func _build_toolbar() -> void:
-	var bar := HBoxContainer.new()
+	# (Wraps onto more rows when the screen is too narrow for it all.)
+	var bar := HFlowContainer.new()
+	bar.add_theme_constant_override(&"v_separation", 4)
 	add_child(bar)
 	_level_label = Label.new()
 	_level_label.text = "No level"
@@ -211,7 +220,7 @@ func _build_toolbar() -> void:
 	bar.add_child(measure)
 	var match_cam := Button.new()
 	match_cam.text = "Match editor view"
-	match_cam.tooltip_text = "Puts the Grade camera where the 3D editor's camera is."
+	match_cam.tooltip_text = "Puts the Paint camera where the 3D editor's camera is.\nMove here: trackpad two-finger drag orbits, Shift + two-finger pans, pinch or Cmd + two-finger zooms;\nAlt + drag orbits, Alt + Shift + drag pans; middle drag orbits, Shift + middle pans, wheel zooms;\nhold right mouse + WASD / QE flies; F frames the selection."
 	match_cam.pressed.connect(match_editor_camera)
 	bar.add_child(match_cam)
 	_edit_target = OptionButton.new()
@@ -230,6 +239,22 @@ func _build_toolbar() -> void:
 	_paint_btn.tooltip_text = "P: the left button paints (the Paint panel's tool and settings) instead of picking layers.\nPick Painted colour or an overlay layer in the tree to paint it; Cmd / Ctrl + click edits the face mask."
 	_paint_btn.toggled.connect(func(_on): _overlay.queue_redraw())
 	bar.add_child(_paint_btn)
+	_grid_btn = CheckButton.new()
+	_grid_btn.text = "Grid"
+	_grid_btn.tooltip_text = "The snap-grid checker instead of the real textures (the level panel's debug grid; the same switch)."
+	_grid_btn.toggled.connect(func(on):
+		if Engine.has_meta(&"n64_level_plugin"):
+			Engine.get_meta(&"n64_level_plugin").grade_set_debug_view(on))
+	bar.add_child(_grid_btn)
+	_game_btn = CheckButton.new()
+	_game_btn.text = "Game view"
+	_game_btn.tooltip_text = "What the game shows at the preview hour: the zone's fog (darker and closer at night),\nambient light, lamps glowing in the fog, the night tint; NPC spots / paths hidden.\n(With Game output on, the screen grade too.)"
+	_game_btn.toggled.connect(func(on):
+		if not on:
+			GamePreview.clear()
+		else:
+			GamePreview.hide_helpers(EditorInterface.get_edited_scene_root(), true))
+	bar.add_child(_game_btn)
 	var refresh := Button.new()
 	refresh.text = "Refresh"
 	refresh.pressed.connect(refresh_level)
@@ -507,6 +532,10 @@ func _on_tree_selected() -> void:
 	_sel_node = layer
 	_info.text = "%s\n%s" % [layer.name, layer.info]
 	_paint_target(n)
+	var di: int = n.get("decal", -1)
+	_sel_decal = _data.decals[di] if _data and di >= 0 and di < _data.decals.size() else null
+	if _sel_decal:
+		_update_highlight()
 	if _selected_ids != layer.ids:
 		_selected_ids = layer.ids
 		_update_highlight()
@@ -539,6 +568,22 @@ func _select_texture_id(id: int) -> void:
 ## The selected layer's faces, tinted over the view (only the Grade camera sees it).
 func _update_highlight() -> void:
 	_highlight.mesh = null
+	if _sel_decal and is_instance_valid(_level) and _sel_decal.texture:
+		var tris := DecalBuilder.project(_level, _sel_decal, _level.global_transform.affine_inverse())
+		if not tris.is_empty():
+			var st := SurfaceTool.new()
+			st.begin(Mesh.PRIMITIVE_TRIANGLES)
+			for v in tris:
+				st.add_vertex(_level.global_transform * (v.p + v.n * 0.01))
+			var m := st.commit()
+			var mat := StandardMaterial3D.new()
+			mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+			mat.albedo_color = Color(1.0, 0.55, 0.1, 0.25)
+			m.surface_set_material(0, mat)
+			_highlight.mesh = m
+		return
 	if _level == null or _data == null or _selected_ids.is_empty():
 		return
 	var want := {}
@@ -618,14 +663,30 @@ func _rebuild_keys() -> void:
 	for k: LightingKey in schedule.keys:
 		var b := Button.new()
 		b.text = k.name
-		b.tooltip_text = "%s (%s): the view as this key's baked light shows it." % [k.name, _fmt_hour(k.hour)]
+		b.toggle_mode = true
+		b.tooltip_text = "%s (%s): the view as this key's baked light shows it.\nLit: the key nearest the preview hour (per-key edits such as AO apply to it)." % [k.name, _fmt_hour(k.hour)]
 		var h := k.hour
-		b.pressed.connect(func(): _hour.value = h)
+		b.pressed.connect(func():
+			_hour.value = h
+			_mark_key())
 		_keys_box.add_child(b)
+	_mark_key.call_deferred()
+
+
+## Presses the button of the key nearest the preview hour (the one being viewed / edited),
+## the others up.
+func _mark_key() -> void:
+	if _keys_box == null:
+		return
+	var current := _current_key()
+	var buttons := _keys_box.get_children().filter(func(c): return c is Button and not c.is_queued_for_deletion())
+	for i in buttons.size():
+		(buttons[i] as Button).set_pressed_no_signal(i == current)
 
 
 func _set_hour(h: float) -> void:
 	_hour_label.text = _fmt_hour(h)
+	_mark_key()
 	if Engine.has_meta(&"n64_preview_hour"):
 		(Engine.get_meta(&"n64_preview_hour") as Callable).call(h)
 	if _same(_panel_key, "vertex/ao"):
@@ -700,6 +761,9 @@ func _set_reference(path: String) -> void:
 
 
 func restore_reference() -> void:
+	var dt := String(EditorInterface.get_editor_settings().get_project_metadata("n64_grade", "decal_texture", ""))
+	if dt != "" and ResourceLoader.exists(dt) and _place_tex == null:
+		_place_tex = load(dt)
 	var p := String(EditorInterface.get_editor_settings().get_project_metadata("n64_grade", "reference", ""))
 	if p != "" and FileAccess.file_exists(p):
 		_set_reference(p)
@@ -741,6 +805,15 @@ func _on_view_input(ev: InputEvent) -> void:
 	if ev is InputEventKey and ev.pressed and not ev.echo and (ev as InputEventKey).keycode == KEY_P \
 			and not (ev as InputEventKey).is_command_or_control_pressed() and _drag == 0:
 		_paint_btn.button_pressed = not _paint_btn.button_pressed
+		_container.accept_event()
+		return
+	# Trackpad: two-finger drag orbits, Shift + two-finger drag pans, Cmd / Ctrl + two-finger
+	# drag or a pinch zooms. Alt + left drag orbits, Alt + Shift + left drag pans (a mouse
+	# with no middle button). Before painting / picking: they never paint.
+	if _trackpad_input(ev):
+		_container.accept_event()
+		return
+	if _decal_input(ev):
 		_container.accept_event()
 		return
 	# Painting: the left button, plain motion and the paint keys go to the paint tool.
@@ -792,8 +865,40 @@ func _on_view_input(ev: InputEvent) -> void:
 		_container.accept_event()
 
 
+func _trackpad_input(ev: InputEvent) -> bool:
+	if ev is InputEventPanGesture:
+		var g := ev as InputEventPanGesture
+		if g.is_command_or_control_pressed():
+			_dist = clampf(_dist * pow(1.04, g.delta.y), 0.5, 2000.0)
+		elif g.shift_pressed:
+			var b := _basis()
+			var k := _dist * 0.02
+			_pivot += (b.x * g.delta.x - b.y * g.delta.y) * k
+		else:
+			_yaw -= g.delta.x * 0.04
+			_pitch = clampf(_pitch - g.delta.y * 0.04, -1.55, 1.55)
+		_update_camera()
+		return true
+	if ev is InputEventMagnifyGesture:
+		var m := ev as InputEventMagnifyGesture
+		_dist = clampf(_dist / maxf(m.factor, 0.01), 0.5, 2000.0)
+		_update_camera()
+		return true
+	if ev is InputEventMouseButton:
+		var mb := ev as InputEventMouseButton
+		if mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed and mb.alt_pressed:
+			_drag = 3 if mb.shift_pressed else 2
+			return true
+		if mb.button_index == MOUSE_BUTTON_LEFT and not mb.pressed and _drag in [2, 3]:
+			_drag = 0
+			return true
+	return false
+
+
 func _process(delta: float) -> void:
 	_poll_processing()
+	if _game_btn and _game_btn.button_pressed and is_visible_in_tree():
+		GamePreview.apply(EditorInterface.get_edited_scene_root(), _hour.value, _cam)
 	if _drag != 1 or not is_visible_in_tree():
 		return
 	var b := _basis()
@@ -832,6 +937,14 @@ func _pick(pos: Vector2) -> void:
 
 
 func _notification(what: int) -> void:
+	if what == NOTIFICATION_VISIBILITY_CHANGED and _game_btn and _game_btn.button_pressed:
+		# (Leaving the Paint screen: the 3D view goes back to the editor's own look.)
+		if is_visible_in_tree():
+			GamePreview.hide_helpers(EditorInterface.get_edited_scene_root(), true)
+		else:
+			GamePreview.clear()
+	if what == NOTIFICATION_VISIBILITY_CHANGED and is_visible_in_tree() and _grid_btn:
+		_grid_btn.set_pressed_no_signal(LevelRoot.debug_view)  # (it may have changed in the 3D view)
 	if what == NOTIFICATION_VISIBILITY_CHANGED and not is_visible_in_tree() and _drag == 1:
 		_drag = 0
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
@@ -867,6 +980,8 @@ func _show_panel(layer: Dictionary) -> void:
 		if n > 0:
 			_migrate.visible = true
 			_migrate.text = "Move Paint panel adjusts here (%d)" % n if layer.kind == &"zone" else "Move Paint panel adjust here"
+	if layer.get("kind") in [&"decals", &"decal"]:
+		sig = "decal%d|%d|%s" % [layer.get("decal", -1), _data.decals.size() if _data else 0, _decal_place]
 	if layer.get("kind") == &"ao_layer" or _same(key, "vertex/ao_layers"):
 		sig = "aol%d|%d|%s" % [layer.get("ao_id", -1), _current_key(), str(g.ao_layers.map(func(l): return [l.id, l.linked]) if g else [])]
 	if _same(key, "vertex/ao"):
@@ -885,6 +1000,10 @@ func _show_panel(layer: Dictionary) -> void:
 	if _same(key, "vertex/ao_layers") or layer.get("kind") == &"ao_layer":
 		_filter_head.visible = false
 		_ao_layers_panel(layer)
+		return
+	if layer.get("kind") in [&"decals", &"decal"]:
+		_filter_head.visible = false
+		_decals_panel(layer)
 		return
 	if key == null:
 		if layer.get("kind") == &"vertex":
@@ -946,7 +1065,7 @@ func _filter_row(key: Variant, list: Array, i: int) -> Control:
 		stops.tooltip_text = "Bands of lightness (gradient stops)."
 		from.pressed.connect(func():
 			var img := _ref_image() if _ref_path != "" else null
-			var g := GradeGradientMap.from_image(img, int(stops.value))
+			var g := GradeGradientMap.from_image(img, int(stops.value), f.perceptual)
 			if g == null:
 				_status.text = "Gradient from reference: pick a reference picture first (Reference > Picture...)."
 				return
@@ -955,11 +1074,79 @@ func _filter_row(key: Variant, list: Array, i: int) -> Control:
 		row.add_child(from)
 		row.add_child(stops)
 		box.add_child(row)
+		box.add_child(_ramp_row(f, insp))
 	elif f is GradeLut:
 		box.add_child(_lut_picker(f, insp))
 	elif f is GradePalette:
 		box.add_child(_palette_picker(f, insp))
 	return panel
+
+
+## Gradient map: make a colour ramp (GradeGradientMap.ramp) from a base colour: steps even
+## in perceived lightness, darks cooler / lights warmer by Temperature; Random rolls one.
+func _ramp_row(f: GradeGradientMap, insp: EditorInspector) -> Control:
+	var v := VBoxContainer.new()
+	var row := HBoxContainer.new()
+	var base := ColorPickerButton.new()
+	base.color = Color(0.36, 0.52, 0.25)
+	base.edit_alpha = false
+	base.custom_minimum_size = Vector2(36, 0)
+	base.tooltip_text = "Ramp colour: its hue and colourfulness (lightness comes from the steps)."
+	_okhsl(base)
+	var steps := SpinBox.new()
+	steps.min_value = 2
+	steps.max_value = 12
+	steps.value = 5
+	steps.tooltip_text = "Steps (colours), evenly spaced in perceived lightness."
+	var temp := SpinBox.new()
+	temp.min_value = -90
+	temp.max_value = 90
+	temp.value = 30
+	temp.suffix = "°"
+	temp.tooltip_text = "Temperature: darks turn this far towards blue, lights towards yellow
+(cool shadows, warm lights; negative: the other way)."
+	var flat := CheckBox.new()
+	flat.text = "Steps"
+	flat.button_pressed = true
+	flat.tooltip_text = "Flat bands (value groups in colour); off: a smooth ramp."
+	row.add_child(base)
+	row.add_child(steps)
+	row.add_child(temp)
+	row.add_child(flat)
+	var row2 := HBoxContainer.new()
+	var make := Button.new()
+	make.text = "Make ramp"
+	make.size_flags_horizontal = SIZE_EXPAND_FILL
+	make.tooltip_text = "Replace the gradient with a ramp of the ramp colour (OKLab: even steps, same hue)."
+	var rand := Button.new()
+	rand.text = "Random"
+	rand.size_flags_horizontal = SIZE_EXPAND_FILL
+	rand.tooltip_text = "Roll a random harmonious ramp (a hue, a colourfulness, a temperature)."
+	var build := func():
+		var lab := GradePalette.oklab(base.color)
+		var c := Vector2(lab.y, lab.z).length()
+		var g := GradeGradientMap.ramp(base.color, int(steps.value), temp.value, c * 0.75, c, 0.2, 0.94, flat.button_pressed)
+		_set_filter(f, &"gradient", g, insp)
+		if flat.button_pressed and not f.stretch:
+			_set_filter(f, &"stretch", true, insp)  # (bands meet each texture's own values)
+		_status.text = "Ramp: %d steps, temperature %d°." % [int(steps.value), int(temp.value)]
+	make.pressed.connect(build)
+	rand.pressed.connect(func():
+		var h := randf() * TAU
+		var c := randf_range(0.04, 0.14)
+		base.color = GradePalette.from_oklab_fit(Vector3(0.65, c * cos(h), c * sin(h)))
+		temp.value = randf_range(10.0, 60.0) * (1.0 if randf() < 0.8 else -1.0)
+		build.call())
+	row2.add_child(make)
+	row2.add_child(rand)
+	v.add_child(row)
+	v.add_child(row2)
+	return v
+
+
+## A colour picker opening in OKHSL (perceptual: moving round the wheel keeps lightness).
+static func _okhsl(b: ColorPickerButton) -> void:
+	b.get_picker().color_mode = ColorPicker.MODE_OKHSL
 
 
 ## Sets a filter property as one undo step and refreshes its inspector.
@@ -1184,6 +1371,8 @@ func _add_filter(script_path: String) -> void:
 	if new_grade:
 		g = ZoneGrade.new()
 	var f: GradeFilter = load(script_path).new()
+	if &"perceptual" in f:
+		f.set(&"perceptual", true)  # (new filters work in OKLab; old ones keep their maths)
 	f.on_light = _same(_panel_key, GradeVertex.LIGHT) and _timed()  # (Keys: time-of-day zones)
 	var list := g.filters(_panel_key).duplicate()
 	list.append(f)
@@ -1532,6 +1721,7 @@ func _ao_panel() -> void:
 	var pick := ColorPickerButton.new()
 	pick.color = view.tint[i]
 	pick.edit_alpha = false
+	_okhsl(pick)
 	pick.size_flags_horizontal = SIZE_EXPAND_FILL
 	pick.tooltip_text = "What corners sink towards: black = plain AO; deep blue at night, a warm bounce at noon."
 	pick.color_changed.connect(func(c): _set_ao(&"tint", c))
@@ -1715,6 +1905,7 @@ func _ao_layers_panel(layer: Dictionary) -> void:
 	var pick := ColorPickerButton.new()
 	pick.color = l.tint[i]
 	pick.edit_alpha = false
+	_okhsl(pick)
 	pick.size_flags_horizontal = SIZE_EXPAND_FILL
 	pick.color_changed.connect(func(c): _set_ao_layer(l, &"tint", c))
 	trow.add_child(pick)
@@ -2008,3 +2199,228 @@ func _queue_shared_save() -> void:
 		var sh := r.shared_grade() if r else null
 		if sh and sh.resource_path != "":
 			ResourceSaver.save(sh, sh.resource_path))
+
+
+# --- Decals --------------------------------------------------------------------------
+
+## Placing (left click on a surface), dragging the selected decal, its keys. True: taken.
+func _decal_input(ev: InputEvent) -> bool:
+	if _data == null or not is_instance_valid(_level) or _paint_btn.button_pressed or _drag != 0:
+		return false
+	if ev is InputEventMouseButton and ev.button_index == MOUSE_BUTTON_LEFT:
+		if not ev.pressed:
+			if _decal_drag:
+				_decal_drag = false
+				return true
+			return false
+		_container.grab_focus()
+		var hit := _hit(ev.position)
+		if hit.is_empty():
+			return false
+		if _decal_place:
+			_place_decal(hit)
+			return true
+		# On the selected decal: drag it. On another: select that one.
+		if _sel_decal and _sel_decal.covers(hit.local):
+			_decal_drag = true
+			return true
+		for i in range(_data.decals.size() - 1, -1, -1):
+			var d: LevelDecal = _data.decals[i]
+			if d and d.covers(hit.local):
+				_select_decal(d)
+				return true
+		return false
+	if ev is InputEventMouseMotion and _decal_drag and _sel_decal:
+		var hit := _hit(ev.position)
+		if not hit.is_empty():
+			_set_decal(_sel_decal, {position = hit.local, normal = hit.local_normal}, "Move Decal")
+		return true
+	if ev is InputEventKey and ev.pressed and _sel_decal and not ev.is_command_or_control_pressed():
+		match ev.keycode:
+			KEY_R:
+				_set_decal(_sel_decal, {rotation = wrapf(_sel_decal.rotation + (-15.0 if ev.shift_pressed else 15.0), -180.0, 180.0)}, "Turn Decal")
+				return true
+			KEY_BRACKETLEFT, KEY_BRACKETRIGHT:
+				var k := 0.9 if ev.keycode == KEY_BRACKETLEFT else 1.0 / 0.9
+				_set_decal(_sel_decal, {size = (_sel_decal.size * k).max(Vector2(0.05, 0.05))}, "Size Decal")
+				return true
+			KEY_DELETE, KEY_BACKSPACE:
+				_remove_decal(_sel_decal)
+				return true
+	return false
+
+
+## The drawn surface under a view point: {position, local (level space), local_normal} or
+## {}. Looks through faces that are only collision (a prop's invisible box): decals land on
+## what's drawn.
+func _hit(pos: Vector2) -> Dictionary:
+	var from := _cam.project_ray_origin(pos)
+	var dir := _cam.project_ray_normal(pos)
+	var hit := {}
+	for _i in 8:
+		hit = _level.raycast(from, dir)
+		if hit.is_empty() or (hit.brush as LevelBrush).face_visual(hit.face):
+			break
+		from = hit.position + dir * 0.01
+		hit = {}
+	if hit.is_empty():
+		return {}
+	var inv := _level.global_transform.affine_inverse()
+	hit.local = inv * hit.position
+	hit.local_normal = (inv.basis * hit.normal).normalized()
+	return hit
+
+
+func _place_decal(hit: Dictionary) -> void:
+	if _place_tex == null:
+		_status.text = "Pick the decal texture first (Decals panel: Texture to place)."
+		return
+	var d := LevelDecal.new()
+	d.texture = _place_tex
+	d.position = hit.local
+	d.normal = hit.local_normal
+	# Upright on walls; on floors and ceilings, the image's top away from the camera.
+	if absf(d.normal.y) > 0.7:
+		var inv := _level.global_transform.affine_inverse()
+		var fwd: Vector3 = inv.basis * -_cam.global_transform.basis.z
+		d.up = Vector3(fwd.x, 0.0, fwd.z).normalized() if Vector2(fwd.x, fwd.z).length() > 0.01 else Vector3.FORWARD
+	else:
+		d.up = Vector3.UP
+	d.size = Vector2(1.0, float(_place_tex.get_height()) / maxf(_place_tex.get_width(), 1.0))
+	var list := _data.decals.duplicate()
+	list.append(d)
+	var ur := EditorInterface.get_editor_undo_redo()
+	ur.create_action("Place Decal", UndoRedo.MERGE_DISABLE, _level)
+	ur.add_do_property(_data, &"decals", list)
+	ur.add_undo_property(_data, &"decals", _data.decals)
+	ur.add_do_method(self, &"_rebuild_tree")
+	ur.add_undo_method(self, &"_rebuild_tree")
+	ur.commit_action()
+	_select_decal(d)
+
+
+func _remove_decal(d: LevelDecal) -> void:
+	var list := _data.decals.duplicate()
+	list.erase(d)
+	var ur := EditorInterface.get_editor_undo_redo()
+	ur.create_action("Remove Decal", UndoRedo.MERGE_DISABLE, _level)
+	ur.add_do_property(_data, &"decals", list)
+	ur.add_undo_property(_data, &"decals", _data.decals)
+	ur.add_do_method(self, &"_rebuild_tree")
+	ur.add_undo_method(self, &"_rebuild_tree")
+	ur.commit_action()
+	_sel_decal = null
+	_sel = [&"decals", null, null, "Decals"]
+	_rebuild_tree()
+	_update_highlight()
+
+
+## Decal properties as one undo step (repeats of `name` merge: a drag is one step).
+func _set_decal(d: LevelDecal, values: Dictionary, name: String) -> void:
+	var ur := EditorInterface.get_editor_undo_redo()
+	ur.create_action(name, UndoRedo.MERGE_ENDS, _level)
+	for k in values:
+		ur.add_do_property(d, k, values[k])
+		ur.add_undo_property(d, k, d.get(k))
+	ur.add_do_method(self, &"_update_highlight")
+	ur.add_undo_method(self, &"_update_highlight")
+	ur.commit_action()
+
+
+func _select_decal(d: LevelDecal) -> void:
+	var i := _data.decals.find(d)
+	_sel = [&"decal", null, null, d.title()]
+	_rebuild_tree()
+	# (titles can repeat: pick the item by index)
+	var stack: Array[TreeItem] = [_tree.get_root()]
+	while not stack.is_empty():
+		var it: TreeItem = stack.pop_back()
+		for c in it.get_children():
+			var n: Dictionary = c.get_metadata(0)
+			if n.kind == &"decal" and n.decal == i:
+				var p := c.get_parent()
+				while p:
+					p.collapsed = false
+					p = p.get_parent()
+				c.select(0)
+				_tree.scroll_to_item(c)
+				return
+			stack.append(c)
+
+
+func _decals_panel(layer: Dictionary) -> void:
+	var box := _filter_box
+	var place := CheckButton.new()
+	place.text = "Place decals (click a surface)"
+	place.button_pressed = _decal_place
+	place.toggled.connect(func(on):
+		_decal_place = on
+		if on:
+			_paint_btn.button_pressed = false)
+	box.add_child(place)
+	box.add_child(_texture_row("Texture to place", _place_tex, func(t):
+		_place_tex = t
+		EditorInterface.get_editor_settings().set_project_metadata("n64_grade", "decal_texture", t.resource_path if t else "")))
+	var d := _sel_decal
+	if d == null:
+		var hint := Label.new()
+		hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		hint.add_theme_font_size_override(&"font_size", 11)
+		hint.text = "Pick a texture with transparency (cut out at half alpha) and click surfaces. Click a decal (Place off) to select it; drag it to move."
+		box.add_child(hint)
+		return
+	box.add_child(HSeparator.new())
+	box.add_child(_texture_row("Texture", d.texture, func(t): _set_decal(d, {texture = t}, "Decal Texture")))
+	for spec in [[&"width", "Width (m)", 0.05, 20.0, d.size.x], [&"height", "Height (m)", 0.05, 20.0, d.size.y],
+			[&"rotation", "Rotation (°)", -180.0, 180.0, d.rotation], [&"depth", "Depth (m)", 0.02, 3.0, d.depth],
+			[&"max_angle", "Max angle (°)", 10.0, 89.0, d.max_angle]]:
+		var row := HBoxContainer.new()
+		var l := Label.new()
+		l.text = spec[1]
+		l.custom_minimum_size.x = 90
+		row.add_child(l)
+		var sp := SpinBox.new()
+		sp.min_value = spec[2]
+		sp.max_value = spec[3]
+		sp.step = 0.01 if spec[0] in [&"width", &"height", &"depth"] else 1.0
+		sp.value = spec[4]
+		sp.size_flags_horizontal = SIZE_EXPAND_FILL
+		var prop: StringName = spec[0]
+		sp.value_changed.connect(func(v):
+			if prop == &"width":
+				_set_decal(d, {size = Vector2(v, d.size.y)}, "Size Decal")
+			elif prop == &"height":
+				_set_decal(d, {size = Vector2(d.size.x, v)}, "Size Decal")
+			else:
+				_set_decal(d, {prop: v}, "Decal " + String(prop).capitalize()))
+		row.add_child(sp)
+		box.add_child(row)
+	var row2 := HBoxContainer.new()
+	var aspect := Button.new()
+	aspect.text = "Match texture aspect"
+	aspect.pressed.connect(func():
+		if d.texture:
+			_set_decal(d, {size = Vector2(d.size.x, d.size.x * d.texture.get_height() / maxf(d.texture.get_width(), 1.0))}, "Size Decal")
+			_panel_sig = ""
+			_show_panel(_sel_node))
+	row2.add_child(aspect)
+	var del := Button.new()
+	del.text = "Delete"
+	del.pressed.connect(func(): _remove_decal(d))
+	row2.add_child(del)
+	box.add_child(row2)
+
+
+func _texture_row(label: String, tex: Texture2D, set_fn: Callable) -> Control:
+	var row := HBoxContainer.new()
+	var l := Label.new()
+	l.text = label
+	l.custom_minimum_size.x = 90
+	row.add_child(l)
+	var pick := EditorResourcePicker.new()
+	pick.base_type = "Texture2D"
+	pick.edited_resource = tex
+	pick.size_flags_horizontal = SIZE_EXPAND_FILL
+	pick.resource_changed.connect(func(r): set_fn.call(r as Texture2D))
+	row.add_child(pick)
+	return row

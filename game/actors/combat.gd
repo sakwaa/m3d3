@@ -28,6 +28,21 @@ const KILL_EDGE := Color(0.7, 0.35, 1.0)
 const RICOCHET_EDGE := Color(1.0, 0.7, 0.25)
 const RICOCHET_FLASH := Color(1.0, 1.0, 1.0, 0.8)
 const RICOCHET_STOP := 4.0 / 60.0
+## Hit effects: OoT / MM's own (OotHitFx: hit mark + blood on flesh, metal mark + clang
+## streaks + blue flash on armour, guards and clashes) or the remake-style emitters + burst.
+enum HitFx { OOT, REMAKE }
+static var hit_fx := HitFx.OOT
+
+
+## OoT's effects for a blow landing at `at`: `metal` (armour, a guard, a clash) or flesh.
+static func _oot_fx(near: Node, at: Vector3, metal: bool) -> void:
+	var root := near.get_tree().current_scene if near.get_tree().current_scene else near.get_parent()
+	if metal:
+		OotHitFx.hit_mark(root, at, OotHitFx.Mark.METAL)
+		OotHitFx.clang(root, at, true)
+	else:
+		OotHitFx.hit_mark(root, at, OotHitFx.Mark.WHITE)
+		OotHitFx.blood(root, at, OotHitFx.Blood.BLUE)
 
 
 static func update_attacks(attacker: Actor) -> void:
@@ -53,7 +68,11 @@ static func update_attacks(attacker: Actor) -> void:
 				swing.pending[target] = true  # (settled when the active window closes)
 				continue
 		swing.resolved[target] = true
-		_resolve(attacker, swing, target, met)
+		# Which way the blade was travelling as it struck (world; zero without a blade).
+		var motion := Vector3.ZERO
+		if not blade.is_empty() and not prev.is_empty():
+			motion = (blade[0] + blade[1]) * 0.5 - (prev[0] + prev[1]) * 0.5
+		_resolve(attacker, swing, target, met, motion)
 		if attacker.active_attack() != swing:
 			return  # the attacker got interrupted (clash / block / ricochet)
 
@@ -67,11 +86,14 @@ static func _between(a: Actor, b: Actor) -> Vector3:
 	return a.global_position.lerp(b.global_position, 0.5) + Vector3.UP * 1.1
 
 
-static func _resolve(attacker: Actor, swing: AttackState, target: Actor, met: StrikePoint = null) -> void:
+static func _resolve(attacker: Actor, swing: AttackState, target: Actor, met: StrikePoint = null, motion := Vector3.ZERO) -> void:
 	var theirs := target.active_attack()
 	if theirs and theirs.reaches(attacker) and not theirs.resolved.has(attacker):
 		theirs.resolved[attacker] = true
-		Effects.spawn(CLASH_EFFECT, _between(attacker, target))
+		if hit_fx == HitFx.OOT:
+			_oot_fx(attacker, _between(attacker, target), true)
+		else:
+			Effects.spawn(CLASH_EFFECT, _between(attacker, target))
 		if swing.weight == theirs.weight:
 			_log(attacker, "clash with %s: both recoil" % target.name)
 			attacker.react(&"Recoil")
@@ -89,15 +111,21 @@ static func _resolve(attacker: Actor, swing: AttackState, target: Actor, met: St
 	var guard := target.state_of(Actor.ACTION) as GuardState
 	if met == null and guard and guard.covers(attacker):
 		_log(attacker, "blocked by %s" % target.name)
-		Effects.spawn(CLASH_EFFECT, _between(attacker, target), (attacker.global_position - target.global_position).normalized())
+		if hit_fx == HitFx.OOT:
+			_oot_fx(attacker, _between(attacker, target), true)
+		else:
+			Effects.spawn(CLASH_EFFECT, _between(attacker, target), (attacker.global_position - target.global_position).normalized())
 		attacker.react(&"Recoil")
 		target.counter_left = COUNTER_TIME
 		return
 	var damage := swing.damage if met == null else maxi(int(round(swing.damage * met.damage_scale)), 1)
 	var at := met.global_position if met else _hit_spot(attacker, target)
 	_log(attacker, "hits %s%s for %d" % [target.name, " (%s)" % met.part if met else "", damage])
-	Effects.spawn(HIT_EFFECT, at, (attacker.global_position - target.global_position).normalized())
-	target.take_hit(damage, attacker, swing.knockback)
+	if hit_fx == HitFx.OOT:
+		_oot_fx(attacker, at, false)
+	else:
+		Effects.spawn(HIT_EFFECT, at, (attacker.global_position - target.global_position).normalized())
+	target.take_hit(damage, attacker, swing.knockback, _hit_info(attacker, swing, target, at, motion))
 	_juice_hit(attacker, swing, target, at)
 
 
@@ -110,8 +138,11 @@ static func _ricochet(attacker: Actor, swing: AttackState, target: Actor, met: S
 	var away := attacker.global_position - target.global_position
 	away.y = 0.0
 	away = away.normalized() if away.length() > 0.01 else -attacker.facing
-	Effects.spawn(CLASH_EFFECT, at, away)
-	if juice.burst:
+	if hit_fx == HitFx.OOT:
+		_oot_fx(attacker, at, true)
+	else:
+		Effects.spawn(CLASH_EFFECT, at, away)
+	if juice.burst and hit_fx != HitFx.OOT:
 		ImpactBurst.spawn(at, (away + Vector3.UP * 0.6).normalized(), 1.4, RICOCHET_EDGE)
 	if juice.flash:
 		target.flash(RICOCHET_FLASH, 3.0 / 60.0, 6.0 / 60.0)
@@ -120,6 +151,26 @@ static func _ricochet(attacker: Actor, swing: AttackState, target: Actor, met: S
 		target.hitstop(RICOCHET_STOP)
 	attacker.react(&"Recoil")
 	target.counter_left = COUNTER_TIME
+
+
+## How a hit pushes (Actor.take_hit): along the blade's travel at contact (a right-to-left
+## slash shoves the target to the attacker's left as well as back), blended with straight
+## away from the attacker; stronger for stronger blades and finishers (trigger_boost).
+static func _hit_info(attacker: Actor, swing: AttackState, target: Actor, at: Vector3, motion: Vector3) -> Dictionary:
+	var away := target.global_position - attacker.global_position
+	away.y = 0.0
+	away = away.normalized() if away.length() > 0.01 else attacker.facing
+	var travel := Vector3(motion.x, 0.0, motion.z)
+	if travel.length() < 0.001:
+		# No blade (a bite, a claw) or a settled near miss: the swing's own line in the world.
+		var f := attacker.facing
+		var right := f.cross(Vector3.UP).normalized()
+		travel = right * swing.slash_axis.x + f * swing.slash_axis.z
+		travel.y = 0.0
+	var dir := away * 0.55 + (travel.normalized() if travel.length() > 0.001 else Vector3.ZERO) * 0.75
+	var heavy := swing.trigger_boost > 1.0
+	var strength := (1.0 + 0.35 * (attacker.blade_power() - 1)) * (1.5 if heavy else 1.0)
+	return {dir = dir.normalized() if dir.length() > 0.01 else away, at = at, strength = strength, heavy = heavy}
 
 
 static func _hit_spot(attacker: Actor, target: Actor) -> Vector3:
@@ -136,7 +187,7 @@ static func _juice_hit(attacker: Actor, swing: AttackState, target: Actor, at: V
 		target.hitstop(t)
 	if juice.flash:
 		target.flash(FLASH_COLOR, FLASH_HOLD, FLASH_FADE)
-	if juice.burst:
+	if juice.burst and hit_fx != HitFx.OOT:
 		var f := attacker.facing
 		var right := f.cross(Vector3.UP).normalized()
 		var axis := right * swing.slash_axis.x + Vector3.UP * swing.slash_axis.y + f * swing.slash_axis.z

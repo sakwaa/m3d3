@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://c1arpfcdpy8sf"
+path="res://.godot/imported/n64_video_edge.glsl-97a2f1213150d7d4608a32670b221b66.res"
+
+[deps]
+
+source_file="res://addons/n64_runtime/post/n64_video_edge.glsl"
+dest_files=["res://.godot/imported/n64_video_edge.glsl-97a2f1213150d7d4608a32670b221b66.res"]
+
+[params]
+

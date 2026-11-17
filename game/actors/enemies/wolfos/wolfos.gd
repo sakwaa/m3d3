@@ -22,6 +22,11 @@ func build() -> void:
 	body.name = "Body"
 	add_child(body)
 	body.add_child(MODEL.instantiate())
+	mass = 0.8  # (lighter than the player: blows carry it further)
+	var sk := body.find_children("*", "Skeleton3D", true, false)
+	if not sk.is_empty():
+		hit_react = HitReact.new(self)
+		sk[0].add_child(hit_react)  # blows bend the body the way they push
 	# (Where a blade lands - head, throat, flanks, haunch, claws up when guarding - is the
 	# model's StrikePoints: characters/wolfos_model.tscn.)
 	add_child(ProjectedShadow.new())

@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://makfgs1lyam7"
+path="res://.godot/imported/n64_video_tape_prep.glsl-500f64951284c56543fae487428800d1.res"
+
+[deps]
+
+source_file="res://addons/n64_runtime/post/n64_video_tape_prep.glsl"
+dest_files=["res://.godot/imported/n64_video_tape_prep.glsl-500f64951284c56543fae487428800d1.res"]
+
+[params]
+

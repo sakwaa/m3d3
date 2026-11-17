@@ -6,6 +6,9 @@ render_mode blend_mix, depth_draw_never, cull_back, diffuse_lambert, specular_di
 // Use on a subdivided plane (waves move vertices); texture tiles in world metres.
 #include "res://addons/n64_runtime/shaders/n64_sampling.gdshaderinc"
 #include "res://addons/n64_runtime/shaders/n64_shine.gdshaderinc"
+#include "res://addons/n64_runtime/shaders/n64_combiner.gdshaderinc"
+#include "res://addons/n64_runtime/shaders/n64_weather.gdshaderinc"
+#include "res://addons/n64_runtime/shaders/n64_ripples.gdshaderinc"
 
 uniform sampler2D water_texture : source_color, filter_nearest_mipmap, repeat_enable, hint_default_white;
 uniform vec4 shallow_color : source_color = vec4(0.25, 0.5, 0.6, 1.0);
@@ -19,8 +22,33 @@ uniform vec2 scroll_b = vec2(-0.07, 0.1);
 uniform float layer_b_scale = 1.37;
 uniform float wave_height = 0.04;
 uniform float wave_speed = 1.2;
+// Second layer's own texture (TEXEL1; off = the same texture again).
+uniform bool use_texture_b = false;
+uniform sampler2D water_texture_b : source_color, filter_nearest_mipmap, repeat_enable, hint_default_white;
+// How the combiner joins the two layers: Average (soft ripples), Multiply (G_CC_INTERFERENCE:
+// dark where either is dark, a sparkly mesh where bright crosses bright), Difference (thin
+// bright lines where the layers' waves cross: caustic-like shimmer).
+uniform int combine : hint_enum("Average", "Multiply", "Difference") = 0;
+// Share of the colour that glows (unlit): 0 water, ~1 lava, magma, glowing slime.
+uniform float glow_amount : hint_range(0.0, 1.0) = 0.0;
 // How much the waves tilt the sheen / glint.
 uniform float wave_tilt = 0.35;
+
+// Glisten (Kaze's combiner trick): two blocky noise textures scroll different ways; cycle 1
+// multiplies them, cycle 2 takes the product from 0 - only where two bright texels cross does
+// it go under -0.5 and wrap round to full brightness: specks of sunlight that pop up and
+// vanish all over the surface. 0 = off. Fades out by glisten_far (Sunshine-like: near water
+// sparkles, far water calm).
+uniform float glisten : hint_range(0.0, 2.0) = 0.0;
+// Noise texels per metre (bigger = finer specks).
+uniform float glisten_texels = 14.0;
+// How hard cycle 2 pushes the product: specks where noise x noise x gain passes 0.5 (0.65: ~3 %
+// of texels, 0.8: ~8 %; at or below 0.5 none).
+uniform float glisten_gain : hint_range(0.5, 1.5) = 0.65;
+// Metres per second the two noise layers slide (opposite ways).
+uniform float glisten_speed = 0.35;
+uniform float glisten_far = 30.0;
+uniform vec4 glisten_color : source_color = vec4(1.0, 0.97, 0.88, 1.0);
 
 // Planar reflection (N64Water node): the scene mirrored in the water plane, low-res.
 uniform bool reflect_on = false;
@@ -63,10 +91,33 @@ void vertex() {
 void fragment() {
 	vec2 uv = world_xz / max(tile_size, 0.01);
 	float ta = n64_texture(water_texture, uv + scroll_a * TIME / max(tile_size, 0.01)).r;
-	float tb = n64_texture(water_texture, uv * layer_b_scale + scroll_b * TIME / max(tile_size, 0.01)).r;
-	float v = (ta + tb) * 0.5;
-	vec3 albedo = mix(deep_color.rgb, shallow_color.rgb, v);
-	vec3 glow = n64_shine(albedo, n64_shine_v);
+	vec2 uvb = uv * layer_b_scale + scroll_b * TIME / max(tile_size, 0.01);
+	float tb = use_texture_b ? n64_texture(water_texture_b, uvb).r : n64_texture(water_texture, uvb).r;
+	float v = combine == 1 ? n64_cc_interference(vec4(ta), vec4(tb)).r * 1.6
+		: combine == 2 ? 1.0 - abs(ta - tb) * 2.0
+		: (ta + tb) * 0.5;
+	// G_CC_BLENDPE: the combined texel picks between ENV (deep) and PRIM (shallow).
+	vec3 albedo = n64_cc_blend_pe(vec4(clamp(v, 0.0, 1.0)), shallow_color, deep_color).rgb;
+	vec3 glow_c = albedo * glow_amount;
+	albedo *= 1.0 - glow_amount;
+	vec3 glow = glow_c + n64_shine(albedo, n64_shine_frag(n64_shine_v, VERTEX, VIEW_MATRIX));
+	if (glisten > 0.0) {
+		vec2 gp = world_xz * glisten_texels;
+		float ga = n64_cc_noise_texel(gp + vec2(1.0, 0.35) * glisten_speed * glisten_texels * TIME);
+		float gb = n64_cc_noise_texel(gp * 1.13 + vec2(17.0, 5.0) - vec2(0.4, 1.0) * glisten_speed * glisten_texels * TIME);
+		// cycle 1: TEXEL0 x TEXEL1; cycle 2: (0 - COMBINED) x PRIM + 0 -> overflow
+		float spark = n64_cc_overflow1((0.0 - ga * gb) * glisten_gain * 1.0 + 0.0);
+		float far = 1.0 - smoothstep(glisten_far * 0.5, glisten_far, length(VERTEX));
+		glow += glisten_color.rgb * spark * glisten * far * (1.0 - glow_amount);
+	}
+	// Ripples: raindrops landing, and the ripple simulation (wading wakes, drips, landings):
+	// crests catch the sky's light.
+	vec3 wpos = (INV_VIEW_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	float rip = n64_rain_rings(wpos.xz, TIME, n64_rain.x, length(VERTEX))
+		+ n64_ripple_sim(wpos.xz, CAMERA_POSITION_WORLD) * 1.2;
+	rip = clamp(rip, -1.0, 1.0) * (1.0 - glow_amount);
+	glow += mix(n64_fog_color.rgb, vec3(1.0), 0.5) * max(rip, 0.0) * 0.3;
+	albedo *= 1.0 + min(rip, 0.0) * 0.2;
 	float alpha = opacity;
 	if (reflect_on) {
 		// Mirror image is left-right flipped (see N64Water); the waves wobble it.

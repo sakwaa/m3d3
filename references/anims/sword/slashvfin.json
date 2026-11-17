@@ -1,7 +1,7 @@
 {
  "name": "SlashVFin",
  "fps": 30,
- "length": 22,
+ "length": 30,
  "loop": false,
  "root": "auto",
  "source": "OoT remake front view 64WRm0sZn0E (60 fps) + MM3D Swordsman's School AXzZe1vsjxk, read by eye",
@@ -9,19 +9,19 @@
  "windows": {
   "windup": [
    0,
-   3
+   8
   ],
   "active": [
-   4,
-   11
+   8,
+   13
   ],
   "cancel": [
    15,
-   22
+   30
   ],
   "opening": [
-   16,
-   22
+   17,
+   30
   ]
  },
  "keys": [
@@ -98,6 +98,44 @@
     15
    ],
    "thigh_L": [
+    26,
+    6
+   ],
+   "shin_L": -16,
+   "thigh_R": [
+    -6,
+    6
+   ],
+   "shin_R": -38,
+   "upper_arm_R": [
+    20,
+    -50
+   ],
+   "forearm_R": [
+    35,
+    -70
+   ],
+   "lean": 8,
+   "twist": -46.0,
+   "hip_twist": -23.0,
+   "lift": -0.04,
+   "blade_R": [
+    -15,
+    -60
+   ],
+   "frame": 6,
+   "ease": "smooth"
+  },
+  {
+   "upper_arm_L": [
+    5,
+    25
+   ],
+   "forearm_L": [
+    40,
+    15
+   ],
+   "thigh_L": [
     36,
     14
    ],
@@ -122,8 +160,8 @@
     205,
     0
    ],
-   "frame": 7,
-   "ease": "smooth"
+   "frame": 9,
+   "ease": "snap"
   },
   {
    "upper_arm_L": [
@@ -152,17 +190,56 @@
     45,
     50
    ],
-   "lean": 24,
-   "twist": 40,
-   "hip_twist": 20,
-   "hip_roll": -8,
+   "lean": 28,
+   "twist": 46.0,
+   "hip_twist": 23.0,
+   "hip_roll": -9.2,
    "lift": -0.04,
    "blade_R": [
     35,
     60
    ],
-   "frame": 11,
+   "frame": 12,
    "ease": "ease_out"
+  },
+  {
+   "upper_arm_L": [
+    5,
+    25
+   ],
+   "forearm_L": [
+    40,
+    15
+   ],
+   "thigh_L": [
+    36,
+    14
+   ],
+   "shin_L": -4,
+   "thigh_R": [
+    -26,
+    10
+   ],
+   "shin_R": -20,
+   "upper_arm_R": [
+    55,
+    45
+   ],
+   "forearm_R": [
+    45,
+    50
+   ],
+   "lean": 26,
+   "twist": 42.3,
+   "hip_twist": 21.2,
+   "hip_roll": -8.5,
+   "lift": -0.04,
+   "blade_R": [
+    35,
+    60
+   ],
+   "frame": 17,
+   "ease": "smooth"
   },
   {
    "upper_arm_L": [
@@ -192,7 +269,7 @@
     165,
     -40
    ],
-   "frame": 16,
+   "frame": 22,
    "ease": "smooth"
   },
   {
@@ -217,7 +294,7 @@
     10
    ],
    "lean": 6,
-   "frame": 22,
+   "frame": 30,
    "ease": "smooth"
   }
  ]

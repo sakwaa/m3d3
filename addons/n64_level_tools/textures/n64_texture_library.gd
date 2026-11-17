@@ -57,7 +57,7 @@ static func import_image(source_file: String, settings: Dictionary, source: Imag
 	tex.source_aspect = float(source.get_width()) / source.get_height()
 	if settings.get("object", 0) != N64ObjectExtract.Kind.NONE:
 		tex.source_aspect = settings.get("object_aspect", tex.source_aspect)
-	tex.set_image(with_mipmaps(result.image))
+	tex.set_image(result.mips if result.has("mips") else with_mipmaps(result.image))
 
 	var path := texture_path(settings)
 	DirAccess.make_dir_recursive_absolute(path.get_base_dir())

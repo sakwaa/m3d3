@@ -13,8 +13,10 @@ extends Resource
 ##  - LUT: any colour grade from a lookup table (`lut`): a strip (N slices of N x N side by
 ##    side; game/looks/lut_neutral_16.png is the untouched one to grade in an image editor
 ##    together with a screenshot), a HaldCLUT image, or an imported .cube file (LutFile).
+##  - Combiner: a ScreenCombiner (the RDP's (A - B) * C + D over the picture: bloom, peaking,
+##    wrapped colours, static); its own pass, up to two at once.
 
-enum Mode { GRADIENT, PALETTE, LUT }
+enum Mode { GRADIENT, PALETTE, LUT, COMBINER }
 
 const MAX_COLOURS := 64
 
@@ -54,11 +56,16 @@ const MAX_COLOURS := 64
 	set(v):
 		lut = v
 		emit_changed()
+## Combiner: the combiner shown.
+@export var combiner: ScreenCombiner:
+	set(v):
+		combiner = v
+		emit_changed()
 
 
 func _validate_property(property: Dictionary) -> void:
 	var by_mode := {gradient = Mode.GRADIENT, palette = Mode.PALETTE, palette_image = Mode.PALETTE,
-		palette_dither = Mode.PALETTE, lut = Mode.LUT}
+		palette_dither = Mode.PALETTE, lut = Mode.LUT, combiner = Mode.COMBINER}
 	if by_mode.has(property.name) and by_mode[property.name] != mode:
 		property.usage = PROPERTY_USAGE_NO_EDITOR
 

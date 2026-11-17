@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://c300ukdyn2wog"
+path="res://.godot/imported/n64_video_combine.glsl-8bc99107933aec33dea735924d39ea7f.res"
+
+[deps]
+
+source_file="res://addons/n64_runtime/post/n64_video_combine.glsl"
+dest_files=["res://.godot/imported/n64_video_combine.glsl-8bc99107933aec33dea735924d39ea7f.res"]
+
+[params]
+

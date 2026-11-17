@@ -177,6 +177,7 @@ func _rebuild() -> void:
 	_fade.box_max = Vector3(width * 0.5 + fade_margin, height + fade_margin, fade_lead)
 	_fade.opening = Vector4(-width * 0.5, width * 0.5, -fade_margin, height)
 	_fade.opening_arch = arch_params(width, height, top, arch_rise)
+	_fade.edge_soft = fade_margin
 	# The box includes the lead-in; the gradient starts at its front edge when fade_start is 0.
 	var span := fade_lead + depth
 	_fade.fade_start = 0.0 if fade_start <= 0.0 else (fade_lead + fade_start * depth) / span

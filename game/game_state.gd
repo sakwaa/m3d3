@@ -12,6 +12,7 @@ signal weather_changed(id: StringName)
 signal item_changed(id: StringName, count: int)
 signal equipped_changed(id: StringName)
 
+const INTERPOLATION_SETTING := "n64/render/physics_interpolation"
 const SAVE_PATH := "user://save_%d.json"
 const SAVE_VERSION := 1
 const WEEK_DAYS := 5
@@ -60,6 +61,12 @@ var weather_now := {}
 
 
 func _ready() -> void:
+	# Physics interpolation: gameplay ticks at a fixed 60 Hz (movement, state machines,
+	# combat), the screen draws in between at the display's own rate with positions blended
+	# between ticks (smooth at 144 Hz etc.). Things placed per frame (the camera, shadows,
+	# UI marks) read get_global_transform_interpolated(); teleports call
+	# reset_physics_interpolation(). Project setting n64/render/physics_interpolation.
+	get_tree().physics_interpolation = bool(ProjectSettings.get_setting(INTERPOLATION_SETTING, true))
 	lighting_schedule = LightingSchedule.load_project()
 	weather_table = WeatherTable.load_project()
 	story = StoryDatabase.load_project()

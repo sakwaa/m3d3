@@ -103,7 +103,7 @@ func _process(delta: float) -> void:
 		for l in get_tree().root.find_children("*", "Light3D", true, false):
 			if l is DirectionalLight3D or l is OmniLight3D:
 				_lights.append(l)
-	var center := caster.global_position + Vector3.UP * _half_height
+	var center := caster.get_global_transform_interpolated().origin + Vector3.UP * _half_height
 	var ground_fade := 1.0 - clampf(_height_above_ground(center) / maxf(fade_height, 0.01), 0.0, 1.0)
 
 	# Candidates: [direction light travels, weight].

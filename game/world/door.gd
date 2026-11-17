@@ -201,6 +201,7 @@ func play_arrival(player: Node3D) -> void:
 	_update_label()
 	player.set_controlled(false)
 	player.global_position = to_global(Vector3(0, 0, -0.3))
+	player.reset_physics_interpolation()
 	player.face(global_basis.z)
 	_dark.visible = dark_behind
 	_set_open(-1.0)

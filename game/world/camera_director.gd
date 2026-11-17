@@ -14,6 +14,11 @@ extends Node
 ## swings behind the player's facing and holds (Parallel1). Letting go hands back to the
 ## orbit from wherever the view is.
 ##
+## Physics interpolation: the player and targets move on 60 Hz ticks and are drawn blended
+## between them; the view is placed every frame from their interpolated positions (`_lag`:
+## how far the drawn player is from its tick position), or it would step at 60 Hz while the
+## player glides (judder on 144 Hz screens).
+##
 ## Movement after a camera cut: while the stick stays held, input keeps the direction it
 ## had before the cut (so the player doesn't suddenly turn); releasing it re-maps to the
 ## new view, like OoT.
@@ -34,6 +39,17 @@ const Z_DATA := {
 	Z.FOLLOW: {at = 29.4, near = 180.0, far = 200.0, off_near = 42.0, off_far = 22.0, pitch_near = -5.0, pitch_far = 10.0,
 		fov_near = 45.0, fov_far = 45.0, clamp = 70.0},
 }
+## Aiming (AimState; TOTK, references/aiming/totk_aim_reference.md): the eye this far back
+## from the head, up and to the bow-hand side (m, in the aim's frame: for TOTK's left-handed
+## Link, him lower-left and the reticle over his right shoulder; mirrored for a right-handed
+## archer), the camera near the arrow's line; and the blend in / out.
+## (TOTK ~2.5 m at its ~50° FOV; the same framing at our 60° is ~2.1 m.)
+const AIM_HEAD := 1.45
+const AIM_BACK := 2.1
+const AIM_RIGHT := 0.25
+const AIM_UP := 0.28
+const AIM_IN := 0.2
+const AIM_OUT := 0.15
 ## Seconds: blending into a lock (7 frames), Parallel's swing behind (6 frames).
 const Z_ENTRY := 0.35
 const Z_SWING := 0.3
@@ -65,6 +81,13 @@ var _z_dist := 6.0
 var _z_t := 1.0  # entry blend / Parallel swing, 0..1
 var _z_from := Transform3D()
 var _z_swing_from := 0.0
+var _lag := Vector3.ZERO
+var _aiming := false
+
+
+## The see-through capsule: aimed this high on the player, this wide (metres).
+const SEE_THROUGH_HEIGHT := 1.0
+const SEE_THROUGH_RADIUS := 0.6
 
 
 func _init(p_player: Actor, p_yaw: Node3D, p_pitch: Node3D, p_arm: SpringArm3D, p_orbit: Camera3D, p_view: Camera3D) -> void:
@@ -86,19 +109,51 @@ func _ready() -> void:
 	_from = view.global_transform
 
 
+## The player is aiming (AimState): the aim camera has the view.
+func aiming() -> bool:
+	return player.has_tag(&"aiming")
+
+
+## Pitch range for mouse / stick (rig pitch: - looks down).
+func pitch_limits() -> Vector2:
+	return Vector2(-1.0, 1.0) if aiming() else Vector2(-1.2, 0.4)
+
+
+## The aim camera: behind the head along the rig's yaw and pitch, offset up and right,
+## pulled in off walls (from the player's drawn position).
+func aim_xf() -> Transform3D:
+	var head := _ip(player) + Vector3.UP * AIM_HEAD
+	var b := Basis.from_euler(Vector3(pitch.rotation.x, yaw.global_rotation.y, 0.0))
+	# (Over the bow shoulder side, mirrored for the archer's hand: TOTK's left-handed Link has
+	# the camera to his right; our right-handed archer has it to his left.)
+	var rig = player.get(&"aim_rig")
+	var hand := 1.0 if rig and rig.left_handed else -1.0
+	var pivot := head + b * Vector3(AIM_RIGHT * hand, AIM_UP, 0.0)
+	var eye := pivot + b * Vector3(0.0, 0.0, AIM_BACK)
+	var hit := _cam_ray(pivot, eye)
+	if not hit.is_empty():
+		eye = (hit.position as Vector3) - b.z * 0.2
+	return Transform3D(b, eye)
+
+
 ## Free mouse turning (yaw) applies.
 func allows_turn() -> bool:
+	if aiming():
+		return true
 	return active == null or (active.mode == CameraZone.Mode.FOLLOW and not active.lock_turn)
 
 
 ## Free mouse pitch applies.
 func allows_pitch() -> bool:
-	return active == null
+	return active == null or aiming()
 
 
 ## Basis movement input is relative to (only its yaw matters). `moving`: the stick is held.
 ## Z-targeting, the player's facing (towards the target: sideways circles it, MM).
 func input_basis(moving: bool) -> Basis:
+	if aiming():
+		_held_basis = null
+		return yaw.global_basis
 	if _z != Z.NONE:
 		_held_basis = null
 		return Basis(Vector3.UP, atan2(-player.facing.x, -player.facing.z))
@@ -128,9 +183,38 @@ func resume(blend := 0.6) -> void:
 	_blend_time = blend
 
 
+## Where `n` is drawn this frame (between physics ticks).
+static func _ip(n: Node3D) -> Vector3:
+	return n.get_global_transform_interpolated().origin
+
+
 func _process(delta: float) -> void:
+	# Pixels between the lens and the player (and right in front of the lens) dither out
+	# (n64_see_through: level and prop shaders); off while a cutscene holds the camera.
+	RenderingServer.global_shader_parameter_set(&"n64_see_through",
+		Vector4(0, 0, 0, 0) if override else Vector4(_ip(player).x, _ip(player).y + SEE_THROUGH_HEIGHT, _ip(player).z, SEE_THROUGH_RADIUS))
 	if override:
 		return
+	_lag = _ip(player) - player.global_position
+	if aiming():
+		if not _aiming:
+			_aiming = true
+			_from = view.global_transform
+			_blend = 0.0
+			_blend_time = AIM_IN
+			_z = Z.NONE
+			_z_target = null
+		_blend = minf(_blend + delta / _blend_time, 1.0)
+		var axf := aim_xf()
+		view.global_transform = _from.interpolate_with(axf, smoothstep(0.0, 1.0, _blend)) if _blend < 1.0 else axf
+		view.fov = lerpf(view.fov, _base_fov, clampf(6.0 * delta, 0.0, 1.0))
+		return
+	if _aiming:
+		# Back to the orbit (it kept the aim's yaw), from where the view is.
+		_aiming = false
+		_from = view.global_transform
+		_blend = 0.0
+		_blend_time = AIM_OUT
 	if player.is_on_floor() and not player.has_tag(&"climbing"):
 		_floor_id = Surface.camera_id(player.floor_surface)
 	var zone := _pick()
@@ -157,8 +241,9 @@ func _process(delta: float) -> void:
 			if active.lock_turn and Vector2(player.velocity.x, player.velocity.z).length() > 0.5:
 				yaw.rotation.y = lerp_angle(yaw.rotation.y, atan2(-player.facing.x, -player.facing.z), clampf(2.5 * delta, 0.0, 1.0))
 		target = orbit.global_transform
+		target.origin += _lag
 	else:
-		target = active.shot(yaw.global_position, yaw.global_rotation.y)
+		target = active.shot(yaw.global_position + _lag, yaw.global_rotation.y)
 	var want_fov := active.fov if active and active.fov > 0.0 else _base_fov
 	view.fov = lerpf(view.fov, want_fov, k)
 	_blend = minf(_blend + delta / maxf(_blend_time, 0.001), 1.0)
@@ -211,13 +296,13 @@ func _z_update(delta: float) -> bool:
 		var was := _z
 		_z = mode
 		_z_target = tgt
-		var off := view.global_position - player.global_position
+		var off := view.global_position - _ip(player)
 		if mode == Z.NONE:
 			# Back to the orbit from where the view is: the rig takes the view's yaw, pitch and
 			# distance (then eases to its own), and the view blends onto it.
 			yaw.global_rotation.y = _view_yaw_basis().get_euler().y
 			pitch.rotation.x = clampf(-asin(clampf(off.normalized().y, -1.0, 1.0)), -1.2, 0.4)
-			arm.spring_length = clampf(view.global_position.distance_to(yaw.global_position), 1.0, maxf(_z_dist, 1.0))
+			arm.spring_length = clampf(view.global_position.distance_to(yaw.global_position + _lag), 1.0, maxf(_z_dist, 1.0))
 			_from = view.global_transform
 			_blend = 0.0
 			_blend_time = 0.5
@@ -233,7 +318,7 @@ func _z_update(delta: float) -> bool:
 			_z_yaw = _behind_line(tgt)  # entry: straight behind the player on the line to it
 	if mode == Z.NONE:
 		return false
-	var p := player.global_position
+	var p := _ip(player)
 	var at: Vector3
 	var fov: float
 	if mode == Z.PARALLEL:
@@ -249,7 +334,7 @@ func _z_update(delta: float) -> bool:
 		fov = 45.0
 	else:
 		var d: Dictionary = Z_DATA[mode]
-		var r := p.distance_to(tgt.origin())
+		var r := p.distance_to(tgt.origin() + (_ip(tgt) - tgt.global_position))
 		var reach := minf(tgt.release_range(), 800.0 * U)
 		var ratio := clampf(r / maxf(reach, 0.01), 0.0, 1.0)
 		at = p + Vector3.UP * float(d.at) * U
@@ -261,7 +346,7 @@ func _z_update(delta: float) -> bool:
 		else:
 			var ru := r / U
 			lean = (0.9 * ru - 0.7 * ru * ru / 200.0 if ru <= 200.0 else 40.0) * U
-		var to := tgt.global_position - at
+		var to := _ip(tgt) - at
 		if to.length() > 0.01:
 			at += to.normalized() * clampf(lean, 0.0, to.length())
 		_z_dist = lerpf(_z_dist, lerpf(d.near, d.far, ratio) * U, _rate(0.5, delta))
@@ -296,7 +381,7 @@ func _z_update(delta: float) -> bool:
 
 ## The camera direction (look-at point to eye) straight behind the player on the line to `t`.
 func _behind_line(t: Targetable) -> float:
-	var to := t.global_position - player.global_position
+	var to := _ip(t) - _ip(player)
 	return atan2(-to.x, -to.z)
 
 

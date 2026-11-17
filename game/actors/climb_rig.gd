@@ -15,6 +15,7 @@ extends SkeletonModifier3D
 ##   leap: arms reach the way of the leap, then for the hold it lands on.
 ##   ladder: hands and feet on the rungs the climb state picks (pose.targets, world),
 ##     arcs between rungs included; nothing stepped here.
+##   push: hands flat on a push block's face (pose.targets); the legs keep the animation.
 ## Changing state, the limbs go from the old state's pose to the new one over mode_blend.
 
 ## Blend, step timing, lift, reach, head look and every state's limb spots: ClimbTuning
@@ -230,7 +231,7 @@ func _ideals(pose: Dictionary, o: Vector3) -> Array[Vector3]:
 				else:
 					go = smoothstep(t.beat_press - 0.12, 0.95, p)  # (leaves the wall as the hips come over)
 					out[FOOT_L] = _curve(wall, over, stand, go)
-		&"ladder":
+		&"ladder", &"push":
 			var spots: Array = pose.targets
 			for i in 4:
 				out[i] = spots[i]
@@ -268,6 +269,8 @@ func _wants(pose: Dictionary) -> Array[bool]:
 			return [p < 0.8, p < 0.8, true, true]
 		&"leap", &"ladder":
 			return [true, true, true, true]
+		&"push":
+			return [true, true, false, false]  # (the legs walk with the animation)
 	return [false, false, false, false]
 
 
@@ -411,7 +414,7 @@ func _orient_hand(sk: Skeleton3D, limb: int, bone: int, pose: Dictionary, to_sk:
 	var palm: Vector3
 	var fingers: Vector3
 	match pose.mode:
-		&"wall", &"ladder":
+		&"wall", &"ladder", &"push":
 			palm = -n
 			fingers = ClimbState.up_of(n)
 		&"ledge", &"pull":
@@ -505,7 +508,7 @@ func _look(sk: Skeleton3D, pose: Dictionary, delta: float) -> void:
 			target = (_plant[HAND_L] + _plant[HAND_R]) * 0.5 + actor.facing * 0.6
 		&"leap":
 			target = o + Vector3.UP * 1.6 + (pose.dir as Vector3) * 2.0
-		&"ladder":
+		&"ladder", &"push":
 			target = pose.look
 	for i in [HAND_L, HAND_R]:
 		if _moving[i]:

@@ -301,6 +301,8 @@ static func add_far(by_cell: Dictionary, sources: Array[Dictionary], data: Level
 					for s in 4:
 						var arr: PackedColorArray = poly.key_colors[s] if s < poly.key_colors.size() else PackedColorArray()
 						kc.append(arr[k] if arr.size() == poly.ids.size() else Color.WHITE)
+					# (key 0's alpha: the brush's coverage ID, as LevelBaker writes it)
+					kc[0] = Color(kc[0], (float(int(src.brush_index) % 7) + 1.0) / 255.0)
 					var cc: PackedColorArray = poly.corner_colors
 					corner[poly.ids[k]] = [cc[k] if cc.size() == poly.ids.size() else Color.WHITE, kc]
 			var merged := BrushOps.merge_coplanar(src.verts, faces, compat)

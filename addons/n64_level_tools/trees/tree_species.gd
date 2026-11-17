@@ -18,6 +18,14 @@ enum Cards {
 	SPRAYS,  ## flat cards along the branch (firs)
 	HANGING,  ## long cards hanging straight down (weeping willow)
 }
+## How the crown is built (CLUMPS species; the others always use cards). Solid foliage is
+## opaque, so the depth test spares what's behind it: canopies cost ~1-2 layers of fill
+## instead of 10-30 stacked cut-out cards.
+enum Foliage {
+	CARDS,  ## every clump as crossed cut-out cards (see-through, ragged)
+	SHELL,  ## one solid low-poly crown, cut-out cards only round its edge (OoT / MM)
+	BLOBS,  ## a solid low-poly blob per group of clumps, cut-out cards on the outer ones
+}
 
 @export var display_name := "Tree"
 @export var latin := ""
@@ -54,6 +62,7 @@ enum Cards {
 @export var levels: Array[TreeLevel] = []
 @export_group("Leaves")
 @export var cards := Cards.CLUMPS
+@export var foliage := Foliage.BLOBS
 @export var leaf_texture: Texture2D
 @export var bark_texture: Texture2D
 ## The whole tree as one cut-out (the far stand-in: the importer's photo, or rendered

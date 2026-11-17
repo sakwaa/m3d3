@@ -13,6 +13,8 @@ signal paint_changed
 signal materials_changed
 ## The scattered cut-outs (flowers, tufts) changed.
 signal scatter_changed
+## Decals were added, removed or edited (LevelDecal).
+signal decals_changed
 ## The grass (mat and tufts) settings changed.
 signal grass_changed
 
@@ -208,6 +210,17 @@ const IDENTITY_BASIS := Vector4(1, 0, 0, 1)
 			if s and not s.changed.is_connected(_on_scatter_changed):
 				s.changed.connect(_on_scatter_changed)
 		scatter_changed.emit()
+## Decals (LevelDecal): images projected onto the surfaces, placed in the Paint screen.
+@export var decals: Array[LevelDecal] = []:
+	set(value):
+		for d in decals:
+			if d and d.changed.is_connected(_on_decal_changed):
+				d.changed.disconnect(_on_decal_changed)
+		decals = value
+		for d in decals:
+			if d and not d.changed.is_connected(_on_decal_changed):
+				d.changed.connect(_on_decal_changed)
+		decals_changed.emit()
 ## Grass: a lumpy mat over the grass-textured ground with tufts in it (GrassSettings;
 ## empty or disabled = none). Rebuilt with the brushes.
 @export var grass: GrassSettings:
@@ -280,6 +293,8 @@ const IDENTITY_BASIS := Vector4(1, 0, 0, 1)
 	set(value):
 		baked_mesh = value
 		bake_changed.emit()
+## The decals as built (DecalBuilder): one mesh, a surface per decal texture.
+@export_storage var baked_decals: ArrayMesh
 ## Big levels: the bake split into cells (baked_mesh is null then), so the camera culls
 ## the ones out of view.
 @export_storage var baked_chunks: Array[ArrayMesh] = []:
@@ -405,6 +420,10 @@ func _on_set_layers_changed() -> void:
 
 func _on_scatter_changed() -> void:
 	scatter_changed.emit()
+
+
+func _on_decal_changed() -> void:
+	decals_changed.emit()
 
 
 func _on_grass_changed() -> void:

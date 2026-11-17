@@ -170,14 +170,20 @@ static func _bake_level(root: LevelRoot, occluders: Array, lights: Array) -> Dic
 	# the build's simplification (BuildSimplify).
 	var result := LevelBaker.bake(data, root.merge_coplanar, true)
 	times.bake = Time.get_ticks_msec() - t
+	# Decals onto the built surfaces (lit as they are now: after lighting and the Grade).
+	t = Time.get_ticks_msec()
+	var decals: ArrayMesh = DecalBuilder.build(root) if not data.decals.is_empty() else null
+	times.decals = Time.get_ticks_msec() - t
 	print("[Build] %s: %s ms%s" % [root.name, times, " (dissolve: %d brushes cached)" % dissolved.cached if dissolved.has("cached") else ""])
 	data.set_block_signals(true)
 	data.baked_mesh = result.mesh
 	data.baked_chunks = result.chunks
+	data.baked_decals = decals
 	data.set_baked_collision(result)
 	data.bake_hash = root.compute_hash()
 	data.set_block_signals(false)
 	result.stats.merge(grade_stats)
+	result.stats.decal_tris = (decals.get_faces().size() / 3) if decals else 0
 	result.stats.dissolve_from = dissolved.get("before", 0)
 	result.stats.dissolve_to = dissolved.get("after", 0)
 	result.stats.hidden_ground_faces = culled.ground

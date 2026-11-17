@@ -1,0 +1,65 @@
+[gd_resource type="Resource" script_class="ActorAnimation" format=3]
+
+[ext_resource type="Script" path="res://addons/n64_actor_tools/actor_animation.gd" id="1_22rls"]
+
+[resource]
+script = ExtResource("1_22rls")
+name = "PushWait"
+fps = 30
+length = 40
+loop = true
+keys = [{
+&"ease": 0,
+&"frame": 0,
+&"pose": {
+&"chest": Quaternion(0, 0, 0, 1),
+&"forearm_L": Quaternion(0.0913696, -1.210677e-09, 0.015079487, 0.99570286),
+&"forearm_R": Quaternion(0.0913696, 1.210677e-09, -0.015079487, 0.99570286),
+&"head": Quaternion(0.034899484, 0, 0, 0.99939084),
+&"neck": Quaternion(0.08715575, 0, 0, 0.9961947),
+&"shin_L": Quaternion(-0.1133005, -4.656613e-10, 0.042538512, 0.99264973),
+&"shin_R": Quaternion(-0.0349317, -5.8207666e-10, -0.04514969, 0.9983694),
+&"spine": Quaternion(-0.15643448, 0, 0, 0.9876884),
+&"thigh_L": Quaternion(0.13065474, 2.7939677e-09, -0.04358472, 0.9904695),
+&"thigh_R": Quaternion(-0.15658729, 4.1909516e-09, 0.04307666, 0.9867243),
+&"upper_arm_L": Quaternion(0.6853947, -2.9802322e-08, 0.14984483, 0.71258736),
+&"upper_arm_R": Quaternion(0.6853947, 2.9802322e-08, -0.14984483, 0.71258736)
+},
+&"root": Vector3(0, -0.0135799125, 0)
+}, {
+&"ease": 0,
+&"frame": 20,
+&"pose": {
+&"chest": Quaternion(0, 0, 0, 1),
+&"forearm_L": Quaternion(0.09123083, 5.2177302e-09, 0.015897179, 0.9957029),
+&"forearm_R": Quaternion(0.09123083, -5.2177302e-09, -0.015897179, 0.9957029),
+&"head": Quaternion(0.03489949, 0, 0, 0.99939084),
+&"neck": Quaternion(0.0958458, 0, 0, 0.9953962),
+&"shin_L": Quaternion(-0.12197324, -1.3969839e-09, 0.04229807, 0.9916317),
+&"shin_R": Quaternion(-0.04365982, -1.8626451e-09, -0.045227233, 0.99802226),
+&"spine": Quaternion(-0.16504766, 0, 0, 0.98628557),
+&"thigh_L": Quaternion(0.13065474, 2.7939677e-09, -0.04358472, 0.9904695),
+&"thigh_R": Quaternion(-0.15658729, 4.1909516e-09, 0.04307666, 0.9867243),
+&"upper_arm_L": Quaternion(0.69019246, 7.4505806e-08, 0.15477955, 0.70687884),
+&"upper_arm_R": Quaternion(0.69019246, -7.4505806e-08, -0.15477955, 0.70687884)
+},
+&"root": Vector3(0, -0.025401734, 0)
+}, {
+&"ease": 0,
+&"frame": 40,
+&"pose": {
+&"chest": Quaternion(0, 0, 0, 1),
+&"forearm_L": Quaternion(0.0913696, -1.210677e-09, 0.015079487, 0.99570286),
+&"forearm_R": Quaternion(0.0913696, 1.210677e-09, -0.015079487, 0.99570286),
+&"head": Quaternion(0.034899484, 0, 0, 0.99939084),
+&"neck": Quaternion(0.08715575, 0, 0, 0.9961947),
+&"shin_L": Quaternion(-0.1133005, -4.656613e-10, 0.042538512, 0.99264973),
+&"shin_R": Quaternion(-0.0349317, -5.8207666e-10, -0.04514969, 0.9983694),
+&"spine": Quaternion(-0.15643448, 0, 0, 0.9876884),
+&"thigh_L": Quaternion(0.13065474, 2.7939677e-09, -0.04358472, 0.9904695),
+&"thigh_R": Quaternion(-0.15658729, 4.1909516e-09, 0.04307666, 0.9867243),
+&"upper_arm_L": Quaternion(0.6853947, -2.9802322e-08, 0.14984483, 0.71258736),
+&"upper_arm_R": Quaternion(0.6853947, 2.9802322e-08, -0.14984483, 0.71258736)
+},
+&"root": Vector3(0, -0.0135799125, 0)
+}]

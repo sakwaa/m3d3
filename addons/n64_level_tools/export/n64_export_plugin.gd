@@ -163,6 +163,14 @@ func _replace_level_root(root: LevelRoot, scene: Node, scene_path: String) -> No
 			mi.layers = root.level_layers()
 			LevelRoot.apply_lod_range(mi, LevelRoot.lod_distance())
 			out.add_child(mi)
+		if data.baked_decals:
+			var dm := MeshInstance3D.new()
+			dm.name = "Decals"
+			dm.mesh = data.baked_decals.duplicate()
+			dm.layers = root.level_layers()
+			dm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			LevelRoot.apply_lod_range(dm, LevelRoot.lod_distance())
+			out.add_child(dm)
 	if data:
 		var c := data.baked_collision_set()
 		for body in Surface.build_bodies(c[0].map(func(shape): return shape.duplicate()), c[1]):

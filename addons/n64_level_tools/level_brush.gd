@@ -548,7 +548,8 @@ static func push_rgba8(bytes: PackedByteArray, c: Color) -> void:
 	bytes.append(clampi(roundi(c.r * 255.0), 0, 255))
 	bytes.append(clampi(roundi(c.g * 255.0), 0, 255))
 	bytes.append(clampi(roundi(c.b * 255.0), 0, 255))
-	bytes.append(255)
+	# (alpha: 255, or in a bake's first key the brush's coverage ID + 1 - LevelBaker)
+	bytes.append(clampi(roundi(c.a * 255.0), 0, 255))
 
 
 func get_face_start(face: int) -> int:
@@ -1901,6 +1902,10 @@ func build_painted_mesh(atlas: Dictionary, brush_index: int, timed := false, bak
 					c = shade.call(c, light[corner] if light_ok else Color.WHITE, c.a, color_scale)
 				elif baked and light_ok:
 					c *= light[corner]
+				if keyed:
+					# The brush's coverage ID in key 0's alpha (index mod 7, + 1), as LevelBaker
+					# writes it: the coverage AA counts one brush's triangles as one surface.
+					kb[0][w * 4 + 3] = brush_index % 7 + 1
 				col[w] = Color(clampf(c.r * inv_scale, 0.0, 1.0), clampf(c.g * inv_scale, 0.0, 1.0), clampf(c.b * inv_scale, 0.0, 1.0), c.a)
 				var planar := PolyUtil.planar_uv(p, n)
 				var base_uv := slope_uv(p + anchor, n) if on_slope else PolyUtil.planar_uv(p + anchor, n)

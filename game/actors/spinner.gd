@@ -5,6 +5,7 @@ extends MeshInstance3D
 
 
 func _ready() -> void:
+	physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF  # (turned every frame)
 	var prism := PrismMesh.new()
 	prism.size = Vector3(0.5, 0.8, 0.5)
 	mesh = prism

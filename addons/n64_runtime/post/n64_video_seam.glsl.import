@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://dyvjfre8s8mn0"
+path="res://.godot/imported/n64_video_seam.glsl-1dc0ec3536ff4328c3fc81ddfec18515.res"
+
+[deps]
+
+source_file="res://addons/n64_runtime/post/n64_video_seam.glsl"
+dest_files=["res://.godot/imported/n64_video_seam.glsl-1dc0ec3536ff4328c3fc81ddfec18515.res"]
+
+[params]
+

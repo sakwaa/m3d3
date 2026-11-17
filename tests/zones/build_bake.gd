@@ -33,6 +33,11 @@ func _ready() -> void:
 		# LEVEL_IN=path.res: the zone's level data swapped for another (a test copy).
 		var lr: Node = scene.find_children("*", "Node3D", true, false).filter(func(n): return n is LevelRoot)[0]
 		lr.set(&"data", ResourceLoader.load(OS.get_environment("LEVEL_IN"), "", ResourceLoader.CACHE_MODE_IGNORE))
+	if OS.get_environment("GRADE_VARIANT") != "":
+		# GRADE_VARIANT=saved|ok|ramps: the zone's grade as tests/zones/colour_compare.gd varies it.
+		var lr: Node = scene.find_children("*", "Node3D", true, false).filter(func(n): return n is LevelRoot)[0]
+		var d: LevelData = lr.get(&"data")
+		d.grade = preload("res://tests/zones/colour_compare.gd").variant_grade(d.grade as ZoneGrade, OS.get_environment("GRADE_VARIANT"))
 	if OS.get_environment("LIGHT_GRID") != "":
 		# LIGHT_GRID=metres: the build's lighting grid (0 = the edited geometry, no extra cuts).
 		ProjectSettings.set_setting(ExportBake.LIGHT_GRID, float(OS.get_environment("LIGHT_GRID")))

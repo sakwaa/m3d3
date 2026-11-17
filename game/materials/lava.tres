@@ -1,0 +1,23 @@
+[gd_resource type="ShaderMaterial" format=3]
+
+[ext_resource type="Shader" path="res://addons/n64_runtime/shaders/n64_water.gdshader" id="1_lava"]
+[ext_resource type="Texture2D" path="res://textures/water/water_ripple.res" id="2_lava"]
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_lava")
+shader_parameter/water_texture = ExtResource("2_lava")
+shader_parameter/shallow_color = Color(1, 0.72, 0.22, 1)
+shader_parameter/deep_color = Color(0.45, 0.05, 0.02, 1)
+shader_parameter/opacity = 1.0
+shader_parameter/tile_size = 3.0
+shader_parameter/scroll_a = Vector2(0.05, 0.02)
+shader_parameter/scroll_b = Vector2(-0.03, 0.04)
+shader_parameter/layer_b_scale = 0.71
+shader_parameter/combine = 2
+shader_parameter/glow_amount = 0.9
+shader_parameter/wave_height = 0.02
+shader_parameter/wave_speed = 0.4
+shader_parameter/shine_strength = 0.0
+shader_parameter/hilite_strength = 0.0
+shader_parameter/wobble_on = false

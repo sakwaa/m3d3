@@ -1,8 +1,40 @@
+// Affine shading (N64): vertex colours, baked light and fog interpolated in screen space,
+// not perspective-corrected (textures still are, as on the N64). `varying N64_SHADE vec3 x;`
+// - noperspective on our patched Godot (engine/patches/0003), plain varyings elsewhere.
+#if defined(M3D3_NOPERSPECTIVE)
+#define N64_SHADE noperspective
+#else
+#define N64_SHADE
+#endif
+
+// Display-space mixing (N64_GAMMA_MIX 1): the N64 filtered textures, shaded between vertices
+// and blended fog on its display values (no linear light); Godot mixes in linear, which turns
+// every in-between colour lighter and greyer (fog reads heavier, filtered texels paler). With
+// it on, those mixes happen on display values (gamma 2.2) here.
+#define N64_GAMMA_MIX 0
+vec3 n64_enc(vec3 c) {
+	return pow(max(c, vec3(0.0)), vec3(1.0 / 2.2));
+}
+vec3 n64_dec(vec3 c) {
+	return pow(max(c, vec3(0.0)), vec3(2.2));
+}
+vec4 n64_enc4(vec4 c) {
+	return vec4(n64_enc(c.rgb), c.a);
+}
+vec4 n64_dec4(vec4 c) {
+	return vec4(n64_dec(c.rgb), c.a);
+}
+
 // Shared N64-style texture sampling. `n64_three_point` is a project-wide shader global
 // (Project Settings > Shader Globals), toggled from the level tools' Paint panel.
 // Textures are expected to carry Godot-generated mipmaps (N64Texture adds them); use
 // filter_nearest_mipmap samplers.
 global uniform bool n64_three_point;
+// Mip choice shape (project setting): x = bias in levels (negative: sharper), y = how far
+// from the RDP's rule (0: the largest texel step) towards the footprint's area (1) - a cheap
+// anisotropy: a roof seen at a slant keeps the detail along it instead of dropping to the
+// level its steep axis needs.
+global uniform vec2 n64_lod_shape;
 // World colour multiplier for baked vertex lighting (time of day). Set by DayNightSun.
 global uniform vec4 n64_world_tint;
 // Time-of-day lighting keys: x = slot a, y = slot b, z = weight of b (set by GameState).
@@ -228,15 +260,34 @@ vec4 n64_fog_out(vec2 v, vec3 tint_v, vec3 view_pos, mat4 inv_view) {
 	return vec4(c, a);
 }
 
-// Mip level from screen-space derivatives (texels per pixel). Computed by hand rather than
-// textureQueryLod so it also works on the Compatibility renderer.
+// Mip level as the RDP chose it (angrylion's tclod): the largest single texel step per
+// pixel (max of |ds/dx|, |dt/dx|, |ds/dy|, |dt/dy| - not the diagonal length), the level its
+// power of two, and the blend to the next level linear within that octave (lod / 2^level - 1),
+// not logarithmic. Computed by hand so it also works on the Compatibility renderer.
 float n64_lod_grad(sampler2D t, vec2 duv_dx, vec2 duv_dy) {
 	vec2 size = vec2(textureSize(t, 0));
-	vec2 dx = duv_dx * size;
-	vec2 dy = duv_dy * size;
-	float rho = max(dot(dx, dx), dot(dy, dy));
+	vec2 dx = abs(duv_dx * size);
+	vec2 dy = abs(duv_dy * size);
+	float lx = max(dx.x, dx.y);
+	float ly = max(dy.x, dy.y);
+	float rho = max(lx, ly);
+	if (n64_lod_shape.y > 0.0) {
+		// Slant rule: towards the footprint's area (the geometric mean of its two true
+		// lengths). It depends only on how much texture a pixel covers, not on how the
+		// texture's axes line up with the screen's - per-axis steps made the level shift as
+		// the camera tilted, and mid-distance textures seemed to turn.
+		vec2 ex = duv_dx * size;
+		vec2 ey = duv_dy * size;
+		rho = mix(rho, sqrt(abs(ex.x * ey.y - ex.y * ey.x)), clamp(n64_lod_shape.y, 0.0, 1.0));
+	}
+	rho *= exp2(n64_lod_shape.x);
 	float max_level = floor(log2(max(size.x, size.y)));
-	return clamp(0.5 * log2(max(rho, 1e-8)), 0.0, max_level);
+	if (rho <= 1.0) {
+		return 0.0;
+	}
+	float level = floor(log2(rho));
+	float frac = rho / exp2(level) - 1.0;
+	return clamp(level + frac, 0.0, max_level);
 }
 
 float n64_lod(sampler2D t, vec2 uv) {
@@ -255,10 +306,16 @@ vec4 n64_sample_level(sampler2D t, vec2 uv, int level) {
 	vec4 b = textureLod(t, (i + vec2(1.5, 0.5)) / size, l);
 	vec4 c = textureLod(t, (i + vec2(0.5, 1.5)) / size, l);
 	vec4 d = textureLod(t, (i + vec2(1.5)) / size, l);
+#if N64_GAMMA_MIX
+	a = n64_enc4(a); b = n64_enc4(b); c = n64_enc4(c); d = n64_enc4(d);
+	vec4 r = f.x + f.y <= 1.0 ? a + f.x * (b - a) + f.y * (c - a) : d + (1.0 - f.x) * (c - d) + (1.0 - f.y) * (b - d);
+	return n64_dec4(r);
+#else
 	if (f.x + f.y <= 1.0) {
 		return a + f.x * (b - a) + f.y * (c - a);
 	}
 	return d + (1.0 - f.x) * (c - d) + (1.0 - f.y) * (b - d);
+#endif
 }
 
 // 3-point with "brilinear" mip blending: pixels near a mip level read only that level (4
@@ -276,7 +333,11 @@ vec4 n64_sample_at_lod(sampler2D t, vec2 uv, float lod) {
 	if (blend >= 1.0) {
 		return n64_sample_level(t, uv, l0 + 1);
 	}
+#if N64_GAMMA_MIX
+	return n64_dec4(mix(n64_enc4(n64_sample_level(t, uv, l0)), n64_enc4(n64_sample_level(t, uv, l0 + 1)), blend));
+#else
 	return mix(n64_sample_level(t, uv, l0), n64_sample_level(t, uv, l0 + 1), blend);
+#endif
 }
 
 vec4 n64_sample(sampler2D t, vec2 uv) {
@@ -427,4 +488,261 @@ vec4 n64_texture_frame(sampler2D t, vec2 uv, vec4 flip, float time) {
 	}
 	float lod = min(n64_lod_grad(t, dx, dy), max(log2(min(cell_px.x, cell_px.y)) - 2.0, 0.0));
 	return n64_sample_at_lod(t, u, lod);
+}
+
+
+// --- Subpixel snap (the RDP's 10.2 fixed-point screen coordinates) ---------------------
+// Screen positions land on a quarter-pixel grid of the render size: faint shimmer on far,
+// thin geometry at low line counts, invisible at high ones. End vertex() with
+// N64_SNAP_MODEL (VERTEX in model space) or N64_SNAP_VIEW (skip_vertex_transform).
+// Screen distortion (ScreenDistortion: OoT / MM's hot rooms, water, warps): a 2 x 2 on the
+// picture, columns (x, y) and (z, w); identity (1, 0, 0, 1) when off.
+global uniform vec4 n64_distort;
+vec4 n64_snap(vec4 clip, vec2 viewport) {
+	clip.xy = mat2(n64_distort.xy, n64_distort.zw) * clip.xy;
+	if (clip.w <= 0.0) {
+		return clip;
+	}
+	vec2 px = (clip.xy / clip.w * 0.5 + 0.5) * viewport;
+	px = round(px * 4.0) / 4.0;
+	clip.xy = ((px / viewport) * 2.0 - 1.0) * clip.w;
+	return clip;
+}
+#define N64_SNAP_MODEL POSITION = n64_snap(PROJECTION_MATRIX * (MODELVIEW_MATRIX * vec4(VERTEX, 1.0)), VIEWPORT_SIZE)
+#define N64_SNAP_VIEW POSITION = n64_snap(PROJECTION_MATRIX * vec4(VERTEX, 1.0), VIEWPORT_SIZE)
+
+// --- Tile wrap modes (the RDP's per-axis clamp / mirror / wrap) --------------------------
+// Each axis of a texture tile wraps (repeats), mirrors (every other repeat flipped: a
+// symmetric texture stored at half size) or clamps (the edge texel stretches on), applied
+// to texel coordinates as the RDP did, so filtering across a mirror seam reads the mirrored
+// neighbour, not the far edge. mode per axis: 0 wrap, 1 mirror, 2 clamp.
+ivec2 n64_wrap_texel(ivec2 i, ivec2 size, ivec2 mode) {
+	ivec2 r;
+	for (int k = 0; k < 2; k++) {
+		int n = size[k];
+		int v = i[k];
+		if (mode[k] == 2) {
+			v = clamp(v, 0, n - 1);
+		} else if (mode[k] == 1) {
+			int m = ((v % (2 * n)) + 2 * n) % (2 * n);
+			v = m >= n ? 2 * n - 1 - m : m;
+		} else {
+			v = ((v % n) + n) % n;
+		}
+		r[k] = v;
+	}
+	return r;
+}
+
+vec4 n64_sample_level_wrap(sampler2D t, vec2 uv, int level, ivec2 mode) {
+	ivec2 size = max(textureSize(t, level), ivec2(1));
+	vec2 p = uv * vec2(size) - 0.5;
+	vec2 f = fract(p);
+	ivec2 i = ivec2(floor(p));
+	vec4 a = texelFetch(t, n64_wrap_texel(i, size, mode), level);
+	if (!n64_three_point) {
+		return texelFetch(t, n64_wrap_texel(ivec2(floor(uv * vec2(size))), size, mode), level);
+	}
+	vec4 b = texelFetch(t, n64_wrap_texel(i + ivec2(1, 0), size, mode), level);
+	vec4 c = texelFetch(t, n64_wrap_texel(i + ivec2(0, 1), size, mode), level);
+	vec4 d = texelFetch(t, n64_wrap_texel(i + ivec2(1, 1), size, mode), level);
+	if (f.x + f.y <= 1.0) {
+		return a + f.x * (b - a) + f.y * (c - a);
+	}
+	return d + (1.0 - f.x) * (c - d) + (1.0 - f.y) * (b - d);
+}
+
+// n64_texture with per-axis wrap modes (all wrap = the usual read).
+vec4 n64_texture_wrap(sampler2D t, vec2 uv, ivec2 mode) {
+	if (mode == ivec2(0)) {
+		return n64_texture(t, uv);
+	}
+	float lod = n64_lod(t, uv);
+	int l0 = int(floor(lod));
+	float blend = clamp((lod - float(l0) - 0.5) / N64_MIP_BAND + 0.5, 0.0, 1.0);
+	if (blend <= 0.0) {
+		return n64_sample_level_wrap(t, uv, l0, mode);
+	}
+	if (blend >= 1.0) {
+		return n64_sample_level_wrap(t, uv, l0 + 1, mode);
+	}
+	return mix(n64_sample_level_wrap(t, uv, l0, mode), n64_sample_level_wrap(t, uv, l0 + 1, mode), blend);
+}
+
+// --- Decal depth (the RDP's ZMODE_DEC) -------------------------------------------------
+// Decals sit exactly on their surface and pass the depth test where the surface is: the
+// view-space position slides `amount` (a fraction of its distance) towards the camera
+// along its own view ray, so it lands on the same pixels and only its depth moves. Holds
+// at any distance, unlike lifting the geometry off the surface.
+#define N64_SNAP_DECAL(amount) POSITION = n64_snap(PROJECTION_MATRIX * vec4((MODELVIEW_MATRIX * vec4(VERTEX, 1.0)).xyz * (1.0 - (amount)), 1.0), VIEWPORT_SIZE)
+
+// --- Dithered alpha (the RDP's alpha compare against dither / noise, G_AC_DITHER) --------
+// A see-through surface drawn solid with pixels dropped: `alpha` against the magic square
+// (ordered, 8 steps) or per-frame noise, as the RDP compared alpha with its dither / random
+// value. Keeps depth and coverage, sorts with nothing, costs nothing (Boos, vanish fades,
+// actors fading out at a distance or in a cutscene). Returns true when the pixel is kept.
+bool n64_alpha_dither(float alpha, vec2 frag, bool noise, float time) {
+	if (alpha >= 1.0) {
+		return true;
+	}
+	float h;
+	if (noise) {
+		h = fract(sin(dot(floor(frag) + floor(time * 60.0) * vec2(0.37, 0.71), vec2(12.9898, 78.233))) * 43758.5453);
+	} else {
+		ivec2 p = ivec2(frag) & ivec2(3);
+		const float m[16] = float[16](0.0, 6.0, 1.0, 7.0, 4.0, 2.0, 5.0, 3.0, 1.0, 7.0, 0.0, 6.0, 5.0, 3.0, 4.0, 2.0);
+		h = (m[p.x + p.y * 4] + 0.5) / 8.0;
+	}
+	return alpha > h;
+}
+
+// --- Palette textures (CI4 / CI8 with a TLUT: N64PaletteTexture) -------------------------
+// `index`: palette indices (R8, index / 255, mip levels re-indexed); `lut`: palettes, a row
+// each (row = the swap this draw uses). Looked up per texel, then filtered, as the RDP did.
+vec4 n64_ci_texel(sampler2D index, sampler2D lut, ivec2 i, ivec2 size, int level, int row, ivec2 mode) {
+	float v = texelFetch(index, n64_wrap_texel(i, size, mode), level).r;
+	return texelFetch(lut, ivec2(int(v * 255.0 + 0.5), row), 0);
+}
+
+vec4 n64_ci_level(sampler2D index, sampler2D lut, vec2 uv, int level, int row, ivec2 mode) {
+	ivec2 size = max(textureSize(index, level), ivec2(1));
+	vec2 p = uv * vec2(size) - 0.5;
+	if (!n64_three_point) {
+		return n64_ci_texel(index, lut, ivec2(floor(uv * vec2(size))), size, level, row, mode);
+	}
+	vec2 f = fract(p);
+	ivec2 i = ivec2(floor(p));
+	vec4 a = n64_ci_texel(index, lut, i, size, level, row, mode);
+	vec4 b = n64_ci_texel(index, lut, i + ivec2(1, 0), size, level, row, mode);
+	vec4 c = n64_ci_texel(index, lut, i + ivec2(0, 1), size, level, row, mode);
+	vec4 d = n64_ci_texel(index, lut, i + ivec2(1, 1), size, level, row, mode);
+	if (f.x + f.y <= 1.0) {
+		return a + f.x * (b - a) + f.y * (c - a);
+	}
+	return d + (1.0 - f.x) * (c - d) + (1.0 - f.y) * (b - d);
+}
+
+vec4 n64_texture_ci(sampler2D index, sampler2D lut, vec2 uv, int row, ivec2 mode) {
+	float lod = n64_lod(index, uv);
+	int l0 = int(floor(lod));
+	float blend = clamp((lod - float(l0) - 0.5) / N64_MIP_BAND + 0.5, 0.0, 1.0);
+	if (blend <= 0.0) {
+		return n64_ci_level(index, lut, uv, l0, row, mode);
+	}
+	if (blend >= 1.0) {
+		return n64_ci_level(index, lut, uv, l0 + 1, row, mode);
+	}
+	return mix(n64_ci_level(index, lut, uv, l0, row, mode), n64_ci_level(index, lut, uv, l0 + 1, row, mode), blend);
+}
+
+// --- Primitive depth (the RDP's G_ZS_PRIM) ------------------------------------------------
+// A sprite drawn at one depth: its centre's (`center`, world), moved `toward` metres
+// towards the camera, so a billboard isn't cut where it passes through a wall or the
+// ground: it's in front or behind as a whole, as OoT's effects were. Position snapped too.
+vec4 n64_prim_depth(vec4 clip, vec3 center, float toward, mat4 view, mat4 proj, vec2 viewport) {
+	vec3 vc = (view * vec4(center, 1.0)).xyz;
+	vc *= max(1.0 - toward / max(length(vc), 1e-3), 0.05);
+	vec4 pc = proj * vec4(vc, 1.0);
+	clip = n64_snap(clip, viewport);
+	if (pc.w > 0.0 && clip.w > 0.0) {
+		clip.z = pc.z / pc.w * clip.w;
+	}
+	return clip;
+}
+
+// --- Detail / sharpen texture LOD (the RDP's magnified modes) -----------------------------
+// Close up, where a texel covers more than a pixel, the RDP could do more than blur:
+//  1 Sharpen: extrapolate away from the next mip level (base + (base - mip 1) x magnification),
+//    so a magnified texture keeps its edges.
+//  2 Detail: a finer texture blended in as you get closer (OoT's Hyrule Field ground), here
+//    multiplied in around its own average so it adds grain, not colour.
+//  3 Hi-res: `detail` is a higher-resolution copy of this same texture (same UVs): close up,
+//    the base is multiplied by how the copy varies around its own blur at the base's
+//    resolution - the base keeps its colour and grade, the copy adds its finer structure.
+// `rho`: texel steps per pixel (below 1 = magnified).
+float n64_texel_step(sampler2D t, vec2 uv) {
+	vec2 size = vec2(textureSize(t, 0));
+	vec2 dx = abs(dFdx(uv) * size);
+	vec2 dy = abs(dFdy(uv) * size);
+	return max(max(dx.x, dx.y), max(dy.x, dy.y));
+}
+
+vec4 n64_lod_detail(vec4 base, sampler2D t, vec2 uv, int mode, sampler2D detail, vec2 detail_uv, float strength) {
+	if (mode == 0 || strength <= 0.0) {
+		return base;
+	}
+	float k = clamp(1.0 - n64_texel_step(t, uv), 0.0, 1.0) * strength;
+	if (k <= 0.0) {
+		return base;
+	}
+	if (mode == 1) {
+		vec4 c1 = n64_sample_level(t, uv, 1);
+		return clamp(base + (base - c1) * k, 0.0, 1.0);
+	}
+	if (mode == 3) {
+		vec2 hs = vec2(textureSize(detail, 0));
+		int lb = clamp(int(round(log2(hs.x / max(float(textureSize(t, 0).x), 1.0)))), 0, 8);
+		// (the copy one level down from its full size - twice the base's resolution for a 4x
+		// copy: finer grain on the base's soft 3-point texels, not a bare high-res photo)
+		vec3 fine = n64_sample_level(detail, detail_uv, max(lb - 1, 0) > 0 ? 1 : 0).rgb;
+		vec3 coarse = max(n64_sample_level(detail, detail_uv, lb).rgb, vec3(0.03));
+		vec3 ratio = clamp(fine / coarse, vec3(0.25), vec3(3.0));
+		return vec4(base.rgb * mix(vec3(1.0), ratio, k), base.a);
+	}
+	vec3 d = n64_texture(detail, detail_uv).rgb;
+	vec3 mean = max(textureLod(detail, vec2(0.5), 16.0).rgb, vec3(0.05));
+	return vec4(base.rgb * mix(vec3(1.0), d / mean, k), base.a);
+}
+
+// --- 8-bit shade (the RSP's vertex colour) ----------------------------------------------
+// Vertex light and colour as the RSP handed them to the RDP: 8 bits a channel in display
+// values, so slow gradients across dark scenes step slightly, as N64 night scenes did.
+// N64_SHADE_BITS 0 = off.
+#define N64_SHADE_BITS 8
+vec3 n64_shade8(vec3 c) {
+#if N64_SHADE_BITS > 0
+	float n = exp2(float(N64_SHADE_BITS)) - 1.0;
+	vec3 s = pow(max(c, vec3(0.0)), vec3(1.0 / 2.2));
+	s = floor(s * n + 0.5) / n;
+	return pow(s, vec3(2.2));
+#else
+	return c;
+#endif
+}
+
+
+// Fog blended on display values, as the RDP's blender did: FOG's amount re-worked so Godot's
+// linear mix lands where the N64's display-space mix would (by luminance), for colour `c`
+// (the surface's colour before fog: ALBEDO + EMISSION). Use: N64_FOG_GAMMA; at the end of
+// fragment(), after FOG and the colours are set.
+vec4 n64_fog_gamma(vec3 c, vec4 fog) {
+#if N64_GAMMA_MIX
+	if (fog.a <= 0.0 || fog.a >= 1.0) {
+		return fog;
+	}
+	const vec3 L = vec3(0.2126, 0.7152, 0.0722);
+	float lc = dot(c, L);
+	float lf = dot(fog.rgb, L);
+	if (abs(lf - lc) < 1e-3) {
+		return fog;
+	}
+	float want = pow(mix(pow(max(lc, 0.0), 1.0 / 2.2), pow(max(lf, 0.0), 1.0 / 2.2), fog.a), 2.2);
+	return vec4(fog.rgb, clamp((want - lc) / (lf - lc), 0.0, 1.0));
+#else
+	return fog;
+#endif
+}
+#define N64_FOG_GAMMA FOG = n64_fog_gamma(ALBEDO + EMISSION, FOG)
+
+
+// Smooth value noise 0..1 (dissolves, effects without a texture).
+float n64_value_noise(vec2 p) {
+	vec2 i = floor(p);
+	vec2 f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	float a = fract(sin(dot(i, vec2(127.1, 311.7))) * 43758.5453);
+	float b = fract(sin(dot(i + vec2(1.0, 0.0), vec2(127.1, 311.7))) * 43758.5453);
+	float c = fract(sin(dot(i + vec2(0.0, 1.0), vec2(127.1, 311.7))) * 43758.5453);
+	float d = fract(sin(dot(i + vec2(1.0, 1.0), vec2(127.1, 311.7))) * 43758.5453);
+	return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
 }

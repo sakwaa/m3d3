@@ -19,7 +19,7 @@ func _ready() -> void:
 	print("piled: %d vertices" % Pile.apply(data))
 	var grass: Texture2D = load(OS.get_environment("GRASS") if OS.get_environment("GRASS") != "" else GRASS)
 	var dirt: Texture2D = load(OS.get_environment("DIRT") if OS.get_environment("DIRT") != "" else DIRT)
-	print("blended: %d faces (%d ms)" % [Blend.apply(data, grass, dirt), Time.get_ticks_msec() - t])
+	print("blended: %d faces (%d ms)" % [Blend.apply(data, [grass], dirt), Time.get_ticks_msec() - t])
 	var res := LevelBaker.bake(data, true)
 	data.baked_mesh = res.mesh
 	data.baked_chunks = res.chunks

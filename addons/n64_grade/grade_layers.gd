@@ -92,6 +92,17 @@ static func build(data: LevelData, edit: ZoneGrade = null) -> Array:
 			n.paint = i + 1
 			ov.children.append(n)
 		out.append(ov)
+	# Decals: images placed on the surfaces (Place decals in their panel).
+	var dn := _node(&"decals", "Decals", "Images placed on the surfaces (posters, cracks, stains, a pattern under a door): projected onto the faces under them, lit like them, baked into the build. Select this to place them.")
+	for i in data.decals.size():
+		var d: LevelDecal = data.decals[i]
+		if d == null:
+			continue
+		var c := _node(&"decal", d.title(), "%.2f × %.2f m · %d° · depth %.2f m. Drag it over the surfaces (Paint off); R / Shift+R turn it, [ ] size it, Delete removes it." % [
+			d.size.x, d.size.y, roundi(d.rotation), d.depth])
+		c.decal = i
+		dn.children.append(c)
+	out.append(dn)
 	# Base textures and their variants (looks), grouped.
 	var bases := {}  # base -> {ids: [], variants: [[id, look]]}
 	for i in data.textures.size():
@@ -202,6 +213,9 @@ static func extra_textures(data: LevelData) -> Dictionary:
 			if l and l.texture:
 				add.call(l.texture, "overlay", _tint_or_none(PaintAtlas.texture_tint(l.texture,
 					PackedColorArray([l.tint_dark, l.tint_light]) if l.override_tint else null)))
+	for d in data.decals:
+		if d and d.texture:
+			add.call(d.texture, "decal", _tint_or_none(PaintAtlas.texture_tint(d.texture, data.base_tints.get(d.texture))))
 	if data.grass and data.grass.enabled:
 		for t in [data.grass.top_texture, data.grass.side_texture, data.grass.rim_texture, data.grass.tuft_texture]:
 			add.call(t, "grass", [])
@@ -225,7 +239,7 @@ static func texture_count(data: LevelData) -> int:
 
 
 static func _node(kind: StringName, name: String, info: String) -> Dictionary:
-	return {kind = kind, name = name, info = info, ids = PackedInt32Array(), faces = 0, children = [], key = null, filter = null, paint = null, ao_id = -1}
+	return {kind = kind, name = name, info = info, ids = PackedInt32Array(), faces = 0, children = [], key = null, filter = null, paint = null, ao_id = -1, decal = -1}
 
 
 ## Makes `n` a layer that takes filters (stack `key`), its filters listed first, top first.

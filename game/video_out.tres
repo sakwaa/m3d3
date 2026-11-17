@@ -1,6 +1,7 @@
 [gd_resource type="CompositorEffect" script_class="N64VideoOut" format=3]
 
 [ext_resource type="Script" path="res://addons/n64_runtime/post/n64_video_out.gd" id="1_1pk5i"]
+[ext_resource type="Resource" path="res://game/looks/tape_studio.tres" id="2_tape"]
 
 [resource]
 resource_local_to_scene = false
@@ -10,3 +11,7 @@ effect_callback_type = 4
 needs_motion_vectors = false
 needs_normal_roughness = false
 script = ExtResource("1_1pk5i")
+edge_aa = 1.0
+seam_dirt = 0.9
+seam_objects_only = false
+tape = ExtResource("2_tape")

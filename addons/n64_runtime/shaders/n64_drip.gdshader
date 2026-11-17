@@ -15,10 +15,10 @@ render_mode unshaded, blend_mix, cull_disabled, depth_draw_never, shadows_disabl
 uniform float stream_spacing = 0.28;
 uniform float stream_jitter = 0.07;
 // Stream thickness, metres (drawn at least ~a pixel wide, fainter when that's wider).
-uniform float stream_width = 0.012;
+uniform float stream_width = 0.02;
 uniform float fall_speed = 5.5;
 // Tint on the light the water catches (n64_rain_light.gdshaderinc), and its opacity when lit.
-uniform vec4 water_color : source_color = vec4(0.95, 0.97, 1.0, 0.4);
+uniform vec4 water_color : source_color = vec4(0.95, 0.97, 1.0, 0.5);
 // How far the eave keeps the sky's light off the streams (0..1).
 uniform float shelter = 0.6;
 
@@ -50,7 +50,7 @@ void fragment() {
 		float half_w = max(stream_width * 0.5, px * 0.6);
 		float thin = (1.0 - smoothstep(half_w * 0.5, half_w, abs(UV.x - centre))) * min(1.0, stream_width * 0.5 / half_w * 1.5);
 		float v = UV.y * 0.9 - TIME * fall_speed * (0.85 + 0.3 * h) + h * 9.0;
-		float len = mix(0.12, 0.45, rain);
+		float len = mix(0.16, 0.5, rain);
 		float drop = 1.0 - smoothstep(len * 0.6, len, fract(v));
 		// The film gathers at the edge: a little denser just under it.
 		float top = mix(1.0, 0.7, smoothstep(0.0, 0.4, UV.y));
@@ -59,7 +59,7 @@ void fragment() {
 		// Splashes: a small ring flickering open where each running stream lands.
 		vec2 p = vec2(UV.x - centre, UV.y - 0.25);
 		float age = fract(TIME * (2.2 + h) + h * 5.0);
-		float r = length(p) / 0.09;
+		float r = length(p) / 0.12;
 		a = (1.0 - smoothstep(0.0, 0.3, abs(r - age))) * (1.0 - age) * running * (0.4 + 0.6 * rain);
 	}
 	if (a < 0.002) {

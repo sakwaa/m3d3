@@ -10,7 +10,19 @@ extends EditorInspectorPlugin
 func _can_handle(object: Object) -> bool:
 	return object is OpeningDressing or object is N64StairTexture or object is Door or object is FenceStyle or object is OpeningSpec \
 		or object is StrokeAlphabet or object is SyllabaryAlphabet \
-		or (object is LevelBrush and (object.is_passage() or object.is_door()))
+		or (object is LevelBrush and (object.is_passage() or object.is_door())) or _ours(object)
+
+
+## Any node / resource of the game's own scripts (res://game, our addons): their texture
+## slots get the N64 picker too (mountains, trees, signs, effects...). (Other textures -
+## not in res://textures - still drop in from the FileSystem dock.)
+static func _ours(object: Object) -> bool:
+	var sc := object.get_script() as Script if object else null
+	if sc == null:
+		return false
+	var p := sc.resource_path
+	return p.begins_with("res://game/") or p.begins_with("res://player/") or p.begins_with("res://addons/n64_runtime/") \
+		or p.begins_with("res://addons/n64_level_tools/") or p.begins_with("res://addons/n64_actor_tools/")
 
 
 const FenceTextureGenerator := preload("res://addons/n64_level_tools/textures/fence_texture_generator.gd")

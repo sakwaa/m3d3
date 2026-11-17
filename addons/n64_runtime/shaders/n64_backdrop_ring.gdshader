@@ -7,6 +7,7 @@ render_mode unshaded, cull_disabled, shadows_disabled, fog_disabled, depth_draw_
 
 #include "res://addons/n64_runtime/shaders/n64_sampling.gdshaderinc"
 #include "res://addons/n64_runtime/shaders/n64_weather.gdshaderinc"
+#include "res://addons/n64_runtime/shaders/n64_coverage.gdshaderinc"
 
 // Time of day light (Zone.outdoor_light), like the effect sprites.
 global uniform vec4 n64_ambient_light;
@@ -20,6 +21,7 @@ void vertex() {
 	vec3 world = CAMERA_POSITION_WORLD + VERTEX;
 	vec4 clip = PROJECTION_MATRIX * VIEW_MATRIX * vec4(world, 1.0);
 	clip.z = clip.w * 1e-9;  // behind the near backdrop too
+	clip.xy = mat2(n64_distort.xy, n64_distort.zw) * clip.xy;  // (ScreenDistortion)
 	POSITION = clip;
 }
 
@@ -30,4 +32,5 @@ void fragment() {
 	}
 	float h = mix(haze.x, haze.y, clamp(n64_rain.x * 1.5, 0.0, 1.0));
 	ALBEDO = mix(c.rgb * n64_ambient_light.rgb * n64_weather_tint.rgb, n64_fog_color.rgb, h);
+	N64_COVERAGE;
 }

@@ -10,6 +10,9 @@ var _width := 0.0
 
 
 func _ready() -> void:
+	# FOLIAGE=0/1/2: every tree in that foliage style (cards / shell / blobs).
+	if OS.get_environment("FOLIAGE") != "":
+		TreeBuilder.foliage_override = int(OS.get_environment("FOLIAGE"))
 	var seeds := [1]
 	if OS.get_environment("SEEDS") != "":
 		seeds = Array(OS.get_environment("SEEDS").split(",")).map(func(x): return int(x))

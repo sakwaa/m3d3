@@ -71,7 +71,7 @@ func _process(delta: float) -> void:
 		if _spinning:
 			Sfx.play(&"lock_off", _anchor)
 	if _target and is_instance_valid(_target) and not _out:
-		_anchor = _target.global_position
+		_anchor = _target.get_global_transform_interpolated().origin
 	while _frames >= 1.0:
 		_frames -= 1.0
 		_tick()
@@ -109,14 +109,14 @@ func _arrow(delta: float) -> void:
 	if h and h.lock_disabled:
 		h = null
 	if h != _arrow_t:
-		_arrow_from = _arrow_pos() if _arrow_t and is_instance_valid(_arrow_t) else (h.global_position if h else Vector3.ZERO)
+		_arrow_from = _arrow_pos() if _arrow_t and is_instance_valid(_arrow_t) else (h.get_global_transform_interpolated().origin if h else Vector3.ZERO)
 		_arrow_t = h
 		_arrow_k = 0.0
 	_arrow_k = minf(_arrow_k + delta / ARROW_MOVE, 1.0)
 
 
 func _arrow_pos() -> Vector3:
-	var to := _arrow_t.global_position + Vector3.UP * ARROW_UP
+	var to := _arrow_t.get_global_transform_interpolated().origin + Vector3.UP * ARROW_UP
 	return _arrow_from.lerp(to, _arrow_k) if _arrow_k < 1.0 else to
 
 

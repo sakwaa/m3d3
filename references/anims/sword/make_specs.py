@@ -33,9 +33,55 @@ def key(frame, ease="smooth", **kw):
 	return k
 
 
+OUT = os.environ.get("OUTDIR", ".")
+# Weight (2026-11-15, from a Unity "Zelda-like" clip the user liked, read at 20 fps): the
+# same shapes with held extremes - the windup held ~0.1 s while the body coils further, a
+# faster strike, the follow-through overshooting and held ~0.17 s, a slower recovery. The
+# next attack can still cut in early in the follow-through hold.
+WEIGHTED = {"SlashH", "SlashH2", "SlashV", "SlashVFin", "Stab"}
+WIND_HOLD = 3      # frames the windup pose is held (coiling on)
+FOLLOW_HOLD = 5    # frames the follow-through is held
+RECOVER_EXTRA = 2  # extra recovery frames
+COIL = 1.15        # how much further the body turns while held / on the overshoot
+
+
+def _scaled(k, f, **extra):
+	out = dict(k)
+	for b in ("twist", "hip_twist", "hip_roll"):
+		if b in out:
+			out[b] = round(out[b] * f, 1)
+	out.update(extra)
+	return out
+
+
+def add_weight(length, keys, windows):
+	wi = next(i for i, k in enumerate(keys) if k["ease"] == "ease_in")
+	si, fi = wi + 1, wi + 2
+	w, s, f = keys[wi]["frame"], keys[si]["frame"], keys[fi]["frame"]
+	t_hold = w + WIND_HOLD
+	t_s = t_hold + max(s - w - 1, 2)
+	t_f = t_s + max(f - s - 1, 2)
+	t_fh = t_f + FOLLOW_HOLD
+	shift = t_fh - f
+	out = [dict(k) for k in keys[:wi + 1]]
+	out.append(_scaled(keys[wi], COIL, frame=t_hold, ease="smooth", lift=keys[wi].get("lift", 0.0) - 0.01))
+	out.append(dict(keys[si], frame=t_s, ease="snap"))
+	follow = _scaled(keys[fi], COIL, frame=t_f, ease="ease_out", lean=keys[fi].get("lean", 0) + 4)
+	out.append(follow)
+	out.append(_scaled(follow, 0.92, frame=t_fh, ease="smooth", lean=follow["lean"] - 2))
+	for k in keys[fi + 1:-1]:
+		out.append(dict(k, frame=k["frame"] + shift))
+	end = length + shift + RECOVER_EXTRA
+	out.append(dict(keys[-1], frame=end))
+	win = {"windup": [0, t_s - 1], "active": [t_s - 1, t_f + 1], "cancel": [t_fh - 2, end], "opening": [t_fh, end]}
+	return end, out, win
+
+
 def spec(name, length, keys, windows, measured=True):
+	if name in WEIGHTED:
+		length, keys, windows = add_weight(length, keys, windows)
 	json.dump({"name": name, "fps": 30, "length": length, "loop": False, "root": "auto", "source": SRC,
-		"measured": measured, "windows": windows, "keys": keys}, open(name.lower() + ".json", "w"), indent=1)
+		"measured": measured, "windows": windows, "keys": keys}, open(os.path.join(OUT, name.lower() + ".json"), "w"), indent=1)
 
 
 # Diagonal: blade cocked up behind the right shoulder -> flat across the front -> out low left.
@@ -141,4 +187,4 @@ spec("JumpSlashLand", 20, [
 	key(11, lean=30, upper_arm_R=[62, 8], forearm_R=[55, 5], blade_R=[48, 0], **LAND),
 	key(20),
 ], {"active": [0, 7], "cancel": [12, 20], "opening": [8, 20]})
-print("specs written:", sorted(f for f in os.listdir(".") if f.endswith(".json")))
+print("specs written to", OUT, sorted(f for f in os.listdir(OUT) if f.endswith(".json")))

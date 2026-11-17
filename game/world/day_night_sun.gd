@@ -19,17 +19,15 @@ extends DirectionalLight3D
 func _process(_delta: float) -> void:
 	var t: float = GameState.time_of_day / 24.0
 	var height := sin((t - 0.25) * TAU)  # 1 at noon, -1 at midnight
-	var world: Color
+	var world := world_tint(GameState.time_of_day, world_day, world_dusk, world_night)
 	if height >= 0.0:
 		rotation.x = -(t - 0.25) * TAU
 		light_energy = lerpf(night_energy, day_energy, clampf(height * 3.0, 0.0, 1.0))
 		light_color = dusk_color.lerp(day_color, clampf(height * 2.5, 0.0, 1.0))
-		world = world_dusk.lerp(world_day, clampf(height * 2.5, 0.0, 1.0))
 	else:
 		rotation.x = -(t - 0.75) * TAU
 		light_energy = night_energy
 		light_color = night_color
-		world = world_dusk.lerp(world_night, clampf(-height * 4.0, 0.0, 1.0))
 	# Never lower than the level's bake lifts it (LevelData.light_min_sun_elevation), so
 	# real-time shadows (actors) match the baked ones instead of stretching at dusk / night.
 	var lift := deg_to_rad(_min_elevation())
@@ -53,3 +51,11 @@ func _min_elevation() -> float:
 	var data: Resource = _lift_root.get(&"data") if _lift_root else null
 	var deg = data.get(&"light_min_sun_elevation") if data else null
 	return deg if deg != null else 0.0
+
+
+## The n64_world_tint at `hour` (also the editor's preview hour: level tools / Paint).
+static func world_tint(hour: float, day: Color, dusk: Color, night: Color) -> Color:
+	var height := sin((fposmod(hour, 24.0) / 24.0 - 0.25) * TAU)
+	if height >= 0.0:
+		return dusk.lerp(day, clampf(height * 2.5, 0.0, 1.0))
+	return dusk.lerp(night, clampf(-height * 4.0, 0.0, 1.0))

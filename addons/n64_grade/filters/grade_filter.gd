@@ -99,6 +99,12 @@ static func _resource_sig(r: Resource) -> Array:
 	return out
 
 
+## Perceived lightness (OKLab L, 0..1): even steps look even, unlike `luma` (a weighted
+## sum of the stored values, which reads blues too dark and yellows too light).
+static func ok_l(c: Color) -> float:
+	return GradePalette.oklab(c).x
+
+
 static func luma(c: Color) -> float:
 	return c.r * LUMA.x + c.g * LUMA.y + c.b * LUMA.z
 

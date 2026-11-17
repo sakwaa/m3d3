@@ -447,7 +447,10 @@ static func cloth_textures(spec: HouseSpec) -> Dictionary:
 			continue
 		if src == null:
 			src = _cloth_source(spec.cloth_texture)
-		var metres := Vector2(AWNING_METRES, AWNING_METRES) if kind == "awning" else NOREN_METRES
+		if kind == "awning":
+			out[kind] = awning_texture(spec.cloth_texture, spec.cloth_color, spec.stripe_color, src)
+			continue
+		var metres := NOREN_METRES
 		var density := N64Texture.texels_per_metre()
 		var w := maxi(4, roundi(metres.x * density / 2.0) * 2)
 		var h := maxi(1, roundi(metres.y * density))
@@ -455,9 +458,7 @@ static func cloth_textures(spec: HouseSpec) -> Dictionary:
 		for y in h:
 			for x in w:
 				var c := src.get_pixel(x % src.get_width(), y % src.get_height())
-				if kind == "awning":
-					c *= spec.cloth_color if x < w / 2 else spec.stripe_color
-				elif x == w - 1:
+				if x == w - 1:
 					c = c.darkened(0.8)
 				img.set_pixel(x, y, Color(c, 1.0))
 		img.generate_mipmaps()
@@ -469,13 +470,104 @@ static func cloth_textures(spec: HouseSpec) -> Dictionary:
 		tex.format = N64TextureConverter.Format.RGBA16
 		tex.texture_size = Vector2i(w, h)
 		tex.world_size = metres.x
-		DirAccess.make_dir_recursive_absolute(CLOTH_DIR)
-		if ResourceSaver.save(tex, path) == OK:
-			tex.take_over_path(path)
-			if Engine.is_editor_hint() and Engine.has_singleton(&"EditorInterface"):
-				Engine.get_singleton(&"EditorInterface").get_resource_filesystem().update_file(path)
+		_save_generated(tex, path)
 		out[kind] = tex
 	return out
+
+
+## Awning shades in one palette texture per cloth (awning_<cloth>_ci.res, CI8): the cloth's
+## shades quantised to 128 colours, indices 0-127 on the left half (the cloth colour) and
+## 128-255 on the right (the stripe colour). Each colour pair is a palette row, and the
+## awning texture (awning_<cloth>_<colour>_<stripe>.res) an N64PaletteSwap of that row: the
+## N64's way to dress every shop from one texture.
+static func awning_texture(cloth: Texture2D, cloth_color: Color, stripe_color: Color, src: Image = null, force := false) -> N64PaletteSwap:
+	var base := cloth.resource_path.get_file().get_basename() if cloth else "plain"
+	var path := "%s/awning_%s_%s_%s.res" % [CLOTH_DIR, base, cloth_color.to_html(false), stripe_color.to_html(false)]
+	if not force and ResourceLoader.exists(path) and load(path) is N64PaletteSwap:
+		return load(path)
+	if src == null:
+		src = _cloth_source(cloth)
+	var pal_path := "%s/awning_%s_ci.res" % [CLOTH_DIR, base]
+	var pal: N64PaletteTexture = load(pal_path) if ResourceLoader.exists(pal_path) else null
+	if pal == null:
+		pal = _awning_palette(src)
+	var row := PackedColorArray()
+	var shades: PackedColorArray = pal.get_meta(&"shades")
+	for side in 2:
+		var tint := cloth_color if side == 0 else stripe_color
+		for k in 128:
+			row.append(Color(shades[k] * tint, 1.0) if k < shades.size() else Color.BLACK)
+	var at := -1
+	for i in pal.palettes.size():
+		if pal.palettes[i] == row:
+			at = i
+	if at < 0:
+		var rows := pal.palettes.duplicate()
+		rows.append(row)
+		pal.palettes = rows
+		at = rows.size() - 1
+	_save_generated(pal, pal_path)
+	var tex := N64PaletteSwap.new()
+	tex.palette_texture = pal
+	tex.palette_row = at
+	tex.refresh_image()
+	tex.category = &"fabric"
+	tex.usage = N64TextureConverter.Usage.SURFACE
+	tex.tiling = N64TextureConverter.Tiling.SEAMLESS
+	tex.format = N64TextureConverter.Format.CI8
+	tex.texture_size = Vector2i(pal.index.get_width(), pal.index.get_height())
+	tex.world_size = AWNING_METRES
+	_save_generated(tex, path)
+	return tex
+
+
+## The shared indices for awnings of cloth `src` (row 0: plain shades on both halves).
+static func _awning_palette(src: Image) -> N64PaletteTexture:
+	var density := N64Texture.texels_per_metre()
+	var w := maxi(4, roundi(AWNING_METRES * density / 2.0) * 2)
+	var h := maxi(1, roundi(AWNING_METRES * density))
+	var half := Image.create(w / 2, h, false, Image.FORMAT_RGBA8)
+	for y in h:
+		for x in w / 2:
+			half.set_pixel(x, y, Color(src.get_pixel(x % src.get_width(), y % src.get_height()), 1.0))
+	var shades := N64TextureConverter._quantize_indexed(half, 128)
+	var lookup := {}
+	for k in shades.size():
+		lookup[shades[k].to_rgba32()] = k
+	var idx := PackedByteArray()
+	idx.resize(w * h)
+	for y in h:
+		for x in w:
+			var c := half.get_pixel(x % (w / 2), y)
+			var k: int = lookup.get(c.to_rgba32(), _nearest(shades, c))
+			idx[y * w + x] = k + (0 if x < w / 2 else 128)
+	var row0 := PackedColorArray()
+	for side in 2:
+		for k in 128:
+			row0.append(shades[k] if k < shades.size() else Color.BLACK)
+	var rows: Array[PackedColorArray] = [row0]
+	var pal := N64PaletteTexture.from_indices(w, h, idx, rows)
+	pal.set_meta(&"shades", shades)
+	return pal
+
+
+static func _nearest(pal: PackedColorArray, c: Color) -> int:
+	var best := 0
+	var bd := INF
+	for k in pal.size():
+		var d := (pal[k].r - c.r) ** 2 + (pal[k].g - c.g) ** 2 + (pal[k].b - c.b) ** 2
+		if d < bd:
+			bd = d
+			best = k
+	return best
+
+
+static func _save_generated(res: Resource, path: String) -> void:
+	DirAccess.make_dir_recursive_absolute(CLOTH_DIR)
+	if ResourceSaver.save(res, path) == OK:
+		res.take_over_path(path)
+		if Engine.is_editor_hint() and Engine.has_singleton(&"EditorInterface"):
+			Engine.get_singleton(&"EditorInterface").get_resource_filesystem().update_file(path)
 
 
 ## Shutter planks for `spec`, made (and saved under CLOTH_DIR) the first time: the eave wood

@@ -44,6 +44,19 @@ static var show_debug := OS.is_debug_build()
 @export var fall_damage_height := 0.0
 
 var health := 8
+## 1 solid .. 0 gone: the actor drawn with pixels dropped by the RDP's dither (n64_actor /
+## n64_textured `fade`, G_AC_DITHER), not blended: vanishing, ghosts, cutscene fades.
+## 0 whole .. 1 gone: the actor burning / crumbling away (threshold dissolve, glowing rim).
+var dissolve := 0.0:
+	set(v):
+		dissolve = clampf(v, 0.0, 1.0)
+		_apply_param(self, &"dissolve", dissolve)
+var fade := 1.0:
+	set(v):
+		v = clampf(v, 0.0, 1.0)
+		if v != fade:
+			fade = v
+			_apply_fade(self)
 ## While set (and the states allow turning), face this instead of the movement (lock-on,
 ## enemies squaring off).
 var face_target: Node3D
@@ -54,6 +67,15 @@ var combo_count := 0
 var face_dir := Vector3.ZERO
 ## Extra horizontal velocity that fades out (knockback, lunges), IMPULSE_FADE m/s each second.
 var impulse := Vector3.ZERO
+## How hard this body is to push (1 = the player): knockback divides by it.
+@export var mass := 1.0
+## The spring-loaded hit reaction on the skeleton (HitReact), if the actor has one.
+var hit_react: HitReact
+## The aiming pose and bow (AimState), when the actor can aim.
+var aim_rig: AimRig
+# A hit's shove and pop, held until the hitstop freeze ends (impact, then the slide).
+var _queued_impulse := Vector3.ZERO
+var _queued_pop := 0.0
 const IMPULSE_FADE := 14.0
 ## Seconds left to punish a blocked attacker (set when this actor blocks).
 var counter_left := 0.0
@@ -89,6 +111,8 @@ var _hazard_wait := 0.0
 var _step_left := 0.0
 var _was_on_floor := true
 var _air_top := 0.0  # highest point since leaving the ground (fall damage)
+## The next landing does no fall damage (DropPortal: falling in from another zone's sky).
+var cushion_landing := false
 var _lean := 0.0  # body lean (radians) and where it pivots, eased (_pose_body)
 var _lean_pivot := 0.8
 var _lean_shift := Vector3.ZERO
@@ -142,6 +166,12 @@ class Intent:
 				_presses.erase(a)
 
 
+## This actor's coverage object ID (1..62, handed out in turn; N64VideoOut outline_code =
+## 64 + it, visible_pixels(it)).
+var object_id := 0
+static var _next_object_id := 0
+
+
 func _ready() -> void:
 	add_to_group(&"actors")
 	health = max_health
@@ -161,6 +191,9 @@ func _ready() -> void:
 	_label = Label3D.new()
 	_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	_label.no_depth_test = true
+	# Last of the transparent pass: no-depth-test effects (a passage's darkness) don't cover it.
+	_label.render_priority = 127
+	_label.outline_render_priority = 126
 	_label.fixed_size = true
 	_label.pixel_size = 0.0012
 	_label.font_size = 22
@@ -168,6 +201,11 @@ func _ready() -> void:
 	_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	_label.position.y = 2.2
 	add_child(_label, false, INTERNAL_MODE_BACK)
+	# One coverage ID for all of this actor's meshes (n64_actor object_id): the video output
+	# treats it as one object - its own parts never outline, seam or count against each other.
+	_next_object_id = _next_object_id % 62 + 1
+	object_id = _next_object_id
+	_apply_param.call_deferred(self, &"object_id", object_id)
 
 
 ## Adds a machine built in code (scenes can just have StateMachine children).
@@ -212,6 +250,8 @@ func _physics_process(delta: float) -> void:
 		_stop_left -= delta
 		if _stop_left <= 0.0 and _anim:
 			_anim.speed_scale = _anim_speed
+		if _stop_left <= 0.0:
+			_release_shove()
 		if not (not scripted and Cutscenes.is_playing()):
 			drive(delta)
 		return
@@ -320,19 +360,45 @@ func react(state: StringName) -> void:
 		m.request(state)
 
 
-func take_hit(damage: int, by: Actor, knockback: float) -> void:
+## `hit` (Combat): dir (world, which way the blow pushed: the blade's travel at contact
+## blended with away from the attacker), at (world, where it landed), strength (about 1 =
+## an ordinary hit, more for strong blades / finishers), heavy (finishers: a small upward
+## pop). Knockback goes along `dir`, divided by `mass`, after any hitstop freeze; the
+## skeleton's HitReact springs from `at` the same way.
+func take_hit(damage: int, by: Actor, knockback: float, hit := {}) -> void:
 	if is_dead():
 		return
 	health = maxi(health - damage, 0)
 	var away := global_position - by.global_position
 	away.y = 0.0
-	impulse = away.normalized() * knockback if away.length() > 0.01 else Vector3.ZERO
+	away = away.normalized() if away.length() > 0.01 else -facing
+	var dir: Vector3 = hit.get("dir", away)
+	dir.y = 0.0
+	dir = dir.normalized() if dir.length() > 0.01 else away
+	var strength: float = hit.get("strength", 1.0)
+	var heavy: bool = hit.get("heavy", false)
+	_queued_impulse = dir * knockback * strength / maxf(mass, 0.1)
+	_queued_pop = (2.6 if heavy or health <= 0 else 0.0) / maxf(mass, 0.1)
+	if not in_hitstop():
+		_release_shove()
+	if hit_react:
+		hit_react.kick(dir, strength / maxf(mass, 0.1) * (1.4 if heavy else 1.0), hit.get("at", global_position + Vector3.UP * 1.0))
 	damaged.emit(damage, by)
 	if is_dead():
 		react(&"Death")
 		died.emit()
 	else:
 		react(&"Hurt")
+
+
+## The held shove of the last hit (after its hitstop).
+func _release_shove() -> void:
+	if _queued_impulse != Vector3.ZERO:
+		impulse = _queued_impulse
+		_queued_impulse = Vector3.ZERO
+	if _queued_pop > 0.0:
+		velocity.y = maxf(velocity.y, _queued_pop)
+		_queued_pop = 0.0
 
 
 func heal_full() -> void:
@@ -513,6 +579,11 @@ func _land_from(drop: float) -> void:
 		# A soft landing: the knees give a little (LandDip), more the further it fell.
 		_dip_depth = clampf(0.025 + drop * 0.012, 0.025, 0.07)
 		_dip_t = 0.0
+	if cushion_landing:
+		# (a fall that was meant to happen - dropped in from another zone's sky: the hard
+		# landing, no harm)
+		cushion_landing = false
+		return
 	if fall_damage_height > 0.0 and drop > fall_damage_height:
 		hurt(1 + int((drop - fall_damage_height) / 4.0))
 
@@ -551,6 +622,7 @@ func _void_out() -> void:
 		Effects.spawn(SPLASH_EFFECT, global_position)
 	if _has_safe:
 		global_position = _safe_position
+		reset_physics_interpolation()  # (a jump, not a slide from the hole)
 	velocity = Vector3.ZERO
 	impulse = Vector3.ZERO
 	voided.emit()
@@ -701,3 +773,18 @@ func _update_label() -> void:
 ## The impulse speed that carries the actor `metres` before it fades out (negative: back).
 static func impulse_for(metres: float) -> float:
 	return signf(metres) * sqrt(2.0 * IMPULSE_FADE * absf(metres))
+
+
+## The fade onto every mesh under `node` (instance shader parameter, so materials stay shared).
+func _apply_fade(node: Node) -> void:
+	if node is GeometryInstance3D and node != _label:
+		(node as GeometryInstance3D).set_instance_shader_parameter(&"fade", fade)
+	for c in node.get_children():
+		_apply_fade(c)
+
+
+func _apply_param(node: Node, param: StringName, value: Variant) -> void:
+	if node is GeometryInstance3D and node != _label:
+		(node as GeometryInstance3D).set_instance_shader_parameter(param, value)
+	for c in node.get_children():
+		_apply_param(c, param, value)

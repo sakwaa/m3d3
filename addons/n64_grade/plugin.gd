@@ -1,6 +1,7 @@
 @tool
 extends EditorPlugin
-## The Grade main screen (DESIGN.md): tuning how a zone looks, beside 2D / 3D / Script.
+## The Paint main screen (DESIGN.md; was "Grade"): painting and tuning how a zone looks,
+## beside 2D / 3D / Script.
 ## Editor only (stripped from exports like the other tool addons).
 
 const View := preload("res://addons/n64_grade/grade_view.gd")
@@ -26,11 +27,11 @@ func _has_main_screen() -> bool:
 
 
 func _get_plugin_name() -> String:
-	return "Grade"
+	return "Paint"
 
 
 func _get_plugin_icon() -> Texture2D:
-	return EditorInterface.get_editor_theme().get_icon(&"ColorPick", &"EditorIcons")
+	return EditorInterface.get_editor_theme().get_icon(&"Paint" if EditorInterface.get_editor_theme().has_icon(&"Paint", &"EditorIcons") else &"ColorPick", &"EditorIcons")
 
 
 func _make_visible(visible: bool) -> void:

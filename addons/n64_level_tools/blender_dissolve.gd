@@ -390,6 +390,7 @@ static func _apply(job: Dictionary, r: Dictionary) -> int:
 			for v in poly:
 				pts.append(b.vertices[v])
 			var n := PolyUtil.newell_normal(pts).normalized()
+			var picks := PackedInt32Array()
 			for v in poly:
 				var pick := -1
 				for fc in job.at_vertex.get(v, []):
@@ -401,11 +402,40 @@ static func _apply(job: Dictionary, r: Dictionary) -> int:
 						pick = fc[1]
 						break
 				if pick < 0:
-					pick = int(job.corner_of.get(Vector2i(src, v), 0))
+					pick = int(job.corner_of.get(Vector2i(src, v), -1))
+				picks.append(pick)
+			# Corners no face of the group has (a neighbour's vertex _rejoin put on this edge):
+			# their values are interpolated along the straight edge between the nearest corners
+			# that have them (not corner 0's: some other face's UV smeared the face).
+			var m := poly.size()
+			for i in m:
+				var pick := picks[i]
+				if pick >= 0:
+					if has_uv:
+						new_uv.append(job.cuv[pick])
+					if has_col:
+						new_col.append(job.ccol[pick])
+					continue
+				var lo := -1
+				var hi := -1
+				for s in range(1, m):
+					if lo < 0 and picks[(i - s + m) % m] >= 0:
+						lo = (i - s + m) % m
+					if hi < 0 and picks[(i + s) % m] >= 0:
+						hi = (i + s) % m
+				if lo < 0 or hi < 0:
+					if has_uv:
+						new_uv.append(job.cuv[0])
+					if has_col:
+						new_col.append(job.ccol[0])
+					continue
+				var a := pts[lo]
+				var span := pts[hi] - a
+				var t := clampf((pts[i] - a).dot(span) / maxf(span.length_squared(), 1e-12), 0.0, 1.0)
 				if has_uv:
-					new_uv.append(job.cuv[pick])
+					new_uv.append(job.cuv[picks[lo]].lerp(job.cuv[picks[hi]], t))
 				if has_col:
-					new_col.append(job.ccol[pick])
+					new_col.append(job.ccol[picks[lo]].lerp(job.ccol[picks[hi]], t))
 	b.hand_edited = true
 	b.set_faces(faces)
 	b.remap_faces(map)
