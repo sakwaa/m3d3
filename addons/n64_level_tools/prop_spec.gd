@@ -9,7 +9,7 @@ extends Resource
 ## from it at the brush (in the editor and in game, never saved with the scene; written out
 ## on export), like Door nodes from door brushes.
 
-enum Kind { SIGN, STALL, RAIN_DRIP, BIRD_FLOCK, NPC_SPOT, NPC_PATH, TREE, LADDER, ROOM, PUSH_BLOCK, BALANCE, VINES, CAPSTAN, SCREW_GATE, MACHINE_WATER, NORIA, MACHINE_DOOR, WATERFALL }
+enum Kind { SIGN, STALL, RAIN_DRIP, BIRD_FLOCK, NPC_SPOT, NPC_PATH, TREE, LADDER, ROOM, PUSH_BLOCK, BALANCE, VINES, CAPSTAN, SCREW_GATE, MACHINE_WATER, NORIA, MACHINE_DOOR, WATERFALL, LIGHT_SHAFT, AMBIENCE }
 
 const SCRIPTS := {
 	Kind.SIGN: "res://game/world/props/signpost.gd",
@@ -30,10 +30,12 @@ const SCRIPTS := {
 	Kind.NORIA: "res://game/world/machines/noria.gd",
 	Kind.MACHINE_DOOR: "res://game/world/machines/machine_door.gd",
 	Kind.WATERFALL: "res://game/world/props/waterfall.gd",
+	Kind.LIGHT_SHAFT: "res://game/world/props/light_shaft.gd",
+	Kind.AMBIENCE: "res://game/world/props/ambient_sound.gd",
 }
 const NAMES := {Kind.SIGN: "Sign", Kind.STALL: "Stall", Kind.RAIN_DRIP: "RainDrip", Kind.BIRD_FLOCK: "Birds",
 	Kind.NPC_SPOT: "Spot", Kind.NPC_PATH: "Path", Kind.TREE: "Tree", Kind.LADDER: "Ladder", Kind.ROOM: "Room",
-	Kind.PUSH_BLOCK: "PushBlock", Kind.BALANCE: "Balance", Kind.VINES: "Vines", Kind.CAPSTAN: "Capstan", Kind.SCREW_GATE: "ScrewGate", Kind.MACHINE_WATER: "Water", Kind.NORIA: "Noria", Kind.MACHINE_DOOR: "MachineDoor", Kind.WATERFALL: "Waterfall"}
+	Kind.PUSH_BLOCK: "PushBlock", Kind.BALANCE: "Balance", Kind.VINES: "Vines", Kind.CAPSTAN: "Capstan", Kind.SCREW_GATE: "ScrewGate", Kind.MACHINE_WATER: "Water", Kind.NORIA: "Noria", Kind.MACHINE_DOOR: "MachineDoor", Kind.WATERFALL: "Waterfall", Kind.LIGHT_SHAFT: "LightShaft", Kind.AMBIENCE: "Ambience"}
 
 ## What the prop is. Changing it starts the new kind from its defaults.
 @export var kind := Kind.SIGN:
@@ -58,7 +60,7 @@ var _template: Node
 
 
 ## Kinds that move or change while playing (and trees: their own LOD cards): not batched.
-const UNBATCHED := [Kind.RAIN_DRIP, Kind.BIRD_FLOCK, Kind.NPC_SPOT, Kind.NPC_PATH, Kind.TREE, Kind.ROOM, Kind.PUSH_BLOCK, Kind.BALANCE, Kind.VINES, Kind.CAPSTAN, Kind.SCREW_GATE, Kind.MACHINE_WATER, Kind.NORIA, Kind.MACHINE_DOOR, Kind.WATERFALL]
+const UNBATCHED := [Kind.RAIN_DRIP, Kind.BIRD_FLOCK, Kind.NPC_SPOT, Kind.NPC_PATH, Kind.TREE, Kind.ROOM, Kind.PUSH_BLOCK, Kind.BALANCE, Kind.VINES, Kind.CAPSTAN, Kind.SCREW_GATE, Kind.MACHINE_WATER, Kind.NORIA, Kind.MACHINE_DOOR, Kind.WATERFALL, Kind.LIGHT_SHAFT, Kind.AMBIENCE]
 
 
 ## The node for this prop, set up from the settings (not in the tree). Static kinds join

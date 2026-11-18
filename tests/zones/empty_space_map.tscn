@@ -1,0 +1,4 @@
+[gd_scene format=3]
+[ext_resource type="Script" path="res://tests/zones/empty_space_map.gd" id="1"]
+[node name="EmptySpaceMap" type="Node"]
+script = ExtResource("1")

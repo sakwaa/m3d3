@@ -7,11 +7,14 @@
 [ext_resource type="Script" path="res://addons/n64_level_tools/level_root.gd" id="4_nix5t"]
 [ext_resource type="Resource" path="res://zones/forest/forest_citadel_level.res" id="5_6oy6k"]
 [ext_resource type="Script" path="res://game/world/spawn_point.gd" id="6_sw33b"]
+[ext_resource type="Script" path="res://addons/n64_runtime/world/mountain_range.gd" id="8_6oy6k"]
+[ext_resource type="Texture2D" path="res://textures/rock/granite_3.res" id="9_sw33b"]
+[ext_resource type="Texture2D" path="res://textures/grass/1_moss.res" id="10_ia5gg"]
 
-[sub_resource type="Resource" id="Resource_62hl4"]
+[sub_resource type="Resource" id="Resource_6oy6k"]
 script = ExtResource("2_4g4l0")
-start = 30.0
-end = 170.0
+start = 25.0
+end = 120.0
 
 [sub_resource type="Environment" id="Environment_ia5gg"]
 background_mode = 2
@@ -19,8 +22,9 @@ background_mode = 2
 [node name="ForestCitadel" type="Node3D" unique_id=533427233]
 script = ExtResource("1_yfcmr")
 display_name = "Forest Citadel"
-fog = SubResource("Resource_62hl4")
-local_weather = &"forest_clouds"
+fog = SubResource("Resource_6oy6k")
+local_weather = &"mountain_rain"
+local_weather_chance = 1.0
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1651318469]
 environment = SubResource("Environment_ia5gg")
@@ -35,5 +39,22 @@ script = ExtResource("4_nix5t")
 data = ExtResource("5_6oy6k")
 
 [node name="Spawn_default" type="Marker3D" parent="." unique_id=927086471]
-transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0, -132)
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0, -154)
 script = ExtResource("6_sw33b")
+
+[node name="Mountains" type="MeshInstance3D" parent="." unique_id=808384758]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -10)
+script = ExtResource("8_6oy6k")
+seed = 9
+layer_radius = PackedFloat32Array(230, 400)
+layer_height_min = PackedFloat32Array(100, 140)
+layer_height_max = PackedFloat32Array(210, 300)
+layer_haze = PackedFloat32Array(0.35, 0.58)
+sharpness = 3.0
+foot_color = Color(0.1, 0.15, 0.09, 1)
+rock_color = Color(0.52, 0.53, 0.54, 1)
+snow_color = Color(0.2, 0.27, 0.16, 1)
+snow_line = 0.9
+open_arcs = Array[Vector2]([Vector2(345, 15)])
+rock_texture = ExtResource("9_sw33b")
+snow_texture = ExtResource("10_ia5gg")

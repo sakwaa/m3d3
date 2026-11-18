@@ -23,8 +23,10 @@ vec3 n64_grass_key_light(vec3 k0, vec3 k1, vec3 k2, vec3 k3) {
 
 // A key packed in a float (r * 65536 + g * 256 + b, bytes): tufts' instance data.
 vec3 n64_grass_unpack(float v) {
-	float x = floor(v + 0.5);
-	return vec3(floor(x / 65536.0), mod(floor(x / 256.0), 256.0), mod(x, 256.0)) / 255.0;
+	// (bytes taken out as integers: floor(v + 0.5) rounds up past 2^23 and float division can
+	// land on 256, so bright keys - white 0xFFFFFF - came out red)
+	int x = int(round(v));
+	return vec3(float(x >> 16), float((x >> 8) & 255), float(x & 255)) / 255.0;
 }
 
 // The light on screen: the level's contrast curve and floor (on the light alone: the grass's

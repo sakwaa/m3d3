@@ -83,6 +83,28 @@ var _z_from := Transform3D()
 var _z_swing_from := 0.0
 var _lag := Vector3.ZERO
 var _aiming := false
+## Slope tilt (OoT Normal1's slopePitchAdj): the smoothed slope ahead (radians, + uphill) and
+## the tilt it last added to the rig's pitch (taken off again before the next one).
+var _slope := 0.0
+var _slope_applied := 0.0
+var _slope_ground := 0.0
+
+
+## Slope tilt (OoT z_camera.c Camera_GetPitchAdjFromFloorHeightDiffs + Normal1): the floor is
+## probed ahead of the player along the view, near (SLOPE_NEAR x the player's height) and far
+## (SLOPE_FAR x, the far probe stopping at walls), from SLOPE_PROBE_Y x height up; the two
+## rises turn into angles (weighted SLOPE_NEAR_WEIGHT / the rest) and add up. Walking down a
+## hill the eye rises to see down it; walking up, it drops to look up it (uphill softened by
+## cos, as OoT does). Added on top of the stick / mouse pitch, eased in (slower while running).
+const SLOPE_HEIGHT := 1.6  # the player's height (OoT: Player_GetHeight)
+const SLOPE_PROBE_Y := 1.2
+const SLOPE_NEAR := 1.0
+const SLOPE_FAR := 2.5
+const SLOPE_NEAR_WEIGHT := 0.8
+## Easing: OoT's per-frame step at 20 Hz, (1/60)*0.5 running .. twice that standing - about
+## 6 s / 3 s to settle. SLOPE_SPEED scales it (1 = OoT).
+const SLOPE_SPEED := 1.0
+const SLOPE_MAX := 0.6  # (radians: steeper probes - ledges, stairs' risers - clamp here)
 
 
 ## The see-through capsule: aimed this high on the player, this wide (metres).
@@ -195,6 +217,8 @@ func _process(delta: float) -> void:
 		Vector4(0, 0, 0, 0) if override else Vector4(_ip(player).x, _ip(player).y + SEE_THROUGH_HEIGHT, _ip(player).z, SEE_THROUGH_RADIUS))
 	if override:
 		return
+	pitch.rotation.x -= _slope_applied  # (this frame's tilt goes on in the follow branch)
+	_slope_applied = 0.0
 	_lag = _ip(player) - player.global_position
 	if aiming():
 		if not _aiming:
@@ -240,6 +264,7 @@ func _process(delta: float) -> void:
 			pitch.rotation.x = lerp_angle(pitch.rotation.x, -deg_to_rad(active.pitch), k)
 			if active.lock_turn and Vector2(player.velocity.x, player.velocity.z).length() > 0.5:
 				yaw.rotation.y = lerp_angle(yaw.rotation.y, atan2(-player.facing.x, -player.facing.z), clampf(2.5 * delta, 0.0, 1.0))
+		_slope_tilt(delta)
 		target = orbit.global_transform
 		target.origin += _lag
 	else:
@@ -393,3 +418,57 @@ func _cam_ray(a: Vector3, b: Vector3) -> Dictionary:
 			exclude.append((n as CollisionObject3D).get_rid())
 	q.exclude = exclude
 	return player.get_world_3d().direct_space_state.intersect_ray(q)
+
+
+## The slope ahead (see SLOPE_*), eased, added to the rig's pitch for this frame.
+func _slope_tilt(delta: float) -> void:
+	var climbing := player.has_tag(&"climbing")
+	if player.is_on_floor():
+		_slope_ground = player.global_position.y
+	var want := 0.0 if climbing else _slope_probe()
+	var speed_ratio := clampf(Vector2(player.velocity.x, player.velocity.z).length() / 6.0, 0.0, 1.0)
+	# (OoT: LERP step (1/unk_10)*0.5 + the same x (1 - speedRatio), unk_10 = 60, per 20 Hz frame)
+	var step := (0.5 / 60.0) * (2.0 - speed_ratio) * SLOPE_SPEED
+	_slope = lerpf(_slope, want, 1.0 - pow(1.0 - minf(step, 1.0), delta * 20.0))
+	# (Camera_CalcDefaultPitch: uphill counts cos(adj) x adj, downhill all of it; the eye pitch
+	# target drops by it - the rig's pitch, - looking down, rises by it)
+	var tilt := cos(_slope) * _slope if _slope > 0.0 else _slope
+	var lim := pitch_limits()
+	var before := pitch.rotation.x
+	pitch.rotation.x = clampf(before + tilt, minf(lim.x, before), maxf(lim.y, before))
+	_slope_applied = pitch.rotation.x - before
+
+
+## Camera_GetPitchAdjFromFloorHeightDiffs: radians, + where the floor ahead (along the view)
+## rises above the player's.
+func _slope_probe() -> float:
+	var fwd := -view.global_basis.z
+	fwd.y = 0.0
+	if fwd.length() < 0.01:
+		return _slope
+	fwd = fwd.normalized()
+	var ground := _slope_ground
+	var from := Vector3(player.global_position.x, ground + SLOPE_HEIGHT * SLOPE_PROBE_Y, player.global_position.z)
+	var near_d := SLOPE_HEIGHT * SLOPE_NEAR
+	var far_d := SLOPE_HEIGHT * SLOPE_FAR
+	var far_at := from + fwd * far_d
+	var wall := _cam_ray(from, far_at)
+	if not wall.is_empty():
+		# (stopped by a wall: just off it, and the near probe no further)
+		far_at = wall.position + wall.normal * 0.12
+		far_d = Vector2(far_at.x - from.x, far_at.z - from.z).length()
+	var near_at := from + fwd * minf(near_d, far_d)
+	near_d = minf(near_d, far_d)
+	var y_near := _floor_y(near_at, ground)
+	var y_far := _floor_y(far_at, y_near)
+	if near_d < 0.05 or far_d < 0.05:
+		return 0.0
+	var a := atan2(SLOPE_NEAR_WEIGHT * (y_near - ground), near_d)
+	var b := atan2((1.0 - SLOPE_NEAR_WEIGHT) * (y_far - ground), far_d)
+	return clampf(a + b, -SLOPE_MAX, SLOPE_MAX)
+
+
+## The floor under `at` (from its height down 6 m), else `fallback`.
+func _floor_y(at: Vector3, fallback: float) -> float:
+	var hit := _cam_ray(at, at + Vector3.DOWN * (SLOPE_HEIGHT * SLOPE_PROBE_Y + 6.0))
+	return hit.position.y if not hit.is_empty() and hit.normal.y > 0.3 else fallback

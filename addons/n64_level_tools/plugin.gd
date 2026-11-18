@@ -1015,6 +1015,8 @@ func _on_action(action: StringName) -> void:
 		&"noria": _place_prop(PropSpec.Kind.NORIA)
 		&"machine_door": _place_prop(PropSpec.Kind.MACHINE_DOOR)
 		&"waterfall": _place_prop(PropSpec.Kind.WATERFALL)
+		&"light_shaft": _place_prop(PropSpec.Kind.LIGHT_SHAFT)
+		&"ambience": _place_prop(PropSpec.Kind.AMBIENCE)
 		&"drips": _add_roof_drips()
 		&"house": _place_house()
 		&"shop": _place_house(true)
@@ -2748,6 +2750,9 @@ func _place_prop(kind := PropSpec.Kind.SIGN, settings := {}) -> void:
 			at = hit.position
 		var to_cam := camera.global_position - at
 		yaw = snappedf(atan2(to_cam.x, to_cam.z), PI / 4.0)
+	if kind == PropSpec.Kind.LIGHT_SHAFT:
+		# (its origin is the top: lifted so the beam lands where the view looks)
+		at -= Basis(Vector3.UP, yaw) * LightShaft.foot_offset(float(settings.get(&"length", LightShaft.LENGTH)), float(settings.get(&"tilt", LightShaft.TILT)))
 	var step := maxf(snap, 0.25)
 	at.x = snappedf(at.x, step)
 	at.z = snappedf(at.z, step)

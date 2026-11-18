@@ -184,6 +184,12 @@ func painted_height(x: float, z: float, reach := 0.75) -> float:
 	set(v):
 		detail = v
 		emit_changed()
+## How far simplifying the carpet's outline may move it (metres): bigger = fewer triangles,
+## coarser edges (undergrowth in a forest can take 0.3).
+@export_range(0.02, 0.5, 0.01, "suffix:m") var outline_tolerance := 0.06:
+	set(v):
+		outline_tolerance = v
+		emit_changed()
 ## Top texture (metres per repeat) and its colour; the edge skirt is the same, darker.
 @export var top_texture: Texture2D = preload("res://textures/grass/ground_cover_3.res"):
 	set(v):

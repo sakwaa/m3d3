@@ -20,9 +20,8 @@ const TUFT_SHADER := preload("res://addons/n64_runtime/shaders/n64_grass_tuft.gd
 const BIN := 4.0
 const FIELD_SCRIPT := "res://game/world/grass_field.gd"
 ## Carpet outline: how close to a grid point it snaps onto it (share of a step: no
-## slivers), and how far simplifying may move it (metres).
+## slivers). (How far simplifying may move it: GrassSettings.outline_tolerance.)
 const SNAP := 0.25
-const OUTLINE_TOLERANCE := 0.06
 
 
 ## The grass nodes for `root` (not yet in the tree; level-local transforms).
@@ -332,7 +331,7 @@ static func build(root: LevelRoot, s: GrassSettings) -> Array[Node3D]:
 			var buf: _MatBuf = tiles[key].mat
 			var simple: Array[PackedVector2Array] = []
 			for loop in loops:
-				var sl := _simplify(loop, border, OUTLINE_TOLERANCE)
+				var sl := _simplify(loop, border, s.outline_tolerance)
 				if sl.size() >= 3:
 					simple.append(sl)
 			var idx0 := buf.index.size()

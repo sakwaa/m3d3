@@ -18,8 +18,9 @@ extends Node
 ##    that shift aside once the wheel runs (capstan "fork" -> gate "gate" -> water "side" ->
 ##    wheel "wheel" -> doors);
 ##  - the mountain wrapping round the back and sides; the river goes under it to the east
-##    beneath a pile of boulders; forest (mostly firs) on the slopes; Forest clouds weather
-##    most days (Zone.local_weather; refs c1-c4).
+##    beneath a pile of boulders; forest (firs, pines, some broadleaf) and undergrowth on the
+##    slopes; grey mossy stone; Mountain rain weather always (Zone.local_weather; refs c1-c4,
+##    forest_path_1/2, mountain_mist_1/2).
 ## All level brushes and prop brushes (edited with the level tools afterwards).
 ##   godot --headless --path . tests/zones/gen_forest_citadel.tscn
 ## Rerunning rebuilds the level (edits made since are lost).
@@ -39,8 +40,20 @@ var T_STEPS: int
 var T_GRAVEL: int
 var T_BOULDER: int
 var T_DIRT: int
+var T_MOSS: int
+var T_BARK: int
+var T_WALL: int
 ## The waterfall's foot (x, z) and the river's last row upstream (x).
 var _fall := Vector2.ZERO
+var _trees: Array[Vector3] = []
+var _fall_at := Vector3.ZERO
+## Spots the undergrowth carpet keeps off (x, z, radius): it drapes over whatever is highest
+## below it, so on a lintel or a lantern it would hang in sheets.
+var _clear: Array[Vector3] = []
+## Trail legs (TRAIL index) with a wall, and which side (+1 / -1 along the leg's left normal).
+var _wall_side := {}
+## Rocks whose tops can carry a pine ([brush, chance]).
+var _tops := []
 var _fall_x0 := -100.0
 
 ## The slope and terrace (metres; the arrival is y 0): the hillside rises from ARRIVE_Z to the
@@ -49,7 +62,7 @@ var _fall_x0 := -100.0
 const ARRIVE_Z := -128.0
 const FRONT_Z := -20.0
 const TERRACE_Z := 46.0
-const TERRACE_X := 46.0
+const TERRACE_X := 36.0  # (was 46: 25 m of bare floor each side of the church)
 const P := 30.0
 const UP := 50.0
 ## The church on it: centre CHURCH_Z; cross half span, arm half width, arms' and tower's heights.
@@ -109,8 +122,13 @@ const CLIFF_RUN := 7.5
 ## entrance cleft (a ~11 m gap at the arrival) up to the side walls, each stretch one big
 ## faceted rock (its height over the ground there). Behind them the land climbs on
 ## (SPUR_RISE per metre past SPUR_BACK, up to SPUR_RISE_MAX), faded out up by the terrace.
-const SPUR := [Vector3(5.5, -164.0, 24.0), Vector3(6.0, -140.0, 30.0), Vector3(46.0, -122.0, 34.0),
-	Vector3(58.0, -92.0, 40.0), Vector3(70.0, -62.0, 44.0), Vector3(77.0, -30.0, 44.0)]
+## (Spatial compression, 2026-11-18: the valley walls stand ~8-12 m past the switchbacks'
+## turns at x +-36 - they were out at 58-77 m, leaving 40-50 m of dead flank each side.)
+const SPUR := [Vector3(5.5, -164.0, 24.0), Vector3(6.0, -140.0, 30.0), Vector3(40.0, -122.0, 34.0),
+	Vector3(46.0, -92.0, 40.0), Vector3(46.0, -62.0, 44.0), Vector3(47.0, -30.0, 44.0),
+	# (on along the terrace's sides, standing on its walls' top edge, to the river terrace: no
+	# dead hillside beside the church, and no way up there but the carved stairs)
+	Vector3(TERRACE_X + 1.0, 4.0, 34.0), Vector3(TERRACE_X + 0.5, 40.0, 28.0)]
 const SPUR_DEPTH := 26.0
 const SPUR_BACK := 12.0
 const SPUR_RISE := 0.6
@@ -130,8 +148,9 @@ func _ready() -> void:
 		load("res://textures/ground/dirt_ground.res"), load("res://textures/rock/sandstone_2.res"),
 		load("res://textures/rock/river_rock_1.res"), load("res://textures/rock/stone_blocks_granite.res"),
 		load("res://textures/ground/sand_2.res"), load("res://textures/rock/granite_3.res"),
-		load("res://textures/ground/brown_earth_2.res")])
-	T_GRASS = 0; T_CLIFF = 1; T_FLOOR = 2; T_CHURCH = 3; T_RIVER = 4; T_STEPS = 5; T_GRAVEL = 6; T_BOULDER = 7; T_DIRT = 8
+		load("res://textures/ground/brown_earth_2.res"), load("res://textures/grass/moss_patch.res"),
+		load("res://textures/wood/tree_bark.res"), load("res://textures/rock/stone_wall_rubble.res")])
+	T_GRASS = 0; T_CLIFF = 1; T_FLOOR = 2; T_CHURCH = 3; T_RIVER = 4; T_STEPS = 5; T_GRAVEL = 6; T_BOULDER = 7; T_DIRT = 8; T_MOSS = 9; T_BARK = 10; T_WALL = 11
 	data.brushes = []
 	var zone: Node = (load(PATH) as PackedScene).instantiate()
 	add_child(zone)
@@ -162,16 +181,16 @@ func _ready() -> void:
 	get_tree().quit()
 
 
-## Spawn at the foot of the slope, facing up it; the name; its own weather (Forest clouds most
-## days); forest fog otherwise.
+## Spawn in the entrance cleft, facing up the slope; the name; its own weather (Mountain rain,
+## always); forest fog under it; the mountain ring.
 func _scene_setup() -> void:
 	var scene: PackedScene = load(PATH)
 	var z := scene.instantiate()
 	(z.get_node("Spawn_default") as Node3D).position = Vector3(0.0, 0.0, -154.0)  # (in the entrance cleft)
 	(z.get_node("Spawn_default") as Node3D).rotation.y = PI  # (facing +Z: up the slope)
 	z.set(&"display_name", "Forest Citadel")
-	z.set(&"local_weather", &"forest_clouds")
-	z.set(&"local_weather_chance", 0.75)
+	z.set(&"local_weather", &"mountain_rain")  # (always: rain and cloud banks in the fog - ancient, hidden)
+	z.set(&"local_weather_chance", 1.0)
 	var fog := FogSettings.new()
 	fog.start = 25.0
 	fog.end = 120.0
@@ -187,8 +206,14 @@ func _scene_setup() -> void:
 	mr.layer_radius = PackedFloat32Array([230.0, 400.0])
 	mr.layer_height_min = PackedFloat32Array([100.0, 140.0])
 	mr.layer_height_max = PackedFloat32Array([210.0, 300.0])
-	mr.sharpness = 2.2
-	mr.snow_line = 0.8
+	mr.sharpness = 3.0
+	# (refs mountain_mist_1/2: grey granite peaks over dark forest, moss and pines on the tops)
+	mr.foot_color = Color(0.1, 0.15, 0.09)
+	mr.rock_color = Color(0.52, 0.53, 0.54)
+	mr.rock_texture = load("res://textures/rock/granite_3.res")
+	mr.snow_color = Color(0.2, 0.27, 0.16)
+	mr.snow_texture = load("res://textures/grass/1_moss.res")
+	mr.snow_line = 0.9
 	mr.open_arcs = [Vector2(345.0, 15.0)] as Array[Vector2]
 	z.add_child(mr)
 	mr.owner = z
@@ -272,8 +297,11 @@ func _build() -> void:
 	_steps()
 	_spurs()
 	_lips()
-	_forest()
-	_card_rows()
+	# (SKIP=spires,ruins,...: leave parts out, to see what each costs)
+	var skip := OS.get_environment("SKIP").split(",")
+	for step: StringName in [&"spires", &"crown_pines", &"trail_walls", &"ruins", &"moments", &"floor_clutter", &"forest", &"card_rows", &"undergrowth", &"ferns", &"birds", &"atmosphere", &"palette"]:
+		if not String(step) in skip:
+			call(StringName("_" + step))
 
 
 ## All the ground as one heightfield brush: the hillside with its paths, the terrace and its
@@ -672,6 +700,16 @@ func _church() -> void:
 	_block(Vector3(w, f, c - w), Vector3(ARM, top, c + w), T_CHURCH, T_CHURCH, Surface.Sound.STONE)  # east
 	_block(Vector3(-w, f, c - ARM), Vector3(w, top, c - w), T_CHURCH, T_CHURCH, Surface.Sound.STONE)  # south
 	_block(Vector3(-w, f, c - w), Vector3(w, P + TOWER_H, c + w), T_CHURCH, T_CHURCH, Surface.Sound.STONE)  # tower
+	# The tower's crown (less of a box): a narrower belfry stage, a stone pyramid roof, and
+	# stubby pinnacles at the arms' roof corners round its foot.
+	var tt := P + TOWER_H
+	_block(Vector3(-w * 0.72, tt, c - w * 0.72), Vector3(w * 0.72, tt + 6.0, c + w * 0.72), T_CHURCH, T_CHURCH, Surface.Sound.STONE)
+	var roof := _add(_shape(BrushShapes.Shape.PYRAMID, Vector3(w * 1.7, 9.0, w * 1.7), Transform3D(Basis(), Vector3(0.0, tt + 6.0, c))))
+	_paint(roof, T_CHURCH, T_CHURCH, Surface.Sound.STONE, Surface.Sound.STONE)
+	for sx: float in [-1.0, 1.0]:
+		for sz: float in [-1.0, 1.0]:
+			var pin := _add(_shape(BrushShapes.Shape.PYRAMID, Vector3(1.6, 4.0, 1.6), Transform3D(Basis(), Vector3(sx * (w + 0.9), top, c + sz * (w + 0.9)))))
+			_paint(pin, T_CHURCH, T_CHURCH, Surface.Sound.STONE, Surface.Sound.STONE)
 	# North arm: solid to 4 m short of its end, then its end round a doorway (x -2.5..2.5, up
 	# 7 m) 4 m deep.
 	var d0 := c + ARM - 4.0
@@ -811,7 +849,7 @@ func _machine() -> void:
 	var trough := SIDE_W * 0.5 + 3.0
 	var y0 := _pool_y(WHEEL_X) - POOL_DEEP + 0.3
 	_prop(PropSpec.Kind.NORIA, {input = &"side", output = &"wheel", radius = r, width = 3.4, dip = 0.0, buckets = 24,
-		rpm = 1.5, trough_length = trough, trough_flip = true},
+		rpm = 1.5, trough_length = trough, trough_flip = true, wood_texture = load("res://textures/wood/wood_weathered_grey.res")},  # (old grey wood)
 		Transform3D(Basis(Vector3.UP, atan2(-1.0, -wdz)), Vector3(WHEEL_X, y0, wz)))
 	# The aqueduct: from the trough's end south over the carved wall into the north arm's end
 	# high up (a channel into the wall); a pillar on the river terrace, one in the courtyard.
@@ -849,6 +887,7 @@ func _waterfall() -> void:
 	var at := Vector3(q.x, _water_y(q.x), q.y)
 	_prop(PropSpec.Kind.WATERFALL, {height = top - at.y, width = 10.0, strands = 4, lean = CLIFF_RUN + 1.0, speed = 1.8,
 		foam_radius = 6.0, seed = 5}, Transform3D(Basis(Vector3.UP, atan2(down.x, down.y)), at))
+	_fall_at = at
 
 
 ## Big grey low-poly standing rocks: a ring round the plunge pool (tall against the cliff,
@@ -1030,6 +1069,23 @@ func _boulder(at: Vector3, size: Vector3, rng: RandomNumberGenerator) -> LevelBr
 	ft.fill(T_BOULDER)
 	fs.resize(n_faces)
 	fs.fill(Surface.Sound.STONE)
+	# (moss on the faces looking up: old stones in a wet forest)
+	var at_i := 0
+	for fi in n_faces:
+		var cnt: int = hb.counts[fi]
+		var nn := Vector3.ZERO
+		var fc := Vector3.ZERO
+		for i in cnt:
+			var p0: Vector3 = hb.verts[hb.indices[at_i + i]]
+			var p1: Vector3 = hb.verts[hb.indices[at_i + (i + 1) % cnt]]
+			nn += Vector3((p0.y - p1.y) * (p0.z + p1.z), (p0.z - p1.z) * (p0.x + p1.x), (p0.x - p1.x) * (p0.y + p1.y))
+			fc += p0
+		fc /= cnt
+		if nn.dot(fc - Vector3(0, h * 0.5, 0)) < 0.0:
+			nn = -nn  # (outward)
+		if nn.normalized().y > 0.55:
+			ft[fi] = T_MOSS
+		at_i += cnt
 	bb.face_textures = ft
 	bb.face_surfaces = fs
 	# (a cool grey over the stone texture)
@@ -1055,12 +1111,12 @@ func _spur_x(z: float) -> float:
 
 ## The land climbing on behind the spurs (into the mountain), faded out up by the terrace.
 func _spur_rise(x: float, z: float) -> float:
-	if z > -20.0:
+	if z > TERRACE_Z:
 		return 0.0
 	var d := absf(x) - (_spur_x(z) + SPUR_BACK)
 	if d <= 0.0:
 		return 0.0
-	return minf(d * SPUR_RISE, SPUR_RISE_MAX) * (1.0 - smoothstep(-45.0, -20.0, z))
+	return minf(d * SPUR_RISE, SPUR_RISE_MAX) * (1.0 - smoothstep(TERRACE_Z - 16.0, TERRACE_Z, z))
 
 
 ## The side spurs: each stretch of SPUR (both sides) one big faceted rock along the valley's
@@ -1102,6 +1158,7 @@ func _spurs() -> void:
 			var ya := _land(a.x, a.y).x
 			var yb := _land(b.x, b.y).x
 			var br := _crag(Vector3(a.x, ya, a.y), dir, out, (yb - ya) / l, 0.0, box, cuts, T_GRASS, T_CLIFF, &"spur")
+			_tops.append([br, 0.7])
 			tris += _tri_count(br)
 	print("spurs: %d triangles" % tris)
 
@@ -1129,9 +1186,12 @@ func _lips() -> void:
 		var jut := rng.randf_range(5.0, 8.0)
 		var a := p - dir * l * 0.5
 		var y := _land(p.x, p.y).x + 0.3
-		tris += _tri_count(_crag(Vector3(a.x, y, a.y), dir, out, 0.0, -0.12, AABB(Vector3(0, -t, -6.0), Vector3(l, t, 6.0 + jut)),
-			_lip_cuts(l, t, 6.0, jut, rng), T_GRASS, T_CLIFF, &"lip"))
-	for r: Vector2 in [Vector2(-42, -30), Vector2(-25, -13), Vector2(14, 26), Vector2(30, 39)]:
+		var lb := _crag(Vector3(a.x, y, a.y), dir, out, 0.0, -0.12, AABB(Vector3(0, -t, -6.0), Vector3(l, t, 6.0 + jut)),
+			_lip_cuts(l, t, 6.0, jut, rng), T_GRASS, T_CLIFF, &"lip")
+		_tops.append([lb, 0.45])
+		tris += _tri_count(lb)
+	for r0: Vector2 in [Vector2(-42, -30), Vector2(-25, -13), Vector2(14, 26), Vector2(30, 39)]:
+		var r := r0 * (TERRACE_X / 46.0)  # (laid out for a 46 m half-width terrace)
 		var y: float = minf(minf(_land(r.x, TERRACE_Z + 0.6).x, _land(r.y, TERRACE_Z + 0.6).x), _land((r.x + r.y) * 0.5, TERRACE_Z + 0.6).x) - 0.05
 		var l: float = r.y - r.x
 		tris += _tri_count(_crag(Vector3(r.x, y, TERRACE_Z + 0.6), Vector2(1, 0), Vector2(0, -1), 0.0, 0.0,
@@ -1301,40 +1361,790 @@ func _clip_hull(faces: Array[PackedVector3Array], n: Vector3, d: float) -> Array
 func _forest() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 11
-	var kinds := ["fir", "fir", "fir", "oak", "sycamore"]
+	# (broadleaf woods - tall straight trunks under a high canopy - with firs for dark mass)
+	var kinds := ["fir", "fir", "umbrella_red_pine", "swiss_stone_pine", "oak", "tulip_tree"]
 	var placed := 0
 	for i in 1400:
 		var p := Vector3(rng.randf_range(-120, 120), 0.0, rng.randf_range(-150, 120))
-		if absf(p.x) < TERRACE_X + 4.0 and p.z > FRONT_Z - 4.0 and p.z < TERRACE_Z + 2.0:
-			continue  # (the terrace and its rim)
 		if _path_at(p.x, p.z).x < PATH_HALF + 2.5:
 			continue  # (the paths)
 		if absf(p.x) < 6.0 and p.z < ARRIVE_Z + 6.0:
 			continue  # (the arrival)
-		if p.z < -30.0 and absf(p.x) > _spur_x(p.z) - 2.0:
-			continue  # (in or behind the side spurs)
-		var cd := _cliff_d(p.x, p.z)
-		if cd > -4.0 and cd < 14.0:
-			continue  # (the cliff's foot and face)
-		if p.z > TERRACE_Z - 2.0:
-			var e := _edges(p.x)
-			if p.z > e[0] - 7.0 and p.z < e[3] + 5.0:
-				continue  # (the river, its banks, the capstan)
-			if Vector2(p.x, p.z).distance_to(_fall) < POOL_R + 6.0:
-				continue  # (the pool and its rocks)
-			if absf(p.x - WHEEL_X) < 6.0 and p.z < e[0]:
-				continue  # (under the aqueduct)
-			if p.x > TERRACE_X - 6.0 and p.x < TERRACE_X + 4.0 and p.z < TERRACE_Z + 6.0:
-				continue  # (the top of the carved stairs)
+		if not _wild(p.x, p.z):
+			continue
 		p.y = _land(p.x, p.z).x
 		var dist := Vector2(p.x, p.z - CHURCH_Z).length()
 		var sp: String = kinds[rng.randi() % kinds.size()]
-		var settings := {species = load(SPECIES + sp + ".tres"), seed = rng.randi_range(1, 99999), size = rng.randf_range(0.9, 1.5)}
+		var settings := {species = load(SPECIES + sp + ".tres"), seed = rng.randi_range(1, 99999), size = rng.randf_range(0.9, 1.5),
+			card_distance = 40.0}  # (the far card from 40 m: fog has them by then; pays for the undergrowth)
 		if dist > 110.0:
 			settings.card_only = true
 			settings.collide = false
 		_prop(PropSpec.Kind.TREE, settings, Transform3D(Basis(Vector3.UP, rng.randf() * TAU), p))
+		_trees.append(p)
 		placed += 1
 		if placed >= 230:
 			break
 	print("trees: %d" % placed)
+
+
+## Open ground the forest can grow on: not the terrace, the cliff's foot and face, the
+## river and its banks, the pool, under the aqueduct, the top of the carved stairs, or in
+## or behind the side spurs.
+func _wild(x: float, z: float) -> bool:
+	if absf(x) < TERRACE_X + 4.0 and z > FRONT_Z - 4.0 and z < TERRACE_Z + 2.0:
+		return false  # (the terrace and its rim)
+	if z < -30.0 and absf(x) > _spur_x(z) - 2.0:
+		return false  # (in or behind the side spurs)
+	var cd := _cliff_d(x, z)
+	if cd > -4.0 and cd < 14.0:
+		return false  # (the cliff's foot and face)
+	if z > TERRACE_Z - 2.0:
+		var e := _edges(x)
+		if z > e[0] - 7.0 and z < e[3] + 5.0:
+			return false  # (the river, its banks, the capstan)
+		if Vector2(x, z).distance_to(_fall) < POOL_R + 6.0:
+			return false  # (the pool and its rocks)
+		if absf(x - WHEEL_X) < 6.0 and z < e[0]:
+			return false  # (under the aqueduct)
+		if x > TERRACE_X - 6.0 and x < TERRACE_X + 4.0 and z < TERRACE_Z + 6.0:
+			return false  # (the top of the carved stairs)
+	return true
+
+
+## The undergrowth (refs forest_path_1/2: shrubs crowding the trail, leafy floor): the level's
+## grass carpet painted (not auto-filled) as knee-to-waist-high leafy mounds - heaped along
+## the paths' sides, round the tree feet, in patches over the slopes - waded through (no
+## collision), with shrub cut-outs for its tufts (also scattered over the bare floor).
+const UNDER_ORIGIN := Vector2(-126.0, -170.0)
+const UNDER_SIZE := Vector2(252.0, 296.0)
+
+
+func _undergrowth() -> void:
+	var s := GrassSettings.new()
+	s.auto_fill = false
+	s.area = Rect2(UNDER_ORIGIN, UNDER_SIZE)
+	var floor_tex: Array[Texture2D] = [data.textures[T_GRASS]]
+	s.grass_textures = floor_tex  # (not the moss: mossy stone tops aren't ground for shrubs)
+	s.edge_style = GrassSettings.EdgeStyle.CARPET  # (mound banks cost ~3x the triangles)
+	s.outline_tolerance = 0.3
+	s.top_texture = load("res://textures/grass/ground_cover_3.res")
+	s.tile = 2.0
+	s.color = Color(0.27, 0.35, 0.19)
+	s.patchiness = 0.5
+	s.edge_dark = 0.6
+	s.tuft_texture = load("res://textures/plants/shrub_feijoa.res")
+	s.tuft_color = Color(0.62, 0.72, 0.55)
+	s.tuft_size = 1.2
+	s.tuft_size_var = 0.4
+	s.tufts = 0.1
+	s.edge_tufts = 3.0
+	s.open_tufts = 0.35
+	s.carpet_tufts = 1.2
+	s.near_distance = 10.0
+	s.far_distance = 28.0  # (far cards: past that the fog has the shrubs; was 50)
+	s.paint_max = 2.0
+	var cell := GrassSettings.PAINT_CELL
+	var w := int(UNDER_SIZE.x / cell)
+	var h := int(UNDER_SIZE.y / cell)
+	var img := Image.create(w, h, false, Image.FORMAT_L8)
+	var noise := FastNoiseLite.new()
+	noise.seed = 53
+	noise.frequency = 0.09
+	var near := {}  # (1 m cells within reach of a tree's foot)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 59
+	for t in _trees:
+		if rng.randf() > 0.6:
+			continue
+		var r := rng.randf_range(1.8, 3.2)
+		for dz in range(-4, 5):
+			for dx in range(-4, 5):
+				if dx * dx + dz * dz <= r * r:
+					near[Vector2i(floori(t.x) + dx, floori(t.z) + dz)] = true
+	var painted := 0
+	var step := 4  # (decided per metre, 4 x 4 paint cells)
+	for j in range(0, h, step):
+		for i in range(0, w, step):
+			var x := UNDER_ORIGIN.x + (i + step * 0.5) * cell
+			var z := UNDER_ORIGIN.y + (j + step * 0.5) * cell
+			var pd := _path_at(x, z).x
+			if pd < PATH_HALF + 0.4:
+				continue
+			var land := _land(x, z)
+			if land.y != 0.0 or not _wild(x, z):
+				continue
+			var blocked := false
+			for c in _clear:
+				if Vector2(x - c.x, z - c.y).length() < c.z:
+					blocked = true
+					break
+			if blocked:
+				continue  # (ruins, stones, logs: the carpet would drape over them)
+			var gx := _land(x + 1.0, z).x - _land(x - 1.0, z).x
+			var gz := _land(x, z + 1.0).x - _land(x, z - 1.0).x
+			if Vector2(gx, gz).length() * 0.5 > 0.9:
+				continue  # (too steep: rock)
+			var n := noise.get_noise_2d(x, z)
+			var want := n * 0.25 - 0.15  # (lumpy, but nothing out on the open slopes)
+			# (crowding the trail; in the cleft only in broken clumps - two even rows read planted)
+			var gate := 1.0 if z > ARRIVE_Z + 8.0 else (1.0 if noise.get_noise_2d(x * 3.1 + 40.0, z * 3.1) > 0.05 else 0.0)
+			if pd < PATH_HALF + 3.5:
+				want += (0.5 - (pd - PATH_HALF) * 0.1) * gate
+			if near.has(Vector2i(floori(x), floori(z))):
+				want += 0.45
+			if want <= 0.0:
+				continue
+			var height := clampf(0.3 + want * 0.4, 0.3, 0.7)  # (knee-high leafy cover: the shrub cut-outs stand over it)
+			var v := s.value_of(height)
+			for dj in step:
+				for di in step:
+					if i + di < w and j + dj < h:
+						img.set_pixel(i + di, j + dj, Color(v / 255.0, 0, 0))
+			painted += 1
+	s.paint_origin = UNDER_ORIGIN
+	s.paint_map = img
+	data.grass = s
+	print("undergrowth: %d m2 painted" % painted)
+
+
+## The palette (refs forest_path_1/2): a darker, cooler forest floor than the town lawns
+## (deep olive in the shade, moss-green lit) and a darker, browner trail.
+func _palette() -> void:
+	data.base_tints = {
+		data.textures[T_GRASS]: PackedColorArray([Color(0.13, 0.19, 0.07), Color(0.36, 0.46, 0.18)]),
+		data.textures[T_DIRT]: PackedColorArray([Color(0.33, 0.23, 0.13), Color(0.5, 0.36, 0.21)]),
+	}
+	# (the tints are half-strength blends: the adjusts after them do the darkening)
+	var floor_adj := ColourAdjust.new()
+	floor_adj.brightness = 0.55
+	floor_adj.saturation = 0.9
+	floor_adj.hue = 12.0  # (yellow-green -> green)
+	floor_adj.temperature = -0.12
+	var trail_adj := ColourAdjust.new()
+	trail_adj.brightness = 0.72
+	trail_adj.saturation = 0.9
+	# Old grey stone (refs mountain_mist_1/2): the cliffs, spurs and boulders granite grey, the
+	# carved terrace and church weathered nearly grey.
+	var rock_adj := ColourAdjust.new()
+	rock_adj.saturation = 0.2
+	rock_adj.brightness = 0.9
+	rock_adj.temperature = -0.08
+	var boulder_adj := ColourAdjust.new()
+	boulder_adj.saturation = 0.35
+	var moss_adj := ColourAdjust.new()  # (old dark moss, not lawn green)
+	moss_adj.brightness = 0.5
+	moss_adj.saturation = 0.7
+	moss_adj.hue = 8.0
+	var bark_adj := ColourAdjust.new()  # (dark wet roots and logs)
+	bark_adj.saturation = 0.35
+	bark_adj.brightness = 0.6
+	bark_adj.temperature = 0.15
+	var wall_adj := ColourAdjust.new()  # (old fieldstone: grey, a little green, darker in the wet)
+	wall_adj.saturation = 0.45
+	wall_adj.brightness = 0.85
+	wall_adj.hue = 20.0
+	var wet_adj := ColourAdjust.new()  # (the river terrace's sand: wet grey gravel, not beach)
+	wet_adj.saturation = 0.35
+	wet_adj.brightness = 0.7
+	var old_adj := ColourAdjust.new()
+	old_adj.saturation = 0.35
+	old_adj.brightness = 0.82
+	data.base_tile_sizes = {data.textures[T_WALL]: 1.8}  # (fieldstones ~0.45 m)
+	data.base_adjusts = {data.textures[T_GRASS]: floor_adj, data.textures[T_DIRT]: trail_adj,
+		data.textures[T_CLIFF]: rock_adj, data.textures[T_BOULDER]: boulder_adj,
+		data.textures[T_CHURCH]: old_adj, data.textures[T_STEPS]: boulder_adj,
+		data.textures[T_GRAVEL]: wet_adj, data.textures[T_MOSS]: moss_adj, data.textures[T_BARK]: bark_adj,
+		data.textures[T_WALL]: wall_adj}
+
+
+# --- Ancient, hidden (refs mountain_mist_1/2) ----------------------------------------------------
+
+## Granite spires: clusters of tall tapering rock towers standing behind the side spurs and
+## on the mountain behind the back cliff (never where the player walks), mossy on their
+## ledges, for the mist to wrap round. Each tower a box tapered in from all four sides,
+## faceted and cut off slanting at the top (~30-40 triangles).
+func _spires() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 61
+	var spots := []  # [x, z, main height]
+	for x: float in [-100.0, -62.0, -24.0, 20.0, 58.0, 96.0]:
+		var z := _cliff_foot(x) + CLIFF_RUN + rng.randf_range(22.0, 40.0)
+		spots.append([x + rng.randf_range(-8.0, 8.0), z, rng.randf_range(48.0, 72.0)])
+	for side: float in [1.0, -1.0]:
+		for z: float in [-150.0, -112.0, -74.0, -40.0]:
+			var x := side * (_spur_x(z) + SPUR_BACK + rng.randf_range(16.0, 30.0))
+			if z < -140.0:
+				x = side * rng.randf_range(24.0, 34.0)  # (flanking the entrance cleft)
+			spots.append([x, z, rng.randf_range(38.0, 62.0)])
+	var tris := 0
+	var n := 0
+	for s in spots:
+		var cluster := rng.randi_range(3, 4)
+		for k in cluster:
+			var h: float = s[2] * (1.0 if k == 0 else rng.randf_range(0.5, 0.85))
+			var off := Vector2.ZERO if k == 0 else Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(4.0, 8.0)
+			var x: float = s[0] + off.x
+			var z: float = s[1] + off.y
+			# (never into the valley: outside the spurs' backs, behind the back cliff's top)
+			var reach := clampf(h * 0.42, 8.0, 22.0) * 0.75 + 3.0  # (its half width, turned, and a gap)
+			if z < -20.0:
+				var edge := (_spur_x(z) if z > -140.0 else 6.0) + SPUR_BACK * 0.5 + reach
+				if absf(x) < edge:
+					x = signf(s[0]) * edge
+			else:
+				z = maxf(z, _cliff_foot(x) + CLIFF_RUN + 8.0 + reach)
+			var br := _spire(Vector3(x, _land(x, z).x, z), h, rng)
+			_tops.append([br, 0.8])
+			tris += _tri_count(br)
+			n += 1
+	print("spires: %d, %d triangles" % [n, tris])
+
+
+## One tower: 2-3 granite blocks stacked, each narrower, shifted a little and turned, so the
+## outline steps in at ledges (moss and pines on them) like the stacked, jointed towers in
+## the refs - not one box. Returns the top block (the others join _tops themselves).
+func _spire(foot: Vector3, h: float, rng: RandomNumberGenerator) -> LevelBrush:
+	var w := clampf(h * rng.randf_range(0.3, 0.42), 8.0, 22.0)
+	var d := w * rng.randf_range(0.7, 1.05)
+	var parts := 2 if h < 45.0 else 3
+	var base := foot.y - 12.0
+	var at := Vector2(foot.x, foot.z)
+	var yaw := rng.randf() * TAU
+	var top: LevelBrush
+	for k in parts:
+		var t0 := float(k) / parts
+		var t1 := float(k + 1) / parts
+		var y1 := foot.y + h * t1 * rng.randf_range(0.97, 1.03) if k < parts - 1 else foot.y + h
+		var b := _spire_block(Vector3(at.x, base, at.y), y1 - base, w, d, yaw, k == parts - 1, rng)
+		if k < parts - 1:
+			_tops.append([b, 0.5])
+		top = b
+		# (the next block: from a little under this one's top, narrower, shifted, turned)
+		base = y1 - h / parts * 0.25
+		at += Vector2.from_angle(rng.randf() * TAU) * w * rng.randf_range(0.05, 0.15)
+		w *= rng.randf_range(0.62, 0.78)
+		d *= rng.randf_range(0.62, 0.78)
+		yaw += rng.randf_range(-0.5, 0.5)
+	return top
+
+
+func _spire_block(foot: Vector3, h: float, w: float, d: float, yaw: float, last: bool, rng: RandomNumberGenerator) -> LevelBrush:
+	var box := AABB(Vector3.ZERO, Vector3(w, h, d))
+	var top_w := rng.randf_range(0.7, 0.88) if not last else rng.randf_range(0.45, 0.65)
+	var tu := w * (1.0 - top_w) * 0.5 / h
+	var tv := d * (1.0 - top_w) * 0.5 / h
+	var cuts := [[Vector3(-1, tu, 0), 0.0], [Vector3(1, tu, 0), w], [Vector3(0, tv, -1), 0.0], [Vector3(0, tv, 1), d]]
+	# (vertical facets down the faces, then chamfers round the top: weathered, not a roof)
+	for f in 3:
+		cuts.append(_cut(Vector3(rng.randf_range(-1, 1), rng.randf_range(-0.05, 0.15), rng.randf_range(-1, 1)), box, rng.randf_range(0.84, 0.94)))
+	for f in 5:
+		var a := TAU * f / 5.0 + rng.randf_range(-0.4, 0.4)
+		cuts.append(_cut(Vector3(cos(a), rng.randf_range(0.9, 1.8), sin(a)), box, rng.randf_range(0.94, 0.98)))
+	var dir := Vector2.from_angle(yaw)
+	var out := Vector2(-dir.y, dir.x)
+	var origin := foot - Vector3(dir.x, 0, dir.y) * w * 0.5 - Vector3(out.x, 0, out.y) * d * 0.5
+	return _crag(origin, dir, out, 0.0, 0.0, box, cuts, T_MOSS, T_CLIFF, &"spire")
+
+
+## Pines on the rock tops (the spires, spurs and brows): flat-topped pines rooted on a ledge
+## facing up, or the highest point; small, no collision, far cards from 40 m.
+func _crown_pines() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 67
+	var kinds := ["umbrella_red_pine", "swiss_stone_pine", "umbrella_red_pine", "fir"]
+	var n := 0
+	for t in _tops:
+		var b: LevelBrush = t[0]
+		if rng.randf() > float(t[1]):
+			continue
+		var spots := _ledges(b)
+		for k in mini(rng.randi_range(1, 2), spots.size()):
+			var p: Vector3 = spots[k]
+			var sp: String = kinds[rng.randi() % kinds.size()]
+			_prop(PropSpec.Kind.TREE, {species = load(SPECIES + sp + ".tres"), seed = rng.randi_range(1, 99999),
+				size = rng.randf_range(0.45, 0.8), collide = false, card_distance = 40.0},
+				Transform3D(Basis(Vector3.UP, rng.randf() * TAU), p - Vector3(0, 0.3, 0)))
+			n += 1
+	print("crown pines: %d" % n)
+
+
+## A brush's faces looking up (world centroids, biggest first), else its highest point.
+func _ledges(b: LevelBrush) -> Array:
+	var out := []
+	var at := 0
+	var centre := Vector3.ZERO
+	for v in b.vertices:
+		centre += v
+	centre /= maxf(b.vertices.size(), 1)
+	var best := Vector3(0, -INF, 0)
+	for fi in b.face_counts.size():
+		var cnt: int = b.face_counts[fi]
+		var nn := Vector3.ZERO
+		var fc := Vector3.ZERO
+		for i in cnt:
+			var p0: Vector3 = b.vertices[b.face_indices[at + i]]
+			var p1: Vector3 = b.vertices[b.face_indices[at + (i + 1) % cnt]]
+			nn += Vector3((p0.y - p1.y) * (p0.z + p1.z), (p0.z - p1.z) * (p0.x + p1.x), (p0.x - p1.x) * (p0.y + p1.y))
+			fc += p0
+			if p0.y > best.y:
+				best = p0
+		fc /= cnt
+		if nn.dot(fc - centre) < 0.0:
+			nn = -nn
+		if nn.normalized().y > 0.75 and nn.length() > 8.0:  # (area x2 > 8 m2)
+			out.append([nn.length(), b.transform * fc])
+		at += cnt
+	out.sort_custom(func(a, c): return a[0] > c[0])
+	var pts := out.map(func(e): return e[1])
+	if pts.is_empty():
+		pts.append(b.transform * best)
+	return pts
+
+
+## Old stonework: a worn gateway in the entrance cleft (the threshold), stone lanterns along
+## the trail (some toppled), broken wall stubs off the switchbacks, toppled pillars on the
+## terrace. Granite blocks, moss on top.
+func _ruins() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 71
+	var tris := 0
+	# The gateway: two pillars and a lintel across the trail, one pillar leaning.
+	var gz := -140.0
+	var g := _land(0.0, gz).x
+	_clear.append(Vector3(0.0, gz, 7.5))
+	for sx: float in [-1.0, 1.0]:
+		var pil := _add(_shape(BrushShapes.Shape.BLOCK, Vector3(1.4, 7.2, 1.4),
+			Transform3D(Basis(Vector3.BACK, sx * (0.03 if sx > 0 else 0.0)), Vector3(sx * 3.5, g - 0.6, gz))))
+		_paint(pil, T_MOSS, T_STEPS, Surface.Sound.STONE, Surface.Sound.STONE)
+		tris += _tri_count(pil)
+	var lintel := _add(_shape(BrushShapes.Shape.BLOCK, Vector3(10.0, 1.1, 1.8), Transform3D(Basis(Vector3.BACK, 0.025), Vector3(0.0, g + 6.55, gz))))
+	_paint(lintel, T_MOSS, T_STEPS, Surface.Sound.STONE, Surface.Sound.STONE)
+	var cap := _add(_shape(BrushShapes.Shape.BLOCK, Vector3(11.4, 0.5, 2.4), Transform3D(Basis(Vector3.BACK, 0.025), Vector3(0.2, g + 7.65, gz))))
+	_paint(cap, T_MOSS, T_STEPS, Surface.Sound.STONE, Surface.Sound.STONE)
+	tris += _tri_count(lintel) + _tri_count(cap)
+	# Lanterns along the walking legs of the trail (not the stone-step climbs).
+	var lanterns := 0
+	var side := 1.0
+	for i in TRAIL.size() - 1:
+		if TRAIL[i][2]:
+			continue
+		var a := Vector2(TRAIL[i][0], TRAIL[i][1])
+		var b := Vector2(TRAIL[i + 1][0], TRAIL[i + 1][1])
+		if a.y < -140.0:
+			continue  # (the cleft: the gateway is enough)
+		var l := a.distance_to(b)
+		var dir := (b - a) / l
+		var t := 6.0
+		while t < l - 4.0:
+			var lside: float = -float(_wall_side[i]) if _wall_side.has(i) else side  # (walls: lanterns go downhill)
+			var q := a + dir * t + Vector2(-dir.y, dir.x) * lside * (PATH_HALF + 1.0)
+			tris += _lantern(Vector3(q.x, _land(q.x, q.y).x, q.y), rng.randf() < 0.25, rng)
+			_clear.append(Vector3(q.x, q.y, 3.0))
+			lanterns += 1
+			side = -side
+			t += rng.randf_range(16.0, 24.0)
+	# Broken wall stubs off the switchback turns, and a line of them below the terrace front.
+	var stubs := 0
+	for i in range(1, TRAIL.size() - 1):
+		if rng.randf() < 0.45:
+			continue
+		var p := Vector2(TRAIL[i][0], TRAIL[i][1])
+		var outv := Vector2(signf(p.x) if p.x != 0.0 else 1.0, 0.0)
+		var q := p + outv * rng.randf_range(4.0, 7.0) + Vector2(0, rng.randf_range(-3.0, 3.0))
+		if _path_at(q.x, q.y).x < PATH_HALF + 1.5 or not _wild(q.x, q.y):
+			continue
+		tris += _wall_stub(Vector3(q.x, _land(q.x, q.y).x, q.y), rng)
+		_clear.append(Vector3(q.x, q.y, 5.0))
+		stubs += 1
+	for x: float in [-30.0, -21.0, 19.0, 27.0]:
+		var z := FRONT_Z - 6.0 + rng.randf_range(-1.5, 1.5)
+		if _path_at(x, z).x < PATH_HALF + 1.5:
+			continue
+		tris += _wall_stub(Vector3(x, _land(x, z).x, z), rng)
+		stubs += 1
+	# Toppled pillars on the terrace (drums lying in the grass), one still standing broken.
+	for spot0: Vector3 in [Vector3(-33.0, 0.0, -9.0), Vector3(35.0, 0.0, 30.0), Vector3(-31.0, 0.0, 33.0)]:
+		var spot := Vector3(spot0.x * TERRACE_X / 46.0, 0.0, spot0.z)  # (laid out for a 46 m half-width terrace)
+		var yaw := rng.randf() * TAU
+		var lying := Basis(Vector3.UP, yaw) * Basis(Vector3.BACK, PI * 0.5)
+		var col := _add(_shape(BrushShapes.Shape.CYLINDER, Vector3(1.0, rng.randf_range(4.0, 6.0), 1.0),
+			Transform3D(lying, Vector3(spot.x, P + 0.38, spot.z) - Basis(Vector3.UP, yaw) * Vector3(2.5, 0, 0)), 8))
+		_paint(col, T_MOSS, T_CHURCH, Surface.Sound.STONE, Surface.Sound.STONE)
+		tris += _tri_count(col)
+	var stand := _add(_shape(BrushShapes.Shape.CYLINDER, Vector3(1.0, 3.2, 1.0), Transform3D(Basis(), Vector3(-36.0 * TERRACE_X / 46.0, P, -4.0)), 8))
+	_paint(stand, T_MOSS, T_CHURCH, Surface.Sound.STONE, Surface.Sound.STONE)
+	tris += _tri_count(stand)
+	print("ruins: gateway, %d lanterns, %d wall stubs, 4 pillars: %d triangles" % [lanterns, stubs, tris])
+
+
+## A stone lantern (base, shaft, lamp box, roof) at `at`, or lying toppled beside its base.
+func _lantern(at: Vector3, toppled: bool, rng: RandomNumberGenerator) -> int:
+	var yaw := Basis(Vector3.UP, rng.randf() * TAU)
+	var parts := [[Vector3(0.8, 0.35, 0.8), 0.0], [Vector3(0.34, 1.0, 0.34), 0.25], [Vector3(0.7, 0.55, 0.7), 1.25]]
+	var tris := 0
+	var base := _add(_shape(BrushShapes.Shape.BLOCK, parts[0][0], Transform3D(yaw, at - Vector3(0, 0.1, 0))))
+	_paint(base, T_MOSS, T_STEPS, Surface.Sound.STONE, Surface.Sound.STONE)
+	tris += _tri_count(base)
+	var lie := yaw * Basis(Vector3.BACK, PI * 0.5)
+	var fall := yaw * Vector3(1, 0, 0)
+	for k in range(1, 3):
+		var size: Vector3 = parts[k][0]
+		var xf := Transform3D(yaw, at + Vector3(0, parts[k][1], 0))
+		if toppled:
+			xf = Transform3D(lie, at + fall * (0.9 + parts[k][1]) + Vector3(0, size.x * 0.5 - 0.05, 0))
+		var pb := _add(_shape(BrushShapes.Shape.BLOCK, size, xf))
+		_paint(pb, T_MOSS, T_STEPS, Surface.Sound.STONE, Surface.Sound.STONE)
+		tris += _tri_count(pb)
+	if not toppled:
+		var roof := _add(_shape(BrushShapes.Shape.PYRAMID, Vector3(1.05, 0.45, 1.05), Transform3D(yaw, at + Vector3(0, 1.8, 0))))
+		_paint(roof, T_MOSS, T_STEPS, Surface.Sound.STONE, Surface.Sound.STONE)
+		tris += _tri_count(roof)
+	return tris
+
+
+## A broken stretch of old wall: a thin slab, its top knocked off at slants, sunk a little.
+func _wall_stub(at: Vector3, rng: RandomNumberGenerator) -> int:
+	var l := rng.randf_range(3.5, 7.0)
+	var h := rng.randf_range(1.2, 3.0)
+	var t := 0.8
+	var box := AABB(Vector3(0, -0.6, 0), Vector3(l, h + 0.6, t))
+	var cuts := []
+	for f in 3:
+		var u := rng.randf_range(0.1, 0.9) * l
+		var n := Vector3(rng.randf_range(-1.2, 1.2), 1.0, 0.0)
+		cuts.append([n, n.dot(Vector3(u, h * rng.randf_range(0.45, 1.0), 0))])
+	var dir := Vector2.from_angle(rng.randf() * TAU)
+	var origin := at - Vector3(dir.x, 0, dir.y) * l * 0.5
+	var b := _crag(origin, dir, Vector2(-dir.y, dir.x), 0.0, 0.0, box, cuts, T_MOSS, T_STEPS, &"ruin")
+	return _tri_count(b)
+
+
+## The forest floor: roots crossing the trail (low, half buried), stones at its edges, mossy
+## logs fallen beside it.
+func _floor_clutter() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 73
+	var roots := 0
+	var stones := 0
+	var tris := 0
+	for i in TRAIL.size() - 1:
+		var a := Vector2(TRAIL[i][0], TRAIL[i][1])
+		var b := Vector2(TRAIL[i + 1][0], TRAIL[i + 1][1])
+		if TRAIL[i][2] or b.y > FRONT_Z - 1.0:
+			continue
+		var l := a.distance_to(b)
+		var dir := (b - a) / l
+		var t := rng.randf_range(4.0, 9.0)
+		while t < l - 2.0:
+			var q := a + dir * t
+			# A root: a thin bar across the trail at a slant, showing ~12 cm.
+			var across := Vector2(-dir.y, dir.x).rotated(rng.randf_range(-0.5, 0.5))
+			var rl := PATH_HALF * 2.0 + rng.randf_range(1.5, 3.0)
+			var o := q - across * rl * 0.5
+			var y := minf(_land(o.x, o.y).x, _land(o.x + across.x * rl, o.y + across.y * rl).x) - 0.2
+			var box := AABB(Vector3(0, -0.15, -0.14), Vector3(rl, 0.47, 0.28))
+			var cuts := [_cut(Vector3(0, 1, 1), box, 0.7), _cut(Vector3(0, 1, -1), box, 0.7)]
+			var slope := (_land(o.x + across.x * rl, o.y + across.y * rl).x - _land(o.x, o.y).x) / rl
+			var rb := _crag(Vector3(o.x, y, o.y), across, Vector2(-across.y, across.x), slope, 0.0, box, cuts, T_BARK, T_BARK, &"root")
+			tris += _tri_count(rb)
+			roots += 1
+			t += rng.randf_range(9.0, 16.0)
+		# Stones along both edges.
+		var u := rng.randf_range(2.0, 6.0)
+		while u < l:
+			var sd := -1.0 if rng.randf() < 0.5 else 1.0
+			var q := a + dir * u + Vector2(-dir.y, dir.x) * sd * (PATH_HALF + rng.randf_range(0.3, 1.2))
+			var sz := Vector3(rng.randf_range(0.5, 1.1), rng.randf_range(0.35, 0.8), rng.randf_range(0.5, 1.0))
+			if _blocked(q.x, q.y):
+				u += rng.randf_range(10.0, 20.0)
+				continue
+			var sb := _boulder(Vector3(q.x, _land(q.x, q.y).x - sz.y * 0.25, q.y), sz, rng)
+			_clear.append(Vector3(q.x, q.y, 1.4))
+			tris += _tri_count(sb)
+			stones += 1
+			u += rng.randf_range(10.0, 20.0)
+	# Fallen logs beside the trail, along the slope.
+	var logs := 0
+	for spot: Vector2 in [Vector2(14.0, -117.0), Vector2(-20.0, -86.0), Vector2(22.0, -60.0), Vector2(-14.0, -34.0)]:
+		if _path_at(spot.x, spot.y).x < PATH_HALF + 2.0:
+			continue
+		var yaw := rng.randf_range(-0.4, 0.4) + (PI * 0.5 if rng.randf() < 0.5 else 0.0)
+		var ll := rng.randf_range(6.0, 9.0)
+		# (its whole length clear of the trail: else turned a quarter, else left out)
+		var crosses := func(y: float) -> bool:
+			for k in 7:
+				var q := Vector2(spot.x, spot.y) + Vector2.from_angle(-y) * ll * (k / 6.0 - 0.5)
+				if _path_at(q.x, q.y).x < PATH_HALF + 1.0:
+					return true
+			return false
+		if crosses.call(yaw):
+			yaw += PI * 0.5
+			if crosses.call(yaw):
+				continue
+		# (a cylinder stands on +Y; laid down it runs along -X from its origin: start at +X)
+		var lie := Basis(Vector3.UP, yaw) * Basis(Vector3.BACK, PI * 0.5)
+		var start := Vector3(spot.x, 0, spot.y) + Basis(Vector3.UP, yaw) * Vector3(ll * 0.5, 0, 0)
+		var y := _land(spot.x, spot.y).x + 0.25
+		var lg := _add(_shape(BrushShapes.Shape.CYLINDER, Vector3(0.9, ll, 0.9), Transform3D(lie, Vector3(start.x, y, start.z)), 6))
+		_paint(lg, T_MOSS, T_BARK, Surface.Sound.WOOD, Surface.Sound.WOOD)
+		_clear.append(Vector3(spot.x, spot.y, ll * 0.5 + 1.5))
+		tris += _tri_count(lg)
+		logs += 1
+	print("floor clutter: %d roots, %d stones, %d logs: %d triangles" % [roots, stones, logs, tris])
+
+
+## Ferns (LevelData scatter: crossed cut-outs, one MultiMesh per 48 m cell): along the trail's
+## edges, round the tree feet, a few on the open slopes; drawn to 18 m.
+func _ferns() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 79
+	var fern := ScatterSet.new()
+	fern.texture = load("res://textures/plants/fern_clump.res")
+	fern.style = ScatterSet.Style.CROSS
+	fern.size = 0.9
+	fern.edge = ScatterSet.Edge.DARKEN
+	fern.draw_distance = 18.0  # (close detail: past that the shrubs and fog carry it)
+	var pts := []  # (an Array: the lambda below appends to the same one)
+	var add := func(x: float, z: float) -> void:
+		if _path_at(x, z).x < PATH_HALF + 0.3 or not _wild(x, z) or _land(x, z).y != 0.0 or _blocked(x, z):
+			return
+		pts.append(Vector4(x, _land(x, z).x - 0.05, z, rng.randf_range(0.7, 1.4)))
+	for i in TRAIL.size() - 1:
+		var a := Vector2(TRAIL[i][0], TRAIL[i][1])
+		var b := Vector2(TRAIL[i + 1][0], TRAIL[i + 1][1])
+		var l := a.distance_to(b)
+		var dir := (b - a) / l
+		var t := 0.0
+		while t < l:
+			var sd := -1.0 if rng.randf() < 0.5 else 1.0
+			var q := a + dir * t + Vector2(-dir.y, dir.x) * sd * (PATH_HALF + rng.randf_range(0.4, 2.5))
+			add.call(q.x, q.y)
+			t += rng.randf_range(1.2, 3.0)
+	for tr in _trees:
+		for k in rng.randi_range(0, 3):
+			var q := Vector2(tr.x, tr.z) + Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(0.8, 2.5)
+			add.call(q.x, q.y)
+	for k in 150:
+		add.call(rng.randf_range(-110, 110), rng.randf_range(-150, 40))
+	fern.points = PackedVector4Array(pts)
+	# (replace the ferns of an earlier run: the level's scatter sets survive regenerating)
+	var sets: Array[ScatterSet] = []
+	for old: ScatterSet in data.scatter:
+		if old and old.texture != fern.texture:
+			sets.append(old)
+	sets.append(fern)
+	data.scatter = sets
+	print("ferns: %d" % pts.size())
+
+
+## Birds wheeling round the spires and the back cliff (dark, crow-like).
+func _birds() -> void:
+	for spot: Vector3 in [Vector3(-60.0, 0.0, 130.0), Vector3(40.0, 0.0, -90.0)]:
+		var y := _land(spot.x, spot.z).x + 25.0
+		_prop(PropSpec.Kind.BIRD_FLOCK, {radius = 30.0, min_birds = 4, max_birds = 8, size = 1.1,
+			body_color = Color(0.13, 0.13, 0.14), belly_color = Color(0.22, 0.22, 0.24), wing_color = Color(0.08, 0.08, 0.09),
+			beak_color = Color(0.25, 0.22, 0.2), active_from = 0.0, active_to = 24.0}, Transform3D(Basis(), Vector3(spot.x, y, spot.z)))
+
+
+## Light and sound: shafts of daylight slanting through the mist (into the valley, onto the
+## river terrace), a column of spray at the waterfall's foot, and the ambience - rain (all
+## over), the waterfall's roar, the river, wind high up.
+func _atmosphere() -> void:
+	# (a shaft's origin is its top; it falls down -Y leaning `tilt` towards local +Z)
+	for s: Array in [[Vector3(18.0, 0.0, -78.0), 58.0, 0.6, 24.0], [Vector3(-26.0, 0.0, 70.0), 52.0, 2.4, 18.0],
+			[Vector3(6.0, 0.0, -122.0), 46.0, 0.3, 14.0]]:
+		var p: Vector3 = s[0]
+		p.y = _land(p.x, p.z).x + float(s[1]) * 0.9
+		_prop(PropSpec.Kind.LIGHT_SHAFT, {length = s[1], radius_top = 3.0, radius_bottom = 9.0, tilt = s[3], intensity = 0.3},
+			Transform3D(Basis(Vector3.UP, s[2]), p))
+	# Spray: a pale, soft column standing in the plunge pool.
+	_prop(PropSpec.Kind.LIGHT_SHAFT, {length = 16.0, radius_top = 7.0, radius_bottom = 5.0, tilt = 0.0, intensity = 0.22,
+		color = Color(0.86, 0.9, 0.92), shimmer = 0.9}, Transform3D(Basis(), _fall_at + Vector3(0, 15.0, 2.0)))
+	# (sound: AmbientSound.Sound RAIN 0, WATERFALL 1, STREAM 2, WIND 3 - by number: the class may not be registered yet)
+	_prop(PropSpec.Kind.AMBIENCE, {sound = 0, volume = 0.7}, Transform3D(Basis(), Vector3(0, 0, -150)))
+	_prop(PropSpec.Kind.AMBIENCE, {sound = 3, volume = 0.35}, Transform3D(Basis(), Vector3(0, 0, -150)))
+	_prop(PropSpec.Kind.AMBIENCE, {sound = 1, volume = 0.9, radius = 70.0}, Transform3D(Basis(), _fall_at))
+	for x: float in [-40.0, 0.0, 40.0]:
+		_prop(PropSpec.Kind.AMBIENCE, {sound = 2, volume = 0.6, radius = 30.0},
+			Transform3D(Basis(), Vector3(x, _water_y(x), RIVER_Z)))
+	print("atmosphere: 3 shafts, spray, 6 ambience")
+
+
+## Inside one of the _clear circles (ruins, stones, logs, walls).
+func _blocked(x: float, z: float) -> bool:
+	for c in _clear:
+		if Vector2(x - c.x, z - c.y).length() < c.z:
+			return true
+	return false
+
+
+## Old dry-stone walls (refs s1-s4: fieldstone walls in the woods) along the high side of
+## the trail's walking legs, so the path reads from afar: knee-to-waist high, in broken
+## sections (4-11 m, 2-6 m gaps), ends slumped, the top lumpy and mossy, the face bulging a
+## little, tumbled stones lying in the gaps. One strip brush a section (~6 triangles a metre).
+func _trail_walls() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 83
+	var tris := 0
+	var sections := 0
+	var metres := 0.0
+	for i in TRAIL.size() - 1:
+		if TRAIL[i][2]:
+			continue  # (the stone-step climbs)
+		var a := Vector2(TRAIL[i][0], TRAIL[i][1])
+		var b := Vector2(TRAIL[i + 1][0], TRAIL[i + 1][1])
+		if a.y < -140.0 or b.y > FRONT_Z - 1.0:
+			continue  # (the cleft; the terrace front)
+		var l := a.distance_to(b)
+		var dir := (b - a) / l
+		var left := Vector2(-dir.y, dir.x)
+		var mid := (a + b) * 0.5
+		var rise := _land(mid.x + left.x * 4.0, mid.y + left.y * 4.0).x - _land(mid.x - left.x * 4.0, mid.y - left.y * 4.0).x
+		if absf(rise) < 0.4:
+			continue  # (flat both sides: no high side)
+		var side := 1.0 if rise > 0.0 else -1.0
+		_wall_side[i] = side
+		var up := left * side
+		var t := rng.randf_range(0.5, 3.0)
+		while t < l - 1.5:
+			var t1 := minf(t + rng.randf_range(4.0, 11.0), l - 0.5)
+			tris += _dry_wall(a, dir, up, t, t1, rng)
+			sections += 1
+			metres += t1 - t
+			var gap := rng.randf_range(2.0, 6.0)
+			# (stones tumbled out into the gap, some towards the path)
+			for k in rng.randi_range(0, 2):
+				var s := minf(t1 + rng.randf_range(0.3, gap - 0.3), l - 0.3)
+				var q := a + dir * s + up * (PATH_HALF + rng.randf_range(0.2, 0.9))
+				var sz := Vector3(rng.randf_range(0.4, 0.75), rng.randf_range(0.3, 0.55), rng.randf_range(0.4, 0.7))
+				tris += _tri_count(_boulder(Vector3(q.x, _land(q.x, q.y).x - sz.y * 0.3, q.y), sz, rng))
+			t = t1 + gap
+	print("trail walls: %d sections, %.0f m, %d triangles" % [sections, metres, tris])
+
+
+## One section from `t0` to `t1` along the leg (a + dir t), standing `up` of the path: a
+## sample every ~0.6 m (lumpy top: a row of rocks against the sky), its face bulging in and
+## out at mid height stone by stone.
+func _dry_wall(a: Vector2, dir: Vector2, up: Vector2, t0: float, t1: float, rng: RandomNumberGenerator) -> int:
+	var d := PATH_HALF + 0.6  # (the wall's middle, from the path's middle)
+	var thick := 0.75
+	var h0 := rng.randf_range(0.95, 1.3)
+	var n := maxi(ceili((t1 - t0) / 0.6), 2)
+	var fb: Array[Vector3] = []
+	var fm: Array[Vector3] = []
+	var ft: Array[Vector3] = []
+	var bt: Array[Vector3] = []
+	var bb: Array[Vector3] = []
+	var dip := rng.randf_range(0.0, 1.0)  # (where a stretch of it has come down, along it)
+	for k in n + 1:
+		var s := lerpf(t0, t1, float(k) / n)
+		var u := float(k) / n
+		var lean := rng.randf_range(-0.06, 0.06)
+		var front := a + dir * s + up * (d - thick * 0.5 + lean)
+		var back := a + dir * s + up * (d + thick * 0.5 + lean * 0.5)
+		var yf := _land(front.x, front.y).x
+		var yb := _land(back.x, back.y).x
+		var slump := smoothstep(0.0, 1.2, s - t0) * smoothstep(0.0, 1.2, t1 - s)  # (ends tumbled down)
+		var broken := 1.0 - 0.45 * exp(-pow((u - dip) * 4.0, 2.0)) if (t1 - t0) > 6.0 else 1.0
+		# (every other sample a rock's crown, between them the joint: a bumpy row of stones)
+		var bump := (0.1 if k % 2 == 0 else -0.08) + rng.randf_range(-0.08, 0.08)
+		var top := yf + h0 * lerpf(0.35, 1.0, slump) * broken + bump
+		top = maxf(top, yb + 0.4 * lerpf(0.5, 1.0, slump))  # (standing proud of the slope behind)
+		var bottom := minf(yf, yb) - 0.45
+		var mid_out := rng.randf_range(0.04, 0.16) if k % 2 == 0 else rng.randf_range(-0.04, 0.04)
+		var mid := a + dir * s + up * (d - thick * 0.5 + lean - mid_out)
+		fb.append(Vector3(front.x, bottom, front.y))
+		fm.append(Vector3(mid.x, lerpf(maxf(bottom, yf), top, 0.5), mid.y))
+		ft.append(Vector3(front.x + up.x * 0.06, top, front.y + up.y * 0.06))
+		bt.append(Vector3(back.x, top - rng.randf_range(0.0, 0.1), back.y))
+		bb.append(Vector3(back.x, bottom, back.y))
+	var o := fb[0]
+	var hb := BrushShapes.Builder.new()
+	var ft_tex := PackedInt32Array()
+	var fs := PackedInt32Array()
+	var out3 := Vector3(up.x, 0, up.y)
+	var add := func(p: Array, outward: Vector3, tex: int) -> void:
+		hb.face(p.map(func(v): return v - o), outward)
+		ft_tex.append(tex)
+		fs.append(Surface.Sound.STONE)
+	for k in n:
+		add.call([fb[k], fb[k + 1], fm[k + 1]], -out3, T_WALL)
+		add.call([fb[k], fm[k + 1], fm[k]], -out3, T_WALL)
+		add.call([fm[k], fm[k + 1], ft[k + 1]], -out3, T_WALL)
+		add.call([fm[k], ft[k + 1], ft[k]], -out3, T_WALL)
+		add.call([ft[k], ft[k + 1], bt[k + 1]], Vector3.UP, T_MOSS)
+		add.call([ft[k], bt[k + 1], bt[k]], Vector3.UP, T_MOSS)
+		add.call([bt[k], bt[k + 1], bb[k + 1]], out3, T_WALL)
+		add.call([bt[k], bb[k + 1], bb[k]], out3, T_WALL)
+	var along := Vector3(dir.x, 0, dir.y)
+	add.call([fb[0], fm[0], ft[0], bt[0], bb[0]], -along, T_WALL)
+	add.call([fb[n], bb[n], bt[n], ft[n], fm[n]], along, T_WALL)
+	var br := LevelBrush.new()
+	br.vertices = hb.verts
+	br.face_indices = hb.indices
+	br.face_counts = hb.counts
+	br.hand_edited = true
+	br.transform = Transform3D(Basis(), o)
+	br.face_textures = ft_tex
+	br.face_surfaces = fs
+	br.tag = &"wall"
+	_add(br)
+	for k in n + 1:
+		var c := (ft[k] + bt[k]) * 0.5
+		_clear.append(Vector3(c.x, c.z, 1.3))
+	return _tri_count(br)
+
+
+## Moments in the pockets the trail leaves (found by tests/zones/empty_space_map): a ring of
+## old standing stones round a mossy altar in the lower west corner, below the second leg;
+## a collapsed hut - two broken wall corners and its fallen lintel - east of the middle legs.
+func _moments() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 89
+	var tris := 0
+	# The stone circle.
+	var c := Vector2(-26.0, -114.0)
+	var g := _land(c.x, c.y).x
+	for k in 9:
+		if k == 3 or k == 7:
+			continue  # (two have fallen)
+		var a := TAU * k / 9.0 + rng.randf_range(-0.12, 0.12)
+		var p := c + Vector2.from_angle(a) * 6.5
+		var h := rng.randf_range(1.6, 2.6)
+		var st := _add(_shape(BrushShapes.Shape.BLOCK, Vector3(0.9, h, 0.5),
+			Transform3D(Basis(Vector3.UP, -a + PI * 0.5) * Basis(Vector3.RIGHT, rng.randf_range(-0.12, 0.12)), Vector3(p.x, _land(p.x, p.y).x - 0.3, p.y))))
+		_paint(st, T_MOSS, T_BOULDER, Surface.Sound.STONE, Surface.Sound.STONE)
+		tris += _tri_count(st)
+	for k: int in [3, 7]:
+		var a := TAU * k / 9.0
+		var p := c + Vector2.from_angle(a) * 7.4
+		var lie := Basis(Vector3.UP, -a) * Basis(Vector3.BACK, PI * 0.5)
+		var st := _add(_shape(BrushShapes.Shape.BLOCK, Vector3(0.5, 2.2, 0.9), Transform3D(lie, Vector3(p.x, _land(p.x, p.y).x + 0.15, p.y))))
+		_paint(st, T_MOSS, T_BOULDER, Surface.Sound.STONE, Surface.Sound.STONE)
+		tris += _tri_count(st)
+	var altar := _add(_shape(BrushShapes.Shape.BLOCK, Vector3(2.0, 0.9, 1.2), Transform3D(Basis(Vector3.UP, 0.3), Vector3(c.x, g - 0.2, c.y))))
+	_paint(altar, T_MOSS, T_STEPS, Surface.Sound.STONE, Surface.Sound.STONE)
+	tris += _tri_count(altar)
+	_clear.append(Vector3(c.x, c.y, 8.5))
+	# The collapsed hut: two corners of its walls still standing, the rest a low stub, the
+	# door lintel fallen across the threshold.
+	var h0 := Vector2(30.0, -80.0)
+	var yaw := 0.4
+	var bx := Basis(Vector3.UP, yaw)
+	for corner: Array in [[Vector3(-2.5, 0, -2.0), 2.6], [Vector3(2.5, 0, 2.0), 1.7]]:
+		var o: Vector3 = bx * corner[0]
+		var at := Vector2(h0.x + o.x, h0.y + o.z)
+		var y := _land(at.x, at.y).x - 0.3
+		var hh: float = corner[1]
+		for wall: Array in [[Vector3(2.4, hh, 0.5), Vector3(1.0, 0, 0)], [Vector3(0.5, hh * 0.85, 2.0), Vector3(0, 0, 0.8)]]:
+			var off: Vector3 = bx * (wall[1] * signf(-corner[0].x))
+			var wb := _add(_shape(BrushShapes.Shape.BLOCK, wall[0], Transform3D(bx, Vector3(at.x + off.x, y, at.y + off.z))))
+			_paint(wb, T_MOSS, T_WALL, Surface.Sound.STONE, Surface.Sound.STONE)
+			tris += _tri_count(wb)
+	var lintel := _add(_shape(BrushShapes.Shape.BLOCK, Vector3(2.2, 0.35, 0.45),
+		Transform3D(bx * Basis(Vector3.FORWARD, 0.2), Vector3(h0.x, _land(h0.x, h0.y).x + 0.1, h0.y))))
+	_paint(lintel, T_MOSS, T_BARK, Surface.Sound.WOOD, Surface.Sound.WOOD)
+	tris += _tri_count(lintel)
+	_clear.append(Vector3(h0.x, h0.y, 5.0))
+	print("moments: stone circle, collapsed hut: %d triangles" % tris)

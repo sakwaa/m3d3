@@ -47,7 +47,7 @@ func _ready() -> void:
 	var at := p.global_position
 	_check("switchback", Vector2(at.x - b.x, at.z - b.z).length() < 1.5 and at.y > 2.0, "player at %s" % at)
 	# The carved stairs: from the walkway at their foot up the east wall, walking north.
-	p.teleport(Transform3D(Basis.IDENTITY, Vector3(43.5, 30.4, 4.0)))
+	p.teleport(Transform3D(Basis.IDENTITY, Vector3(33.5, 30.4, 4.0)))  # (the generator's TERRACE_X - 2.5)
 	p.facing = Vector3.BACK
 	for i in 60 * 30:
 		p.intent.move = Vector3.BACK

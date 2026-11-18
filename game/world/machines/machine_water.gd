@@ -93,27 +93,44 @@ func _rebuild() -> void:
 	_place()
 
 
-## The `strip` surface: each pair of rows a band of quads, split across about every 2 m.
+## The strip's vertex spacing across (metres).
+const STRIP_STEP := 2.5
+
+
+## The `strip` surface: rows zipped into bands, each row split about every STRIP_STEP m.
 func _strip_mesh() -> ArrayMesh:
-	var across := 1
-	for r in strip:
-		across = maxi(across, ceili((r.z - r.y) / 2.0))
+	# Each row split by its own width (a vertex every STRIP_STEP m across), neighbouring rows
+	# zipped together (a long thin river no longer carries the widest pool's split on every
+	# row; no T-junctions: every triangle uses only the two rows' own vertices).
+	var counts := PackedInt32Array()
+	var starts := PackedInt32Array()
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	st.set_normal(Vector3.UP)
-	for i in strip.size():
-		var r := strip[i]
+	var n := 0
+	for r in strip:
+		var across := maxi(ceili((r.z - r.y) / STRIP_STEP), 1)
+		counts.append(across)
+		starts.append(n)
 		for k in across + 1:
 			st.add_vertex(Vector3(lerpf(r.y, r.z, float(k) / across), 0.0, r.x))
+		n += across + 1
 	for i in strip.size() - 1:
-		for k in across:
-			var a := i * (across + 1) + k
-			var b := a + across + 1
-			# (counter-clockwise seen from above: facing up)
-			st.add_index(a); st.add_index(a + 1); st.add_index(b)
-			st.add_index(a + 1); st.add_index(b + 1); st.add_index(b)
-	var m := st.commit()
-	return m
+		var na := counts[i]
+		var nb := counts[i + 1]
+		var a0 := starts[i]
+		var b0 := starts[i + 1]
+		var ia := 0
+		var ib := 0
+		while ia < na or ib < nb:
+			# (advance along whichever row is behind; counter-clockwise seen from above)
+			if ib >= nb or (ia < na and float(ia + 1) / na <= float(ib + 1) / nb):
+				st.add_index(a0 + ia); st.add_index(a0 + ia + 1); st.add_index(b0 + ib)
+				ia += 1
+			else:
+				st.add_index(a0 + ia); st.add_index(b0 + ib + 1); st.add_index(b0 + ib)
+				ib += 1
+	return st.commit()
 
 
 func prop_bounds() -> AABB:

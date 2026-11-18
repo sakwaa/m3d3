@@ -295,6 +295,58 @@ cloud_banks_height = 14.0
 wind = 0.9
 gusts = 0.4
 
+[sub_resource type="Resource" id="Resource_mrain0"]
+script = ExtResource("2_wi7t7")
+zenith = Color(0.07, 0.085, 0.11, 1)
+horizon = Color(0.13, 0.15, 0.18, 1)
+cloud_light = Color(0.12, 0.135, 0.16, 1)
+cloud_dark = Color(0.09, 0.1, 0.125, 1)
+
+[sub_resource type="Resource" id="Resource_mrain1"]
+script = ExtResource("2_wi7t7")
+zenith = Color(0.42, 0.47, 0.55, 1)
+horizon = Color(0.66, 0.68, 0.71, 1)
+cloud_light = Color(0.7, 0.71, 0.73, 1)
+cloud_dark = Color(0.5, 0.52, 0.57, 1)
+
+[sub_resource type="Resource" id="Resource_mrain2"]
+script = ExtResource("2_wi7t7")
+zenith = Color(0.5, 0.57, 0.66, 1)
+horizon = Color(0.78, 0.8, 0.83, 1)
+cloud_light = Color(0.82, 0.83, 0.85, 1)
+cloud_dark = Color(0.6, 0.63, 0.68, 1)
+
+[sub_resource type="Resource" id="Resource_mrain3"]
+script = ExtResource("2_wi7t7")
+zenith = Color(0.3, 0.33, 0.42, 1)
+horizon = Color(0.56, 0.57, 0.62, 1)
+cloud_light = Color(0.58, 0.58, 0.63, 1)
+cloud_dark = Color(0.42, 0.43, 0.5, 1)
+
+[sub_resource type="Resource" id="Resource_mrain"]
+script = ExtResource("1_i1um7")
+id = &"mountain_rain"
+display_name = "Mountain rain"
+keys = Array[ExtResource("2_wi7t7")]([SubResource("Resource_mrain0"), SubResource("Resource_mrain1"), SubResource("Resource_mrain2"), SubResource("Resource_mrain3")])
+cloud_cover = 0.97
+cloud_softness = 0.85
+cloud_speed = 0.012
+world_tint = Color(0.7, 0.76, 0.82, 1)
+sun_strength = 0.35
+fog_begin = 20.0
+fog_end = 125.0
+fog_amount = 1.0
+fog_overrides_zone = true
+fog_shade = 0.66
+fog_night_shade = 1.2
+fog_drift = 0.6
+fog_drift_size = 30.0
+cloud_banks = 0.45
+cloud_banks_height = 5.0
+rain = 0.35
+wind = 0.7
+gusts = 0.3
+
 [resource]
 script = ExtResource("3_xw1r1")
-presets = Array[ExtResource("1_i1um7")]([SubResource("Resource_o5bx5"), SubResource("Resource_x6gkc"), SubResource("Resource_rainy"), SubResource("Resource_lsg6s"), SubResource("Resource_misty"), SubResource("Resource_windy"), SubResource("Resource_fclouds")])
+presets = Array[ExtResource("1_i1um7")]([SubResource("Resource_o5bx5"), SubResource("Resource_x6gkc"), SubResource("Resource_rainy"), SubResource("Resource_lsg6s"), SubResource("Resource_misty"), SubResource("Resource_windy"), SubResource("Resource_fclouds"), SubResource("Resource_mrain")])
