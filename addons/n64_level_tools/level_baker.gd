@@ -614,7 +614,7 @@ static func _add_source(sources: Array[Dictionary], polys: Array[Dictionary], ve
 		polys.append({src = sources.size() - 1, ids = ids, pts = pts, normal = n, visual = visual, collide = collide, lod = lod,
 			colored = colored, corner_colors = corner_colors, key_colors = key_colors,
 			key = ("mat:%d" % material.get_instance_id()) if material else ("tex:%d:%d:%d%s" % [texture, overlay, layer_set, ":cut" if cut else ""]),
-			texture = texture, overlay = overlay, layer_set = layer_set, cutout = cut, exact_uvs = exact_uvs, material = material, masked_face = masked, uv_tweak = tweak, uv_stretch = brush.get_face_uv_stretch(f),
+			texture = texture, overlay = overlay, layer_set = layer_set, cutout = cut, exact_uvs = exact_uvs, material = material, masked_face = masked, uv_tweak = tweak, uv_stretch = brush.get_face_uv_stretch(f) if brush else Vector2.ONE,
 			surface = surfaces[f] if f < surfaces.size() else fixed_surface})
 
 

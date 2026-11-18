@@ -67,7 +67,7 @@ uniform float dissolve_rim = 0.06;
 instance uniform float prim_fog = -1.0;
 // Close-up texture LOD: 0 off, 1 sharpen, 2 detail texture (detail = repeats per albedo
 // repeat, strength).
-uniform int lod_mode : hint_enum("Off", "Sharpen", "Detail") = 0;
+uniform int lod_mode : hint_enum("Off", "Sharpen", "Detail", "Hi-res", "IHQ", "IHQ colour") = 0;
 uniform sampler2D detail_texture : source_color, filter_nearest_mipmap, repeat_enable, hint_default_white;
 uniform vec2 detail = vec2(4.0, 0.0);
 // Swap by distance (SM64's paintings: the mip level picks the picture): swap_texture shows

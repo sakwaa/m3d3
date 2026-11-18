@@ -62,6 +62,8 @@ static func sample(preset: WeatherPreset, schedule: LightingSchedule, hour: floa
 		fog_glow = preset.fog_glow,
 		ground_mist = preset.ground_mist,
 		ground_mist_height = preset.ground_mist_height,
+		cloud_banks = preset.cloud_banks,
+		cloud_banks_height = preset.cloud_banks_height,
 		lightning = 1.0 if preset.lightning else 0.0,
 		sandstorm = preset.sandstorm,
 		sandstorm_haze = 1.0 if preset.sandstorm_haze else 0.0,

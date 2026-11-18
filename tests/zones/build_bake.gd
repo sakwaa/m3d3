@@ -4,7 +4,7 @@ const ExportBake := preload("res://addons/n64_level_tools/export/export_bake.gd"
 ## Runs the Build & Play / export bake (ExportBake: cull, Blender dissolve, relight, bake)
 ## on a copy of a zone and saves the result to OUT (a .res, for LEVEL_OVERRIDE renders);
 ## the zone's own files are never touched. Prints the build's stats.
-##   ZONE=res://...tscn OUT=/abs/path.res [DISSOLVE=0] [STEPS=/abs/steps.txt] [LIGHT_GRID=m] [NO_AO=1] [MERGE=0] godot --path . tests/zones/build_bake.tscn  (a window: the AO bake renders)
+##   ZONE=res://...tscn OUT=/abs/path.res [DISSOLVE=0] [STEPS=/abs/steps.txt] [LIGHT_GRID=m] [NO_AO=1] [MERGE=0] [REPORT=label] godot --path . tests/zones/build_bake.tscn  (a window: the AO bake renders)
 
 
 func _ready() -> void:
@@ -65,6 +65,9 @@ func _ready() -> void:
 			print("unseen: ", st.unseen)
 		if st.has("room_vis"):
 			print("rooms: %s in %d ms" % [st.room_vis, st.room_vis_ms])
+	if OS.get_environment("REPORT") != "":
+		# REPORT=label: the build report (build_reports/<stamp>_<label>/summary.md, report.json).
+		print("report: ", ExportBake.BuildReport.write(out.levels, OS.get_environment("REPORT"), "build_bake"))
 	var root: LevelRoot = scene.find_children("*", "Node3D", true, false).filter(func(n): return n is LevelRoot)[0]
 	var data := root.data
 	var err := ResourceSaver.save(data, OS.get_environment("OUT"), ResourceSaver.FLAG_COMPRESS)

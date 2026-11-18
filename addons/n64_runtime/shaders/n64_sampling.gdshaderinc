@@ -659,6 +659,14 @@ vec4 n64_prim_depth(vec4 clip, vec3 center, float toward, mat4 view, mat4 proj, 
 //  3 Hi-res: `detail` is a higher-resolution copy of this same texture (same UVs): close up,
 //    the base is multiplied by how the copy varies around its own blur at the base's
 //    resolution - the base keeps its colour and grade, the copy adds its finer structure.
+//  4 IHQ (libdragon's trick, after the RDP's detail mode): the base is the colour layer and
+//    `detail` an intensity layer (I4) at a finer resolution, fitted by the converter so that
+//    base x (1 - f) + I x f matches the full-resolution picture (f = strength), mixed on
+//    display values like the RDP. Holds at the texture's normal size too, not only close up;
+//    fades out once the intensity layer itself would be minified.
+//  5 IHQ keeping colour (not something the RDP could do): the intensity layer replaces part of
+//    the base's own brightness instead of fading its colour: base + (I - luma(base)) x f, so
+//    the base's hue and saturation stay whole (its own fitted layer: ihq_detail KEEP=1).
 // `rho`: texel steps per pixel (below 1 = magnified).
 float n64_texel_step(sampler2D t, vec2 uv) {
 	vec2 size = vec2(textureSize(t, 0));
@@ -670,6 +678,17 @@ float n64_texel_step(sampler2D t, vec2 uv) {
 vec4 n64_lod_detail(vec4 base, sampler2D t, vec2 uv, int mode, sampler2D detail, vec2 detail_uv, float strength) {
 	if (mode == 0 || strength <= 0.0) {
 		return base;
+	}
+	if (mode == 4 || mode == 5) {
+		float fade = clamp(2.0 - n64_texel_step(detail, detail_uv), 0.0, 1.0);
+		if (fade <= 0.0) {
+			return base;
+		}
+		float i = n64_enc(n64_sample_level(detail, detail_uv, 0).rgb).r;
+		vec3 b = n64_enc(base.rgb);
+		vec3 c = mode == 4 ? mix(b, vec3(i), strength)
+			: clamp(b + (i - dot(b, vec3(0.299, 0.587, 0.114))) * strength, 0.0, 1.0);
+		return vec4(n64_dec(mix(b, c, fade)), base.a);
 	}
 	float k = clamp(1.0 - n64_texel_step(t, uv), 0.0, 1.0) * strength;
 	if (k <= 0.0) {

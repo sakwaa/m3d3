@@ -58,6 +58,14 @@ signal room_changed(room: Room)
 ## How far round the camera it's drawn (metres across; beyond, the regular fog takes over).
 @export_range(10.0, 120.0, 1.0, "suffix:m") var ground_mist_reach := 60.0
 @export var ground_mist_dither := false
+@export_group("Local weather")
+## Weather this place makes for itself (a forest up in the clouds): on arriving, most days
+## (`local_weather_chance`, rolled per day) the weather turns to it at once, and back to what
+## it was on leaving. Empty = the game's weather as it is.
+@export var local_weather := &""
+@export_range(0.0, 1.0, 0.05) var local_weather_chance := 0.75
+## Cloud banks rolling through (WeatherPreset.cloud_banks): 0..1, or -1 = the weather's.
+@export_range(-1.0, 1.0, 0.05) var cloud_banks := -1.0
 @export_group("Intro")
 ## The first time the player arrives (Majora's Mask style): a camera pan over the area and
 ## its name as a title card. Plays once (its cutscene's "seen" flag).
@@ -82,9 +90,15 @@ var _inside_portals: Array[RoomPortal] = []
 var _held_rooms: Array[Room] = []
 
 
+func _enter_tree() -> void:
+	if not Engine.is_editor_hint():
+		MachineBus.reset()  # (a new zone's machines start from rest)
+
+
 func _ready() -> void:
 	if zone_id == &"":
 		zone_id = StringName(scene_file_path.get_file().get_basename())
+	_apply_local_weather()
 	if display_name.is_empty():
 		display_name = String(zone_id).capitalize()
 	_collect(self)
@@ -115,6 +129,7 @@ func _process(delta: float) -> void:
 	_update_audio(delta)
 	_update_mist(delta)
 	_update_dust(delta)
+	_update_clouds(delta)
 	_update_grass_sim(delta)
 	_update_ripples(delta)
 
@@ -197,6 +212,76 @@ func _update_dust(delta: float) -> void:
 	c.a = 1.0
 	_dust.color = c
 	_dust.amount = _dust_amount
+
+
+# --- Local weather -------------------------------------------------------------------------
+
+var _weather_before := &""
+
+
+## On arriving: this place's own weather most days (rolled by zone and day, so it holds for
+## the day), put back on leaving.
+func _apply_local_weather() -> void:
+	if local_weather == &"" or Engine.is_editor_hint() or DropPortal.is_preview(self):
+		return
+	var roll := float(hash(str(zone_id, ":", GameState.day)) % 1000) / 1000.0
+	if roll < local_weather_chance and GameState.weather != local_weather:
+		_weather_before = GameState.weather
+		GameState.set_weather(local_weather, 0.0)
+
+
+# --- Cloud banks (a GroundMist made tall and white) ------------------------------------------
+
+## Cloud rolling through the trees (WeatherPreset.cloud_banks): the ground mist's columns made
+## tall (cloud_banks_height), big and slow-churning, thick banks passing between thinner
+## cloud, blown along the wind, in the fog's colour. The camera stands inside it.
+var _clouds: GroundMist
+var _clouds_amount := 0.0
+var _clouds_age := 0.0
+
+
+func _update_clouds(delta: float) -> void:
+	var w: Dictionary = GameState.weather_now
+	var want: float = float(w.get("cloud_banks", 0.0)) if _sky() != null else 0.0
+	if cloud_banks >= 0.0:
+		want = cloud_banks
+	if current_room and current_room.ground_mist >= 0.0:
+		want = 0.0  # (rooms with their own mist are indoors / sheltered)
+	_clouds_age += delta
+	_clouds_amount = want if _clouds_age < 0.5 else move_toward(_clouds_amount, want, delta / 4.0)
+	if _clouds == null:
+		if _clouds_amount <= 0.001:
+			return
+		_clouds = GroundMist.new()
+		_clouds.name = "Clouds"
+		_clouds.simulate = false
+		_clouds.layer_count = 8
+		_clouds.patch = 110.0
+		_clouds.spacing = 4.0
+		_clouds.cloud_size = 70.0
+		_clouds.churn = 0.9
+		_clouds.density = 0.5
+		_clouds.thickness = 0.05
+		_clouds.top_light = 0.4
+		_clouds.near_clear = 8.0
+		_clouds.open = true
+		# (banks ~60 m across passing through every so often, thin cloud between)
+		_clouds.bunch_size = 260.0
+		_clouds.bunch_range = Vector2(0.4, 0.75)
+		_clouds.bunch_floor = 0.2
+		_clouds.bunch_peak = 2.6
+		add_child(_clouds, false, INTERNAL_MODE_BACK)
+	_clouds.height = float(w.get("cloud_banks_height", 14.0))
+	var c: Color = n64_fog_colour_now()
+	c.a = 1.0
+	_clouds.color = c
+	_clouds.amount = _clouds_amount
+
+
+## The fog colour on screen now (the clouds take it, so they melt into the distance).
+func n64_fog_colour_now() -> Color:
+	var f := fog_target()
+	return f.get("color", Color(0.8, 0.82, 0.85)) as Color
 
 
 # --- Grass wading (GroundSim) --------------------------------------------------------------
@@ -693,6 +778,8 @@ func _sky() -> DynamicSky:
 
 
 func _exit_tree() -> void:
+	if _weather_before != &"" and GameState.weather == local_weather:
+		GameState.set_weather(_weather_before, 0.0)
 	if distortion != ScreenDistortion.Kind.NONE and not DropPortal.is_preview(self):
 		ScreenDistortion.release(distortion)
 	# The camera (the player's) outlives the zone: give it back its own draw distance.

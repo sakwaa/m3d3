@@ -248,6 +248,11 @@ func _build_machines() -> void:
 	push.name = "Push"
 	push.animation = &"Idle"
 	push.restrict = {&"Action": PackedStringArray(["Ready"])}
+	# Capstans: hold Grab beside a spoke, the stick pushes it round (or pulls it back).
+	var capstan := LocoCapstan.new()
+	capstan.name = "Capstan"
+	capstan.animation = &"Idle"
+	capstan.restrict = {&"Action": PackedStringArray(["Ready"])}
 	# Limbs come from the ClimbRig; the body holds a neutral pose under them.
 	for s in [climb, hang, ceiling, leap, ladder]:
 		s.animation = &"Idle"
@@ -258,11 +263,13 @@ func _build_machines() -> void:
 		s.climb_state = &"Climb"
 	for s in [idle, walk, run] + strafes:
 		s.push_state = &"Push"
+		s.capstan_state = &"Capstan"
 	for s in [idle, walk, run, jump, fall, land] + strafes:
 		loco.add_child(s)
 	for s in climbing:
 		loco.add_child(s)
 	loco.add_child(push)
+	loco.add_child(capstan)
 	add_machine(loco)
 
 	var action := StateMachine.new()
@@ -536,6 +543,7 @@ func _process(delta: float) -> void:
 		_turn_camera(delta)
 	var p := get_global_transform_interpolated().origin
 	RenderingServer.global_shader_parameter_set(&"n64_bender0", Vector4(p.x, p.y, p.z, 0.9))
+	WorldVines.bender = Vector4(p.x, p.y, p.z, 0.4)  # (hanging vines part round the body)
 
 
 func drive(delta: float) -> void:

@@ -4,3 +4,7 @@
 
 [resource]
 script = ExtResource("1")
+
+defocus = 0.4
+focus_near = 20.0
+focus_far = 100.0

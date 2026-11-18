@@ -1,7 +1,8 @@
 extends Node3D
 ## Renders a zone from a set camera (to compare with its reference photo) and quits.
 ##   ZONE=res://... CAM=x,y,z LOOK=x,y,z [FOV=50] [HOUR=15] [NOFOG=1] [PLAYER=x,y,z[,yaw]]
-##   [WEATHER=rainy] [RAIN_OLD=1] [GRADE=1: tests/zones/grade.gd] [WIRE=1: wireframe] [NOAO=1] OUT=dir godot --path . --resolution 1280x960 tests/zones/shot.tscn
+##   [MACHINE=1: Permivor machines start fully run (capstans turned, gates open, water full,
+##   wheels running, doors moved)] [WEATHER=rainy] [RAIN_OLD=1] [GRADE=1: tests/zones/grade.gd] [WIRE=1: wireframe] [NOAO=1] OUT=dir godot --path . --resolution 1280x960 tests/zones/shot.tscn
 
 var _frames := 0
 
@@ -143,6 +144,8 @@ func _vec(s: String) -> Vector3:
 
 func _process(_delta: float) -> void:
 	_frames += 1
+	if _frames == 3 and OS.get_environment("MACHINE") != "":
+		_machines_run()
 	if _frames == 2:
 		if OS.get_environment("LOOK_SUN") != "":
 			# LOOK_SUN=yaw_deg[,pitch_deg]: the camera turned towards the sun, then off by these.
@@ -700,3 +703,23 @@ func _lifted(mesh: ArrayMesh, _lr: Node) -> ArrayMesh:
 		m.set_shader_parameter(&"decal_depth", 0.0)
 		out.surface_set_material(i, m)
 	return out
+
+
+## MACHINE=1: every machine part put in its fully-run state.
+func _machines_run() -> void:
+	var r := get_tree().root
+	for c: Capstan in r.find_children("*", "Capstan", true, false):
+		c.angle = c.turns * 360.0
+		c._target = c.angle
+	for g: ScrewGate in r.find_children("*", "ScrewGate", true, false):
+		g.open = 1.0
+		g._place()
+	for w: MachineWater in r.find_children("*", "MachineWater", true, false):
+		w.full = 1.0
+		w._place()
+	for n: Noria in r.find_children("*", "Noria", true, false):
+		n.running = 1.0
+	for d: MachineDoor in r.find_children("*", "MachineDoor", true, false):
+		d.moved = 1.0
+		d._done = true
+		d._body.position = d.move

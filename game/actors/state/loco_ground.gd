@@ -20,6 +20,8 @@ extends ActorState
 @export var climb_state: StringName
 ## Holding Grab facing a PushBlock's face takes hold of it (a LocoPush state; empty = can't).
 @export var push_state: StringName
+## Holding Grab beside a Capstan's spoke takes hold of it (a LocoCapstan state; empty = can't).
+@export var capstan_state: StringName
 ## Seconds off the floor before falling (walking off ledges; small bumps don't count).
 @export var coyote_time := 0.12
 @export_group("Z-targeting")
@@ -53,6 +55,10 @@ func update(delta: float) -> void:
 	if push_state != &"" and actor.intent.held(&"grab"):
 		var push := machine.states.get(push_state) as LocoPush
 		if push and push.try_grab():
+			return
+	if capstan_state != &"" and actor.intent.held(&"grab"):
+		var cap := machine.states.get(capstan_state) as LocoCapstan
+		if cap and cap.try_grab():
 			return
 	if climb_state != &"" and actor.intent.move.length() > 0.3:
 		var climb := machine.states.get(climb_state) as LocoClimb

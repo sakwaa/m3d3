@@ -16,8 +16,15 @@ var a: WorldVines
 var b: WorldVines
 
 
+## WIRE=1: each shot also saved as wireframe (<name>_wire.png), to overlay the triangles.
+var wire := false
+
+
 func _ready() -> void:
 	out = OS.get_environment("OUT")
+	wire = OS.get_environment("WIRE") != ""
+	if wire:
+		RenderingServer.set_debug_generate_wireframes(true)  # (before any mesh is made)
 	var env := WorldEnvironment.new()
 	env.environment = Environment.new()
 	env.environment.background_mode = Environment.BG_COLOR
@@ -53,6 +60,19 @@ func _ready() -> void:
 			v.open_back = false
 			v.stem_bend = 0.0
 			v.leaf_triangles = false
+			v.ground_tent = false
+			v.flat_under = false
+	# FLAT=0: no base fill (every vine 3D); FILL=x: fill_share.
+	if OS.get_environment("FLAT") == "0":
+		for v in [a, b]:
+			v.flat_under = false
+	if OS.get_environment("FILL") != "":
+		for v in [a, b]:
+			v.fill_share = float(OS.get_environment("FILL"))
+	# TENT=0: the flat-back stems on the ground too (to compare with the tents).
+	if OS.get_environment("TENT") == "0":
+		for v in [a, b]:
+			v.ground_tent = false
 	cam = Camera3D.new()
 	cam.fov = 50
 	add_child(cam)
@@ -99,6 +119,8 @@ func _run() -> void:
 	await _shot("full_b", Vector3(-1, 2.2, 4.5), Vector3(-4.5, 1.0, -2))
 	await _shot("full_c", Vector3(3.5, 1.6, 3.8), Vector3(0, 0.8, 0))
 	await _shot("wall_end", Vector3(-3.2, 1.6, 3.0), Vector3(-5.8, 1.2, 0.0))
+	await _shot("close_b", Vector3(-4.3, 0.9, -5.2), Vector3(-5.7, 0.5, -6.6))
+	await _shot("close_floor", Vector3(-2.2, 1.1, 1.6), Vector3(-2.6, 0.0, -0.4))
 	for k in [0.25, 0.5, 0.75]:
 		a.grown = k
 		b.grown = k
@@ -139,6 +161,13 @@ func _shot(name: String, from: Vector3, at: Vector3) -> void:
 		return
 	await RenderingServer.frame_post_draw
 	get_viewport().get_texture().get_image().save_png(out + "/" + name + ".png")
+	if wire:
+		get_viewport().debug_draw = Viewport.DEBUG_DRAW_WIREFRAME
+		for i in 3:
+			await get_tree().process_frame
+		await RenderingServer.frame_post_draw
+		get_viewport().get_texture().get_image().save_png(out + "/" + name + "_wire.png")
+		get_viewport().debug_draw = Viewport.DEBUG_DRAW_DISABLED
 
 
 func _mat(tex: String, color: Color, uv: Vector2) -> ShaderMaterial:

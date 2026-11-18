@@ -50,6 +50,11 @@ extends Resource
 ## (0 none .. 1 full) and how high it reaches. Zones and rooms can override it.
 @export_range(0.0, 1.0, 0.05) var ground_mist := 0.0
 @export_range(0.1, 2.0, 0.05, "suffix:m") var ground_mist_height := 0.7
+## Cloud banks rolling through (a forest on a mountainside in cloud): tall drifting banks of
+## cloud following the ground, blown along the wind, thick and thin by turns (0 none .. 1
+## full) and how high they reach above the ground. Zones can override (Zone.cloud_banks).
+@export_range(0.0, 1.0, 0.05) var cloud_banks := 0.0
+@export_range(2.0, 18.0, 0.5, "suffix:m") var cloud_banks_height := 14.0
 ## Screen look while this weather lasts outdoors (over the zone's; a room's wins).
 @export var screen_look: ScreenLook
 @export_group("Effects")

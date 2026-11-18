@@ -355,7 +355,7 @@ static func add_far(by_cell: Dictionary, sources: Array[Dictionary], data: Level
 		var tex := ImageTexture.create_from_image(flat)
 		var mat := PaintAtlas.make_material(tex, data, masks, 0, false)
 		mat.set_shader_parameter(&"base_tile", cell_size.x)
-		mat.set_shader_parameter(&"base_var", 0.0)
+		mat.set_shader_parameter(&"base_var", Vector3(0.0, 8.0, 0.0))  # (variation off; a vec3 uniform)
 		mat.set_shader_parameter(&"base_anti", Vector2.ZERO)
 		materials[key] = mat
 	if painter:

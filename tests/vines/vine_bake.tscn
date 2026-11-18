@@ -1,0 +1,6 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://tests/vines/vine_bake.gd" id="1"]
+
+[node name="VineBake" type="Node3D"]
+script = ExtResource("1")

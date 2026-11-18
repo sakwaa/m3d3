@@ -33,8 +33,13 @@ extends ImageTexture
 ## edges crisp instead of blurring; Detail blends `detail_texture` in, repeated
 ## `detail_repeats` times per repeat of this one (Hyrule Field's ground grain); Hi-res:
 ## `detail_texture` is a higher-resolution copy of this texture (detail_repeats 1), its finer
-## structure added close up while this one's colour stays (tests/tools/hires_detail.tscn).
-@export_enum("Off", "Sharpen", "Detail", "Hi-res") var lod_mode := 0
+## structure added close up while this one's colour stays (tests/tools/hires_detail.tscn);
+## IHQ (libdragon's trick): `detail_texture` is a fitted intensity layer (I4) at twice the
+## resolution, mixed in by `detail_strength` (the fitted factor) - this texture's colour plus
+## the fine layer's shading make the full-res picture, at about a quarter of an RGBA16 copy's
+## size (tests/tools/ihq_detail.tscn); IHQ colour: the same, but the layer replaces part of
+## this texture's brightness instead of fading its colour (hue and saturation kept; KEEP=1).
+@export_enum("Off", "Sharpen", "Detail", "Hi-res", "IHQ", "IHQ colour") var lod_mode := 0
 @export var detail_texture: Texture2D
 @export_range(1.0, 16.0, 0.5) var detail_repeats := 4.0
 @export_range(0.0, 1.0, 0.05) var detail_strength := 0.6

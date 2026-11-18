@@ -244,6 +244,57 @@ gusts = 0.8
 dust = 0.5
 dust_far = 0.6
 
+[sub_resource type="Resource" id="Resource_fclouds0"]
+script = ExtResource("2_wi7t7")
+zenith = Color(0.1, 0.115, 0.14, 1)
+horizon = Color(0.17, 0.19, 0.22, 1)
+cloud_light = Color(0.15, 0.165, 0.19, 1)
+cloud_dark = Color(0.12, 0.13, 0.155, 1)
+
+[sub_resource type="Resource" id="Resource_fclouds1"]
+script = ExtResource("2_wi7t7")
+zenith = Color(0.6, 0.62, 0.66, 1)
+horizon = Color(0.78, 0.77, 0.76, 1)
+cloud_light = Color(0.8, 0.79, 0.78, 1)
+cloud_dark = Color(0.7, 0.7, 0.71, 1)
+
+[sub_resource type="Resource" id="Resource_fclouds2"]
+script = ExtResource("2_wi7t7")
+zenith = Color(0.74, 0.77, 0.8, 1)
+horizon = Color(0.88, 0.89, 0.9, 1)
+cloud_light = Color(0.9, 0.91, 0.92, 1)
+cloud_dark = Color(0.8, 0.82, 0.84, 1)
+
+[sub_resource type="Resource" id="Resource_fclouds3"]
+script = ExtResource("2_wi7t7")
+zenith = Color(0.46, 0.48, 0.55, 1)
+horizon = Color(0.66, 0.66, 0.7, 1)
+cloud_light = Color(0.68, 0.68, 0.72, 1)
+cloud_dark = Color(0.58, 0.59, 0.64, 1)
+
+[sub_resource type="Resource" id="Resource_fclouds"]
+script = ExtResource("1_i1um7")
+id = &"forest_clouds"
+display_name = "Forest clouds"
+keys = Array[ExtResource("2_wi7t7")]([SubResource("Resource_fclouds0"), SubResource("Resource_fclouds1"), SubResource("Resource_fclouds2"), SubResource("Resource_fclouds3")])
+cloud_cover = 0.95
+cloud_softness = 0.8
+cloud_speed = 0.01
+world_tint = Color(0.82, 0.86, 0.9, 1)
+sun_strength = 0.5
+fog_begin = 28.0
+fog_end = 180.0
+fog_amount = 0.72
+fog_overrides_zone = true
+fog_shade = 0.9
+fog_night_shade = 1.2
+fog_drift = 0.55
+fog_drift_size = 34.0
+cloud_banks = 1.0
+cloud_banks_height = 14.0
+wind = 0.9
+gusts = 0.4
+
 [resource]
 script = ExtResource("3_xw1r1")
-presets = Array[ExtResource("1_i1um7")]([SubResource("Resource_o5bx5"), SubResource("Resource_x6gkc"), SubResource("Resource_rainy"), SubResource("Resource_lsg6s"), SubResource("Resource_misty"), SubResource("Resource_windy")])
+presets = Array[ExtResource("1_i1um7")]([SubResource("Resource_o5bx5"), SubResource("Resource_x6gkc"), SubResource("Resource_rainy"), SubResource("Resource_lsg6s"), SubResource("Resource_misty"), SubResource("Resource_windy"), SubResource("Resource_fclouds")])

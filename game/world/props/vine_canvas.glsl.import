@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://dvyv74app82tv"
+path="res://.godot/imported/vine_canvas.glsl-95f950d5053869ebdd9ba1e931647d80.res"
+
+[deps]
+
+source_file="res://game/world/props/vine_canvas.glsl"
+dest_files=["res://.godot/imported/vine_canvas.glsl-95f950d5053869ebdd9ba1e931647d80.res"]
+
+[params]
+

@@ -34,7 +34,7 @@ uniform float base_tile = 1.0;
 uniform float decal_depth = 0.0;
 // The base texture's tile wrap per axis (the RDP's): 0 wrap, 1 mirror, 2 clamp.
 uniform ivec2 base_wrap = ivec2(0);
-// Close-up texture LOD (N64Texture lod_mode): 0 off, 1 sharpen, 2 detail texture; base_detail
+// Close-up texture LOD (N64Texture lod_mode): 0 off, 1 sharpen, 2 detail texture, 3 hi-res, 4 IHQ; base_detail
 // = (detail repeats per base repeat, strength).
 uniform int base_lod_mode = 0;
 // Palette texture (N64PaletteSwap): base_tex holds the shared indices, this row of

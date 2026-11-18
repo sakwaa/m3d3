@@ -4,6 +4,10 @@ usual texture import (category plants):
   vine_leaf.png       one pointed oval leaf on a short stalk (stalk at the bottom middle)
   vine_leaf_heart.png one heart-shaped leaf, same layout
   vine_stem.png       twisted rope-like stem bark, tiling both ways (u round, v along)
+  vine_sprig.png      three leaves fanned out on stalks from one point (bottom middle): one
+                      triangle (apex at the stalks) carries all three
+  vine_card.png       a whole vine seen from above, tiling along its length (v): the stem
+                      down the middle, leaves alternating either side (one strip = stem + leaves)
 Run: tools/anim_ref/.venv-pose/bin/python -I tools/vine_leaves/make_vine_textures.py [OUT_DIR]
 Not shipped (tools/ is export-excluded); the imported textures are.
 """
@@ -106,8 +110,71 @@ def stem(size=(32, 32)):
 	return im
 
 
+def draw_leaf(d, base, length, angle_deg, wrap_h=0, shape="oval"):
+	"""A leaf drawn straight onto `d`: stalk end at `base`, `length` px (at SS) long, turned
+	`angle_deg` from pointing up (+ = clockwise). Shaded like leaf(): the left half lighter,
+	a bright patch, a dark midrib. wrap_h: drawn again a canvas height above and below."""
+	unit = leaf_outline(1.0, 1.0, shape)  # (in a unit box: base at (0.5, 0.86), tip at (0.5, 0.04))
+	a = math.radians(angle_deg)
+	ca, sa = math.cos(a), math.sin(a)
+	def tf(x, y):
+		# unit box -> leaf space (base at origin, up = -y), scaled, turned, moved
+		lx, ly = (x - 0.5) * length / 0.82, (y - 0.86) * length / 0.82
+		return (base[0] + lx * ca - ly * sa, base[1] + lx * sa + ly * ca)
+	for dy in ([0] if not wrap_h else [-wrap_h, 0, wrap_h]):
+		pts = [(x, y + dy) for x, y in (tf(*q) for q in unit)]
+		d.polygon(pts, fill=GREENS[1] + (255,))
+		left = [tf(x, y) for x, y in unit if x <= 0.501]
+		d.polygon([(x, y + dy) for x, y in left] + [(tf(0.5, 0.86)[0], tf(0.5, 0.86)[1] + dy)], fill=GREENS[3] + (255,))
+		inner = [tf(0.5 + (x - 0.5) * 0.55, 0.45 + (y - 0.45) * 0.7) for x, y in unit if x <= 0.501]
+		d.polygon([(x, y + dy) for x, y in inner] + [(tf(0.5, 0.7)[0], tf(0.5, 0.7)[1] + dy)], fill=GREENS[4] + (255,))
+		b0, b1 = tf(0.5, 0.86), tf(0.5, 0.14)
+		d.line([(b0[0], b0[1] + dy), (b1[0], b1[1] + dy)], fill=GREENS[0] + (255,), width=max(SS // 2, 2))
+
+
+def sprig(size=(64, 64)):
+	"""Three leaves fanned from a point at the bottom middle, on short stalks."""
+	w, h = size[0] * SS, size[1] * SS
+	im = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+	d = ImageDraw.Draw(im)
+	root = (w * 0.5, h * 0.97)
+	for ang, ln, st in [(-34, 0.42, 0.16), (34, 0.42, 0.16), (0, 0.52, 0.12)]:
+		a = math.radians(ang)
+		b = (root[0] + math.sin(a) * h * st, root[1] - math.cos(a) * h * st)
+		d.line([root, b], fill=GREENS[0] + (255,), width=int(SS * 1.6))
+		draw_leaf(d, b, h * ln, ang)
+	return im
+
+
+def card(size=(64, 64)):
+	"""A vine from above, tiling along v: stem down the middle, leaves either side."""
+	w, h = size[0] * SS, size[1] * SS
+	im = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+	d = ImageDraw.Draw(im)
+	browns = [(42, 40, 24), (58, 58, 32), (78, 80, 42), (98, 104, 54), (120, 126, 68)]
+	sw = w * 0.12  # stem width
+	x0, x1 = w * 0.5 - sw / 2, w * 0.5 + sw / 2
+	# Leaves first (the stem over their stalks): six a tile, alternating, out and forwards.
+	n = 4
+	for i in range(n):
+		side = -1 if i % 2 == 0 else 1
+		y = (i + 0.5) * h / n
+		ln = w * (0.44 if i % 2 == 0 else 0.4)
+		draw_leaf(d, (w * 0.5 + side * sw * 0.3, y), ln, side * (50 + 12 * ((i * 7) % 3)), wrap_h=h)
+	d.rectangle([x0, 0, x1, h], fill=browns[2] + (255,))
+	turns = 5
+	for k in range(turns + 1):
+		y = k * h / turns
+		d.line([(x0, y), (x1, y - h / turns * 0.6)], fill=browns[4] + (255,), width=int(SS * 1.2))
+		d.line([(x0, y + h / turns * 0.45), (x1, y - h / turns * 0.15)], fill=browns[0] + (255,), width=int(SS * 1.2))
+	d.line([(x0, 0), (x0, h)], fill=browns[0] + (255,), width=SS)
+	return im
+
+
 if __name__ == "__main__":
 	os.makedirs(OUT, exist_ok=True)
 	finish(leaf("oval"), (32, 32), os.path.join(OUT, "vine_leaf.png"))
 	finish(leaf("heart"), (32, 32), os.path.join(OUT, "vine_leaf_heart.png"))
 	finish(stem(), (32, 32), os.path.join(OUT, "vine_stem.png"), cutout=False)
+	finish(sprig(), (64, 64), os.path.join(OUT, "vine_sprig.png"))
+	finish(card(), (64, 64), os.path.join(OUT, "vine_card.png"))
